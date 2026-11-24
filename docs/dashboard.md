@@ -33,7 +33,7 @@ server uses only what Node ships (`node:http`, `node:sqlite`, `node:child_proces
 | Current training / evaluation status | the lamp in the header and the sentence under the run's name |
 
 - **Score** everywhere is KOs plus the overtime bonus when it was cashed: what the ranking counts and what a model
-  is promoted on (docs/training.md §5). A run ended for standing still (no KO and no movement for 30 game seconds)
+  is promoted on (docs/training.md §5). A run ended for going 30 game seconds without a KO (docs/training.md §3, "Standing still")
   is invalid and scores 0; the Overview and every evaluation count them.
 - **The run's route** (Overview) draws the run as a track: every checkpoint a stop, evaluations pinned above the
   stop they were made at (median score, coloured by verdict), registered models named below. A stop can be selected
@@ -89,8 +89,14 @@ registers, promotes or rolls back.
   has learned so far, watch its newest checkpoint.
 - **Recorded** means: played again. An episode of an evaluation is watched from its own model file and seed, with the
   most probable action, which gives the same episode (docs/training.md §5); the page compares KOs and game time
-  with the stored row when it ends. Nothing is recorded to disk. Scripted baselines and training episodes cannot be
-  watched again (no model file belongs to them; their dialog answers, when stored, are on the episode's page).
+  with the stored row when it ends. Nothing is recorded to disk.
+- **The button on an episode's page** starts the game and opens this view in one press. For an evaluation's episode
+  it is the replay above ("Watch the replay"). A **training episode** was not recorded move by move, and its model
+  changed while it was played: "Watch this seed again" plays its seed with the checkpoint its run had when the
+  episode ended (the newest one saved before that; the run's first when none was), with sampled actions as in
+  training. The same map and start, the same model, other dice: not the same run, and both pages say so. An exact
+  replay of a training episode would need the trainer to store every action (about 9 bytes per decision); it does
+  not. A scripted baseline cannot be watched again yet: the watcher plays stored models only.
 - The view does not change the episode: a test plays the same seed and actions with and without it.
 
 ## 3. The stable model cannot be damaged from here

@@ -167,7 +167,7 @@ def play_seeds(model, *, layouts, env_options: dict[str, Any], scenario: dict[st
                         still.append(s)
                     continue
                 episode = s.frame.header.get("episode")
-                s.tracker.step(s.frame.header["c"], episode, s.frame.header.get("ot"), bool(s.frame.header.get("sw")))
+                s.tracker.step(s.frame.header["c"], episode, s.frame.header.get("ot"), bool(s.frame.header.get("sw")), bool(s.frame.header.get("rf")))
                 if episode is None:
                     still.append(s)
                     continue

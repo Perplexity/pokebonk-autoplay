@@ -67,7 +67,7 @@ export const px = (n: number): number => Math.round(n * 10) / 10;
 
 export const REWARD_NAMES: Record<string, string> = {
   ko: 'KOs', overtime: 'Overtime bonus', overtime_void: 'Lost overtime', guardian: 'Guardians beaten', zone: 'Zones entered', legendary: 'Legendary beaten', death: 'Fainting',
-  map_use: 'Using the map', shop_sale: 'Selling in the shop', idle: 'Standing still', point_use: 'Map points used', item: 'Items collected', spend: 'Pokédollars spent', earn: 'Pokédollars earned',
+  map_use: 'Using the map', shop_sale: 'Selling in the shop', idle: 'Going without a KO', point_use: 'Map points used', item: 'Items collected', spend: 'Pokédollars spent', earn: 'Pokédollars earned', rift: 'Rifts completed (by speed)',
 };
 
 export const KIND_NAMES: Record<string, string> = {

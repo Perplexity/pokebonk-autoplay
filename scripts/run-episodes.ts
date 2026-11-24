@@ -14,6 +14,7 @@
  *   --workers=K (default 1)            --species=<dex>  --map=<id>  --tier=0..2  --classic
  *   --max-time=<game seconds, 0 = none>   --action-repeat=3   --hz=60
  *   --max-idle=<game seconds>          end an episode as invalid after this long without a KO and without movement
+ *   --max-ko-gap=<game seconds>        end an episode as invalid after this long without a KO (boss fights do not count)
  *                                      (default: no such rule; training and evaluation use 30)
  *   --recycle-after=8                  episodes per worker process before it is replaced by a fresh one (memory growth).
  *                                      1 = every episode in a fresh process (loads the game once per episode)
@@ -39,7 +40,7 @@ import { DEFAULT_DATABASE, EpisodeStore } from '../src/storage/database.ts';
 import type { EpisodeRecord } from '../src/storage/records.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const KNOWN = new Set(['policy', 'episodes', 'seed', 'seeds', 'workers', 'species', 'map', 'tier', 'classic', 'max-time', 'max-idle', 'action-repeat', 'hz', 'recycle-after', 'recycle-rss', 'episode-timeout', 'db', 'no-db', 'jsonl', 'out', 'label', 'quiet', 'policy-options']);
+const KNOWN = new Set(['policy', 'episodes', 'seed', 'seeds', 'workers', 'species', 'map', 'tier', 'classic', 'max-time', 'max-idle', 'max-ko-gap', 'action-repeat', 'hz', 'recycle-after', 'recycle-rss', 'episode-timeout', 'db', 'no-db', 'jsonl', 'out', 'label', 'quiet', 'policy-options']);
 const args = new Map<string, string>();
 const say = (s = '') => process.stdout.write(s + '\n');
 const usage = (msg: string): never => { process.stderr.write(`run-episodes: ${msg}\n`); process.exit(2); };
@@ -60,7 +61,7 @@ const config: BatchConfig = {
   policy: args.get('policy') ?? DEFAULT_BATCH.policy, episodes: num('episodes', 1), seed: num('seed', 1), workers: num('workers', 1),
   ...(args.has('seeds') ? { seeds: args.get('seeds')!.split(',').map(Number) } : {}),
   species: num('species', DEFAULT_BATCH.species), map: args.get('map') ?? DEFAULT_BATCH.map, tier: num('tier', DEFAULT_BATCH.tier), ranked: !args.has('classic'),
-  maxGameTime: num('max-time', 0), ...(args.has('max-idle') ? { maxIdleGameTime: num('max-idle', 0) } : {}), hz: num('hz', 60), actionRepeat: num('action-repeat', 3),
+  maxGameTime: num('max-time', 0), ...(args.has('max-idle') ? { maxIdleGameTime: num('max-idle', 0) } : {}), ...(args.has('max-ko-gap') ? { maxKoGapGameTime: num('max-ko-gap', 0) } : {}), hz: num('hz', 60), actionRepeat: num('action-repeat', 3),
   recycleAfter: num('recycle-after', DEFAULT_BATCH.recycleAfter), recycleRssMB: num('recycle-rss', DEFAULT_BATCH.recycleRssMB), episodeTimeoutSec: num('episode-timeout', DEFAULT_BATCH.episodeTimeoutSec),
   label: args.get('label') ?? null,
   ...(args.has('policy-options') ? { policyOptions: JSON.parse(args.get('policy-options')!) as Record<string, unknown> } : {}),

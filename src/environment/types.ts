@@ -255,6 +255,17 @@ export interface GameEnvironmentOptions {
   maxIdleGameTime?: number;
   /** What counts as having moved, for `maxIdleGameTime`: leaving a circle of this radius (metres). Default 3. */
   idleRadius?: number;
+  /**
+   * The same rule read strictly (the owner, 2026-11-24: "in a real run, you'd be getting KOs extremely often"): an
+   * episode in which no KO was made for this many seconds of the run clock ends there as `truncated` with the end
+   * cause `idle: no KO for … s of game time`, whether the player moved or not. The time a guardian or the legendary
+   * is alive does not count: a boss fight is one long KO. Time inside a rift does not count either, for this rule and for
+   * `maxIdleGameTime` (the owner: "We should allow rifts infinite time"; the reward pays a rift by how quickly it is done). In the sanctuary outside Overtime, where nothing spawns, the
+   * allowance is four times as long (the walk to the shrine, the rest before Overtime). Measured on 32 baseline episodes: outside boss fights and
+   * rifts the longest stretch without a KO was 16 s; inside a rift, where the zone clock stands still and nothing
+   * comes unless a wave is called, up to 800 s. Default 0: no such rule.
+   */
+  maxKoGapGameTime?: number;
   /** Defaults for `reset()`. */
   species?: number;
   map?: string;

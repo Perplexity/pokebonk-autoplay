@@ -134,7 +134,10 @@ export function findHuntSpecies(loaded: string[]): number[] {
   return found[0];
 }
 
-type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; dataDir?: string; apiTarget?: string; encode: boolean };
+/** `maxKoGapGameTime` in the sanctuary outside Overtime: this many times the allowance (see koGapTooLong). */
+const SANCTUARY_KO_GAP_FACTOR = 4;
+
+type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; dataDir?: string; apiTarget?: string; encode: boolean };
 
 export class HeadlessGameEnvironment implements GameEnvironment {
   readonly options: Resolved;
@@ -165,18 +168,22 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   private previousPlay: PlayAction | null = null;
   /** The last sign of activity, for `maxIdleGameTime`: the run clock, the KOs and the place at that moment. */
   private activity = { time: 0, kills: 0, x: 0, z: 0 };
+  /** The last KO (or the last moment a boss was alive), for `maxKoGapGameTime`: the run clock and the KOs then. */
+  private lastKo = { time: 0, kills: 0, overtime: false };
+  private koGapAllowance = 0;
   /** Wall-clock cost of the last boot and reset, for measurements. */
   readonly timing = { bootMs: 0, resetMs: 0, lastResetMs: 0, resets: 0, lastReset: { closeMs: 0, accountMs: 0, startMs: 0 } };
 
   constructor(options: GameEnvironmentOptions = {}) {
     this.options = {
       hz: options.hz ?? 60, actionRepeat: options.actionRepeat ?? 3, invalidAction: options.invalidAction ?? 'throw',
-      maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
+      maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, maxKoGapGameTime: options.maxKoGapGameTime ?? 0, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
       ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
       encode: !!options.encode,
     };
     if (!Number.isInteger(this.options.actionRepeat) || this.options.actionRepeat < 1) throw new Error('actionRepeat must be a positive integer');
     if (!(this.options.maxIdleGameTime >= 0) || !(this.options.idleRadius > 0)) throw new Error('maxIdleGameTime must be 0 (no rule) or a positive number of game seconds, and idleRadius a positive number of metres');
+    if (!(this.options.maxKoGapGameTime >= 0)) throw new Error('maxKoGapGameTime must be 0 (no rule) or a positive number of game seconds');
     if (this.options.invalidAction !== 'throw' && this.options.invalidAction !== 'penalty') throw new Error('invalidAction must be "throw" or "penalty"');
   }
 
@@ -381,6 +388,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     this.held.clear();
     this.previousPlay = null;
     this.activity = { time: 0, kills: 0, x: Number(run.player?.pos?.x) || 0, z: Number(run.player?.pos?.z) || 0 };
+    this.lastKo = { time: 0, kills: 0, overtime: false };
     this.pointsUsed = {};
     this.pointsSeen = new WeakSet();
     this.pointsCounted = new WeakSet();
@@ -529,11 +537,33 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (!(this.options.maxIdleGameTime > 0)) return false;
     const run = this.run, a = this.activity, kills = run.stats?.kills | 0;
     const x = Number(run.player?.pos?.x) || 0, z = Number(run.player?.pos?.z) || 0;
-    if (kills !== a.kills || Math.hypot(x - a.x, z - a.z) > this.options.idleRadius) {
+    // Inside a rift neither rule runs (the owner, 2026-11-24: "We should allow rifts infinite time").
+    if (kills !== a.kills || Math.hypot(x - a.x, z - a.z) > this.options.idleRadius || run.rifts?.isInside) {
       this.activity = { time: run.time, kills, x, z };
       return false;
     }
     return run.time - a.time >= this.options.maxIdleGameTime;
+  }
+
+  /**
+   * The rule against going without a KO (`maxKoGapGameTime`). A KO moves the mark, and so does every moment a
+   * guardian or the legendary is alive, and every moment inside a rift. Reads the run clock, the KO count,
+   * `boss.alive`, `rifts.isInside`, `sanctuary` and `overtime.live`; writes nothing.
+   */
+  private koGapTooLong(): boolean {
+    if (!(this.options.maxKoGapGameTime > 0)) return false;
+    const run = this.run, kills = run.stats?.kills | 0;
+    // Overtime going live is a new stretch as well: the rest before it was measured against the sanctuary's allowance.
+    const overtime = !!run.overtime?.live;
+    if (kills !== this.lastKo.kills || run.boss?.alive || overtime !== this.lastKo.overtime || run.rifts?.isInside) {
+      this.lastKo = { time: run.time, kills, overtime };
+      return false;
+    }
+    // The sanctuary has no wild Pokémon at all: the walk to the shrine and the rest before Overtime (45 s at most in
+    // the heuristic baseline) are stretches without a KO in every complete run. Four times the allowance there.
+    const allowance = this.options.maxKoGapGameTime * (run.sanctuary && !run.overtime?.live ? SANCTUARY_KO_GAP_FACTOR : 1);
+    this.koGapAllowance = allowance;
+    return run.time - this.lastKo.time >= allowance;
   }
 
   /** Fail loudly on anything the environment has no rule for. */
@@ -674,6 +704,12 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       this.episode.truncated = true;
       this.episode.done = true;
       this.episode.endCause = `idle: no KO and no movement for ${this.options.maxIdleGameTime} s of game time`;
+      this.releaseAll();
+    } else if (this.koGapTooLong()) {
+      truncated = true;
+      this.episode.truncated = true;
+      this.episode.done = true;
+      this.episode.endCause = `idle: no KO for ${this.koGapAllowance} s of game time`;
       this.releaseAll();
     }
     const observation = this.observe();

@@ -14,11 +14,11 @@ TRAINING_DEFAULTS: dict[str, Any] = {
     "name": None,
     "seed": 1,
     "game": {"build": "mwsewi0r"},
-    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 0, "max_idle_game_time": 30, "ranked": True},
+    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 0, "max_idle_game_time": 30, "max_ko_gap_game_time": 30, "ranked": True},
     "scenarios": {"species": [150], "maps": ["forest"], "tiers": [0]},
     "episode_seeds": {"first": 1_000_000},
     "workers": {"envs": 5, "spares": 2, "recycle_after": 8, "recycle_rss_mb": 1500, "max_errors": 20, "step_timeout": 300, "reset_timeout": 600},
-    "reward_file": "reward-v5.yaml",
+    "reward_file": "reward-v6.yaml",
     "ppo": {"n_steps": 1024, "batch_size": 1024, "n_epochs": 4, "learning_rate": 3.0e-4, "gamma": 0.999, "gae_lambda": 0.95, "clip_range": 0.2,
             "ent_coef": 0.01, "vf_coef": 0.5, "max_grad_norm": 0.5, "target_kl": None},
     "network": {"architecture": "sets-v1", "features_dim": 512, "pi": [256], "vf": [256]},
@@ -32,13 +32,13 @@ TRAINING_DEFAULTS: dict[str, Any] = {
 
 EVALUATION_DEFAULTS: dict[str, Any] = {
     "game": {"build": "mwsewi0r"},
-    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 3600, "max_idle_game_time": 30, "ranked": True},
+    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 3600, "max_idle_game_time": 30, "max_ko_gap_game_time": 30, "ranked": True},
     "scenario": {"species": 150, "map": "forest", "tier": 0},
     "seeds": "900001-900050",
     "workers": {"envs": 5, "recycle_after": 8, "recycle_rss_mb": 1500, "step_timeout": 300, "reset_timeout": 600},
     "deterministic": True,
     "device": "cpu",
-    "reward_file": "reward-v5.yaml",
+    "reward_file": "reward-v6.yaml",
     # What a model must do to be promotable: its `metric` over the seeds, divided by the reference's, must reach `min_ratio`,
     # with no episode lost to an error. The reference is the stable model's evaluation on the same seeds and scenario when
     # there is a stable model, else the batch labelled `first_reference`. Only an evaluation on exactly the seeds
@@ -100,8 +100,10 @@ def load(path: str | Path | None, defaults: dict[str, Any], overrides: list[str]
 
 def env_options(config: dict[str, Any], **scenario) -> dict[str, Any]:
     e = config["env"]
-    # `max_idle_game_time` did not exist before 2026-11-24: a run created without it is resumed without the rule.
+    # `max_idle_game_time` and `max_ko_gap_game_time` did not exist before 2026-11-24: a run created without one is
+    # resumed without that rule.
     out = {"hz": int(e["hz"]), "actionRepeat": int(e["action_repeat"]), "maxGameTime": float(e["max_game_time"]), "maxIdleGameTime": float(e.get("max_idle_game_time", 0)),
+           "maxKoGapGameTime": float(e.get("max_ko_gap_game_time", 0)),
            "ranked": bool(e["ranked"]), "species": 155, "map": "forest", "tier": 0}
     out.update(scenario)
     return out

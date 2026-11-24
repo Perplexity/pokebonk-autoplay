@@ -262,6 +262,15 @@ test('standing still: with maxIdleGameTime, no KO and no movement for that long 
     assert.equal(pushing.info.endCause, 'idle: no KO and no movement for 2 s of game time');
     assert.ok(pushing.info.time > 3 && pushing.info.time < 5 && pushing.observation.snapshot.player.x < -10, `ended at ${pushing.info.time} s`);
   } finally { o.maxIdleGameTime = 0; }
+  // The stricter rule: no KO for that long ends the episode even while walking (the walk that went on above).
+  const k = env.options as { maxKoGapGameTime: number };
+  k.maxKoGapGameTime = 2;
+  try {
+    const walkingWithoutKo = await hold('e', 10);
+    assert.deepEqual([walkingWithoutKo.terminated, walkingWithoutKo.truncated, walkingWithoutKo.info.kills], [false, true, 0]);
+    assert.equal(walkingWithoutKo.info.endCause, 'idle: no KO for 2 s of game time');
+    assert.ok(walkingWithoutKo.info.time >= 2 && walkingWithoutKo.info.time < 2.06, `ended at ${walkingWithoutKo.info.time} s`);
+  } finally { k.maxKoGapGameTime = 0; }
   // Without the option there is no such rule.
   const free = await hold('none', 4);
   assert.deepEqual([free.terminated, free.truncated], [false, false]);

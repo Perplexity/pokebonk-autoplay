@@ -1,7 +1,9 @@
-import type { EpisodeDetail } from '../../shared/api.ts';
+import { useState } from 'react';
+import type { ActionResult, CheckpointInfo, EpisodeDetail, RunInfo } from '../../shared/api.ts';
 import { Figure } from '../components/Figure.tsx';
+import { Notice } from '../components/Notice.tsx';
 import { Empty, Failure, Loading, Screen } from '../components/Screen.tsx';
-import { useApi } from '../lib/api.ts';
+import { act, useApi } from '../lib/api.ts';
 import { gameClock, KIND_NAMES, num, num1, percent, REWARD_NAMES } from '../lib/format.ts';
 import { go, href } from '../lib/route.ts';
 
@@ -11,11 +13,46 @@ const COUNTERS: [string, string][] = [
   ['slotSpins', 'Slot-machine spins'], ['riftsCleared', 'Rifts cleared'], ['formsUsed', 'Max forms used'], ['captured', 'Pokémon caught'],
 ];
 
+/**
+ * The checkpoint of the episode's run that was the model when the episode ended: the newest one saved before that, or
+ * the run's first when the episode ended before any was saved.
+ */
+function checkpointFor(e: EpisodeDetail, runs: RunInfo[] | undefined): CheckpointInfo | null {
+  const run = runs?.find((r) => r.sessions.some((s) => s.batchId === e.batchId));
+  if (!run?.checkpoints.length) return null;
+  let best: CheckpointInfo | null = null, first = run.checkpoints[0];
+  for (const c of run.checkpoints) {
+    if (c.timesteps < first.timesteps) first = c;
+    if (c.createdAt <= e.finishedAt && (!best || c.timesteps > best.timesteps)) best = c;
+  }
+  return best ?? first;
+}
+
 export default function Episode({ arg }: { arg: string | null }) {
   const { data: e, error } = useApi<EpisodeDetail>(arg && /^\d+$/.test(arg) ? `/episodes/${arg}` : null, 300_000);
+  const training = e?.batch.kind === 'training';
+  const runs = useApi<RunInfo[]>(training ? '/runs' : null, 30_000);
+  const [result, setResult] = useState<ActionResult | null>(null);
+  const [starting, setStarting] = useState(false);
   if (error) return <Failure error={error} />;
   if (!e) return <Loading what="the episode" />;
   const moves = e.build?.moves ?? [], damage = moves.reduce((n, m) => n + m.damageDone, 0);
+  const checkpoint = training ? checkpointFor(e, runs.data) : null;
+  // An evaluation's episode is played again exactly. A training episode was not recorded move by move: its seed is
+  // played again by the checkpoint its run had at the time.
+  const watch = async () => {
+    setStarting(true);
+    const r = await act('watch/start', e.replay ? { episode: e.id, speed: 4 }
+      : { model: `checkpoint:${checkpoint!.id}`, seed: e.seed, speed: 4, stochastic: true, species: e.species, map: e.map, tier: e.tier });
+    setStarting(false);
+    if (r.ok) go('watch', null, e.replay ? { episode: e.id } : { like: e.id, model: `checkpoint:${checkpoint!.id}`, seed: e.seed });
+    else setResult(r);
+  };
+  const canWatch = !!e.replay || !!checkpoint;
+  const watchNote = e.replay ? 'Played again from its own model file and seed: the same episode, move for move.'
+    : checkpoint ? `Training episodes are not recorded move by move. This plays the same seed again with the model its run had then (the checkpoint at ${num(checkpoint.timesteps)} decisions), with sampled actions as in training: the same map and start, not the same run.`
+    : training ? (runs.data ? 'Its run has no checkpoint to play it with yet: the first is saved after about 100,000 decisions.' : '')
+    : 'A scripted baseline cannot be watched again yet: the watcher plays stored models only.';
   return (
     <div className="grid grid-cols-1 gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -24,8 +61,12 @@ export default function Episode({ arg }: { arg: string | null }) {
           <h1 className="type-display mt-1">Seed {e.seed}</h1>
           <p className="mt-2 text-base text-ink-2">Episode {e.id}, {e.map} tier {e.tier}, played by {e.batch.policy}. It ended: {e.endCause}.</p>
         </div>
-        {e.replay ? <button type="button" className="btn btn-primary" onClick={() => go('watch', null, { episode: e.id })}>Watch it again</button> : null}
+        <div className="grid max-w-[46ch] justify-items-start gap-2 sm:justify-items-end sm:text-right">
+          {canWatch ? <button type="button" className="btn btn-primary" disabled={starting} onClick={() => void watch()}>{starting ? 'Starting the game' : e.replay ? 'Watch the replay' : 'Watch this seed again'}</button> : null}
+          {watchNote ? <p className="text-sm text-ink-2">{watchNote}</p> : null}
+        </div>
       </header>
+      <Notice result={result} onDismiss={() => setResult(null)} />
       <dl className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 xl:grid-cols-6">
         <Figure label="Score" value={num(e.score)} detail={e.overtimeCashed ? `${num(e.kills)} KOs and ${num(e.overtimeBonus)} overtime bonus` : `${num(e.kills)} KOs`} />
         <Figure label="Game time" value={gameClock(e.gameTime)} />

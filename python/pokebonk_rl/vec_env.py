@@ -209,7 +209,7 @@ class NodeVecEnv(VecEnv):
                 self._place(i, new, first)
                 continue
             episode = frame.header.get("episode")
-            rewards[i] = slot.tracker.step(frame.header["c"], episode, frame.header.get("ot"), bool(frame.header.get("sw")))
+            rewards[i] = slot.tracker.step(frame.header["c"], episode, frame.header.get("ot"), bool(frame.header.get("sw")), bool(frame.header.get("rf")))
             if episode is None:
                 self._obs["float"][i], self._obs["int"][i], self._masks[i] = frame.float, frame.int, frame.mask.astype(bool)
                 continue

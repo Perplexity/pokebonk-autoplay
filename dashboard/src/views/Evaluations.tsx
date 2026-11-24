@@ -108,7 +108,7 @@ function Detail({ id }: { id: number }) {
         <p className="mt-2 max-w-[80ch] text-ink-2">
           {e.reference ? <>Compared with {e.reference}. </> : null}
           {e.ratio != null && e.metric ? <>The rule: the model's {e.metric.replace('_', ' ')} divided by the reference's must reach {num2(e.minRatio)}; it is {num2(e.ratio)}. </> : null}
-          {e.note ?? ''}{s.invalid ? ` ${s.invalid} of ${s.episodes} runs were ended for standing still (no KO and no movement for 30 game seconds): they are invalid and score 0.` : ''}{e.lostToErrors ? ` ${e.lostToErrors} episodes were lost to errors.` : ''}
+          {e.note ?? ''}{s.invalid ? ` ${s.invalid} of ${s.episodes} runs were ended for going 30 game seconds without a KO: they are invalid and score 0.` : ''}{e.lostToErrors ? ` ${e.lostToErrors} episodes were lost to errors.` : ''}
         </p>
       </Screen>
       <Screen title="Seed by seed" actions={<button type="button" className="btn btn-quiet" aria-pressed={table} onClick={() => setTable((t) => !t)}>{table ? 'Show the chart' : 'Show as a table'}</button>}>

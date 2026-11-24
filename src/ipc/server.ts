@@ -13,7 +13,7 @@
  *              header's `n` (they are those of the layout descriptors in data/encoding/<build>/)
  *
  * Requests (header only):
- *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, maxIdleGameTime?, species, map, tier, ranked}, recordDecisions, view?}  → hello
+ *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, maxIdleGameTime?, maxKoGapGameTime?, species, map, tier, ranked}, recordDecisions, view?}  → hello
  *       (view: every obs reply also carries `v`, a top-down picture of the moment for somebody watching)
  *   {cmd: 'reset', seed, species?, map?, tier?}                                                     → obs
  *   {cmd: 'step', a: [move, jump, dash, ultimate, interact, form, incense, fuse, choice]}                                → obs
@@ -22,7 +22,8 @@
  * Replies:
  *   {t: 'hello', pid, protocol}     (the game is loaded by the first reset, not here)
  *   {t: 'obs', phase, step, term, trunc, n: [floatSize, intSize, maskSize], c: <counters>, ot: <overtime or null>,
- *    sw: 1 while the zone's final swarm is on (the zone clock ran out), else 0, hp, maxHp, rss,
+ *    sw: 1 while the zone's final swarm is on (the zone clock ran out), else 0, rf: 1 while inside a rift, else 0,
+ *    hp, maxHp, rss,
  *     metadata?: <BatchMetadata, with the first reset of the process>,
  *     episode?: <EpisodeRecord, with the step that ended the episode>}  + payload
  *   {t: 'error', name, message, stack, details}  then the process exits with code 1: after an error the environment's
@@ -62,7 +63,7 @@ process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => (process.stderr.
 
 // ---------------------------------------------------------------- state
 
-interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean }
+interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean }
 type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a: number[] } | { cmd: 'close' };
 
 let env: HeadlessGameEnvironment | null = null;
@@ -83,7 +84,7 @@ function reply(o: Observation, res: StepResult | null, extra: Record<string, unk
   const p = o.snapshot.player;
   out({
     t: 'obs', phase: o.phase, step: o.step, n: [o.encoded!.float.length, o.encoded!.int.length, o.encoded!.mask.length], term: res?.terminated ?? false, trunc: res?.truncated ?? false,
-    c: res ? res.info.counters : o.state.counters, ot: res?.info.overtime ?? null, sw: o.state.zone.finalSwarm ? 1 : 0, hp: p.hp, maxHp: p.maxHp,
+    c: res ? res.info.counters : o.state.counters, ot: res?.info.overtime ?? null, sw: o.state.zone.finalSwarm ? 1 : 0, rf: o.snapshot.rift?.inside ? 1 : 0, hp: p.hp, maxHp: p.maxHp,
     rss: Math.round(process.memoryUsage().rss / 1048576), ...(withView ? { v: viewOf(o) } : {}), ...extra,
   }, payloadOf(o));
 }

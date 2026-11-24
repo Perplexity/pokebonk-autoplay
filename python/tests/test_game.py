@@ -202,20 +202,20 @@ def test_short_training_run_completes_and_leaves_recoverable_checkpoints(trained
     last = root / "models" / "runs" / "tiny" / "checkpoints" / "ckpt_000000000256"
     assert {p.name for p in last.iterdir()} == {"model.zip", "vecnormalize.pkl", "state.json"}
     state = json.loads((last / "state.json").read_text("utf-8"))
-    assert state["timesteps"] == 256 and state["run"] == "tiny" and state["reward_version"] == "v5" and state["model_sha256"] == sha256_file(last / "model.zip")
+    assert state["timesteps"] == 256 and state["run"] == "tiny" and state["reward_version"] == "v6" and state["model_sha256"] == sha256_file(last / "model.zip")
     assert state["observation_layout_hash"] == LAYOUTS.observation_hash and state["action_layout_hash"] == LAYOUTS.action_hash
     con = db(root)
     run_row = con.execute("SELECT * FROM training_runs WHERE name = 'tiny'").fetchone()
-    assert run_row["algorithm"] == "MaskablePPO" and run_row["reward_version"] == "v5" and run_row["game_build"] == BUILD
+    assert run_row["algorithm"] == "MaskablePPO" and run_row["reward_version"] == "v6" and run_row["game_build"] == BUILD
     session = con.execute("SELECT * FROM training_sessions").fetchone()
     assert session["status"] == "completed" and session["start_timesteps"] == 0 and session["end_timesteps"] == 256 and session["resumed_from"] is None
     batch = con.execute("SELECT * FROM batches WHERE id = ?", (session["batch_id"],)).fetchone()
-    assert batch["status"] == "completed" and batch["policy_name"] == "ppo-train" and batch["reward_version"] == "v5" and batch["profile_preset"] == "unlocked-v3" and batch["error_count"] == 0
+    assert batch["status"] == "completed" and batch["policy_name"] == "ppo-train" and batch["reward_version"] == "v6" and batch["profile_preset"] == "unlocked-v3" and batch["error_count"] == 0
     assert [(c["kind"], c["timesteps"]) for c in con.execute("SELECT * FROM checkpoints ORDER BY id")] == [("periodic", 128), ("periodic", 256)]
     # Episodes that ended while training are stored with their reward split into components, and no network attempt.
     episodes = con.execute("SELECT e.*, r.total, r.components_json, r.reward_version AS rv FROM episodes e JOIN episode_rewards r ON r.episode_id = e.id WHERE e.batch_id = ?", (batch["id"],)).fetchall()
-    assert len(episodes) >= 2 and all(e["seed"] >= 1_000_000 and e["truncated"] == 1 and e["blocked_network"] == 0 and e["rv"] == "v5" for e in episodes)
-    assert all(json.loads(e["components_json"]).keys() == {"ko", "guardian", "zone", "legendary", "overtime", "overtime_void", "map_use", "shop_sale", "death", "idle", "point_use", "item", "spend", "earn"} for e in episodes)
+    assert len(episodes) >= 2 and all(e["seed"] >= 1_000_000 and e["truncated"] == 1 and e["blocked_network"] == 0 and e["rv"] == "v6" for e in episodes)
+    assert all(json.loads(e["components_json"]).keys() == {"ko", "guardian", "zone", "legendary", "overtime", "overtime_void", "map_use", "shop_sale", "death", "idle", "point_use", "item", "spend", "earn", "rift"} for e in episodes)
     assert any(f.name.startswith("events.out.tfevents") for f in (root / "tb").rglob("*"))
     assert "Using cpu device" in trained["first"].stdout
 

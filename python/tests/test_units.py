@@ -27,7 +27,7 @@ BUILD = "mwsewi0r"
 # ---------------------------------------------------------------- reward
 
 def counters(**over):
-    c = {"kills": 0, "guardiansDefeated": 0, "legendariesDefeated": 0, "zonesEntered": 1, "damageTaken": 0.0, "mapUse": 0, "shopSold": 0, "pointsUsed": 0, "itemsPeak": 0, "goldSpent": 0, "goldEarned": 0}
+    c = {"kills": 0, "guardiansDefeated": 0, "legendariesDefeated": 0, "zonesEntered": 1, "damageTaken": 0.0, "mapUse": 0, "shopSold": 0, "pointsUsed": 0, "itemsPeak": 0, "goldSpent": 0, "goldEarned": 0, "riftsCleared": 0, "time": 0.0}
     c.update(over)
     return c
 
@@ -253,6 +253,50 @@ def test_reward_v4_pays_for_a_map_point_and_for_an_item_added_to_the_collection(
     assert old.step(counters(mapUse=1, pointsUsed=1, itemsPeak=1), None, None) == pytest.approx(0.1) and "point_use" not in old.summary()["raw"]
 
 
+def test_reward_v6_pays_a_completed_rift_by_how_quickly_it_was_done():
+    from pokebonk_rl.reward import RIFT_HALF_SECONDS
+    r = default_reward("v6")
+    w = r.weights
+    v5 = default_reward("v5").weights
+    assert r.version == "v6" and {k: w[k] for k in v5} == v5 and set(w) - set(v5) == {"rift"} and w["rift"] > 0
+
+    def visit(seconds, cleared=True, leave=True):
+        t = RewardTracker(r)
+        t.reset(counters(time=100.0))
+        paid = t.step(counters(time=100.05), None, None, False, True)                                   # walks in
+        done = counters(time=100.0 + seconds - 0.05, riftsCleared=int(cleared))
+        paid += t.step(done, None, None, False, True)                                                    # still inside
+        if leave:
+            paid += t.step({**done, "time": 100.0 + seconds}, None, None, False, False)                 # back in the zone
+        return paid, t.summary()
+
+    # Cleared and left after 30 s: the full weight would be for no time at all, half of it for RIFT_HALF_SECONDS.
+    quick, s = visit(30)
+    assert quick == pytest.approx(w["rift"] * RIFT_HALF_SECONDS / (RIFT_HALF_SECONDS + 30) * 0.01) and s["raw"]["rift"] == pytest.approx(RIFT_HALF_SECONDS / (RIFT_HALF_SECONDS + 30))
+    assert s["raw"]["rifts_completed"] == 1 and s["raw"]["rift_seconds"] == pytest.approx(30)
+    half, _ = visit(RIFT_HALF_SECONDS)
+    slow, _ = visit(600)
+    hour, _ = visit(3600)
+    # The quicker, the more; never nothing, never a penalty: a rift has all the time it takes.
+    assert quick > half > slow > hour > 0 and half == pytest.approx(w["rift"] / 2 * 0.01)
+    # Not completed: left without clearing it, or cleared and still inside when the episode ends. Nothing is paid.
+    assert visit(30, cleared=False)[0] == 0.0 and visit(30, leave=False)[0] == 0.0
+    # A second rift is timed from its own entrance.
+    t = RewardTracker(r)
+    t.reset(counters(time=0.0))
+    t.step(counters(time=10.0), None, None, False, True)
+    first = t.step(counters(time=40.0, riftsCleared=1), None, None, False, False)
+    t.step(counters(time=500.0, riftsCleared=1), None, None, False, False)                               # the zone, meanwhile
+    t.step(counters(time=500.05, riftsCleared=1), None, None, False, True)
+    second = t.step(counters(time=540.0, riftsCleared=2), None, None, False, False)
+    assert first > 0 and second == pytest.approx(w["rift"] * RIFT_HALF_SECONDS / (RIFT_HALF_SECONDS + 40) * 0.01)
+    # v5 does not know the component.
+    old = RewardTracker(default_reward("v5"))
+    old.reset(counters(time=0.0))
+    old.step(counters(time=1.0), None, None, False, True)
+    assert old.step(counters(time=30.0, riftsCleared=1), None, None, False, False) == 0.0 and "rift" not in old.summary()["components"]
+
+
 def test_reward_v5_follows_the_owners_order_of_importance():
     """KOs first, then the KOs of staying (final swarms, Overtime), then spending Pokédollars and using the map,
     then earning Pokédollars, then everything else."""
@@ -361,14 +405,18 @@ def test_reward_weights_must_have_the_sign_of_their_component():
 
 def test_configuration_files_load_and_unknown_keys_are_errors(tmp_path):
     training = cfg.load(REPO / "configs" / "training.yaml", cfg.TRAINING_DEFAULTS)
-    assert training["reward"]["version"] == "v5" and training["env"]["action_repeat"] == 3 and training["device"] == "cpu"
+    assert training["reward"]["version"] == "v6" and training["env"]["action_repeat"] == 3 and training["device"] == "cpu"
     assert training["scenarios"]["species"] == [150]
     assert cfg.env_options(training)["maxIdleGameTime"] == 30 == cfg.env_options(cfg.load(REPO / "configs" / "evaluation.yaml", cfg.EVALUATION_DEFAULTS))["maxIdleGameTime"]
     # A run created before the rule existed has no such key in its stored configuration: it is resumed without it.
     assert cfg.env_options({"env": {k: v for k, v in training["env"].items() if k != "max_idle_game_time"}})["maxIdleGameTime"] == 0
+    # The rule against going without a KO: on in both files, off for a run stored before it existed.
+    assert cfg.env_options(training)["maxKoGapGameTime"] == 30
+    assert cfg.env_options({"env": {k: v for k, v in training["env"].items() if k != "max_ko_gap_game_time"}})["maxKoGapGameTime"] == 0
     evaluation = cfg.load(REPO / "configs" / "evaluation.yaml", cfg.EVALUATION_DEFAULTS, ["workers.envs=2", "seeds=4-6"])
+    assert cfg.env_options(evaluation)["maxKoGapGameTime"] == 30
     assert evaluation["workers"]["envs"] == 2 and cfg.parse_seeds(evaluation["seeds"]) == [4, 5, 6]
-    assert evaluation["scenario"]["species"] == 150 and evaluation["reward"]["version"] == "v5" and len(cfg.parse_seeds(evaluation["promotion"]["seeds"])) == 50
+    assert evaluation["scenario"]["species"] == 150 and evaluation["reward"]["version"] == "v6" and len(cfg.parse_seeds(evaluation["promotion"]["seeds"])) == 50
     # The files spell out every default: a default changed in code without the file (or the reverse) shows here.
     for path, defaults in [("training.yaml", cfg.TRAINING_DEFAULTS), ("evaluation.yaml", cfg.EVALUATION_DEFAULTS)]:
         loaded = cfg.load(REPO / "configs" / path, defaults)

@@ -82,9 +82,12 @@ export default function Watch({ query }: { arg: string | null; query: URLSearchP
   const meta = useApi<Meta>('/meta', 30_000);
   const state = useApi<WatchState>('/watch', 4_000);
   const episodeId = query.get('episode');
-  const stored = useApi<EpisodeDetail>(episodeId && /^\d+$/.test(episodeId) ? `/episodes/${episodeId}` : null, 300_000);
+  // A training episode played again by a checkpoint of its run: the same seed, not the same episode.
+  const likeId = query.get('like');
+  const storedId = episodeId ?? likeId;
+  const stored = useApi<EpisodeDetail>(storedId && /^\d+$/.test(storedId) ? `/episodes/${storedId}` : null, 300_000);
   const [model, setModel] = useState<string | null>(null);
-  const [seed, setSeed] = useState('5');
+  const [seed, setSeed] = useState(() => query.get('seed') ?? '5');
   const [speed, setSpeed] = useState(4);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [start, setStart] = useState<Start | null>(null);
@@ -133,9 +136,10 @@ export default function Watch({ query }: { arg: string | null; query: URLSearchP
   const active = state.data?.active ?? false;
   const begin = async (e: FormEvent) => {
     e.preventDefault();
-    setResult(await act('watch/start', episodeId ? { episode: Number(episodeId), speed } : { model: chosen, seed: Number(seed), speed }));
+    const like = likeId && stored.data ? { stochastic: true, species: stored.data.species, map: stored.data.map, tier: stored.data.tier } : {};
+    setResult(await act('watch/start', episodeId ? { episode: Number(episodeId), speed } : { model: chosen, seed: Number(seed), speed, ...like }));
   };
-  const same = end && stored.data ? end.kills === stored.data.kills && Math.abs(end.gameTime - stored.data.gameTime) < 0.01 : null;
+  const same = end && stored.data && episodeId ? end.kills === stored.data.kills && Math.abs(end.gameTime - stored.data.gameTime) < 0.01 : null;
 
   return (
     <div className="grid grid-cols-1 gap-5">
@@ -146,6 +150,12 @@ export default function Watch({ query }: { arg: string | null; query: URLSearchP
         </p>
       </header>
       <Notice result={result} onDismiss={() => setResult(null)} />
+      {likeId ? (
+        <p className="max-w-[78ch] border-l-2 border-action pl-3">
+          Episode {likeId}{stored.data ? ` (seed ${stored.data.seed}: ${num(stored.data.kills)} KOs in ${gameClock(stored.data.gameTime)}, it ended: ${stored.data.endCause})` : ''} was a training episode, and those are not recorded move by move.
+          This is its seed played again by the model its run had then, with sampled actions: the same map and start, a different run.
+        </p>
+      ) : null}
       <form onSubmit={begin} className="flex flex-wrap items-end gap-3">
         {episodeId ? (
           <p className="max-w-[60ch] self-center">Episode {episodeId}{stored.data ? ` (seed ${stored.data.seed}, ${num(stored.data.kills)} KOs when it was stored)` : ''} is played again from its own model file and seed, which gives the same episode.</p>

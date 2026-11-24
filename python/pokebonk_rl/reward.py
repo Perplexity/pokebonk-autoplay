@@ -61,6 +61,16 @@ with the milestones (guardian, zone, legendary: "everything else") made smaller 
   earn           Pokédollars earned (`counters.goldEarned`, the game's own `stats.gold`), per Pokédollar; less than
                  `spend`, so that keeping them never pays as much as spending them.
 
+Version v6 (configs/reward-v6.yaml), after the owner's decision of 2026-11-24: "We should allow rifts infinite time,
+but we need a way of rewarding a rift completion based on how quickly we cleared it. The quicker, the more rewards."
+Everything of v5, and:
+
+  rift           a rift completed: cleared (`counters.riftsCleared` went up while inside) and left through its portal.
+                 Paid at the moment of leaving, RIFT_HALF_SECONDS / (RIFT_HALF_SECONDS + seconds inside) of the weight:
+                 all of it for no time at all, half for RIFT_HALF_SECONDS, never nothing and never a penalty. The
+                 seconds are the run clock's from walking in to walking out (the bridge's `rf`), so both the fight and
+                 the walk to the exit count. A rift left uncleared, or not left before the episode ends, pays nothing.
+
 Also measured in every version (`raw`, weight 0, like damage taken): `swarm_kos`, the KOs made while the zone's final
 swarm was on (the bridge's `sw`). They are KOs and are paid as KOs.
 
@@ -77,7 +87,10 @@ COMPONENTS_V2 = (*COMPONENTS_V1, "map_use", "shop_sale")
 COMPONENTS_V3 = (*COMPONENTS_V2, "idle")
 COMPONENTS_V4 = (*COMPONENTS_V3, "point_use", "item")
 COMPONENTS_V5 = (*COMPONENTS_V4, "spend", "earn")
-COMPONENTS = {"v0": COMPONENTS_V0, "v1": COMPONENTS_V1, "v2": COMPONENTS_V2, "v3": COMPONENTS_V3, "v4": COMPONENTS_V4, "v5": COMPONENTS_V5}
+COMPONENTS_V6 = (*COMPONENTS_V5, "rift")
+#: v6: a completed rift is paid this share of the `rift` weight: RIFT_HALF_SECONDS / (RIFT_HALF_SECONDS + seconds inside).
+RIFT_HALF_SECONDS = 60.0
+COMPONENTS = {"v6": COMPONENTS_V6, "v0": COMPONENTS_V0, "v1": COMPONENTS_V1, "v2": COMPONENTS_V2, "v3": COMPONENTS_V3, "v4": COMPONENTS_V4, "v5": COMPONENTS_V5}
 #: Components whose weight is a penalty: the count is positive, the weight must not be.
 PENALTIES = ("death", "overtime_void", "shop_sale", "idle")
 
@@ -136,6 +149,9 @@ class RewardTracker:
         self.raw = {k: 0.0 for k in self.config.components}
         self.raw["damage_taken"] = 0.0
         self.raw["swarm_kos"] = 0.0
+        self.raw["rifts_completed"] = 0.0
+        self.raw["rift_seconds"] = 0.0
+        self.rift_entered: tuple[float, float] | None = None   # v6: the run clock and `riftsCleared` when the rift was entered
         self.total = 0.0
         self.steps = 0
         self.bonus_paid = 0.0            # v1: overtime bonus KOs paid so far
@@ -165,10 +181,12 @@ class RewardTracker:
         raw["overtime"] = target - self.bonus_paid
         self.bonus_paid = target
 
-    def step(self, counters: dict[str, Any], episode: dict[str, Any] | None, overtime: dict[str, Any] | None = None, final_swarm: bool = False) -> float:
+    def step(self, counters: dict[str, Any], episode: dict[str, Any] | None, overtime: dict[str, Any] | None = None, final_swarm: bool = False,
+             in_rift: bool = False) -> float:
         """`counters` after the step; `episode` is the end-of-episode record on the step that ended it, else None;
         `overtime` is the step's overtime state as the environment reports it (`ot` of the bridge's reply), or None;
-        `final_swarm`: the zone's final swarm is on after the step (`sw` of the bridge's reply)."""
+        `final_swarm`: the zone's final swarm is on after the step (`sw` of the bridge's reply); `in_rift`: the player
+        is inside a rift after the step (`rf`)."""
         if self.prev is None:
             raise RuntimeError("RewardTracker.step before reset")
         p, c = self.prev, counters
@@ -196,6 +214,19 @@ class RewardTracker:
                 if counter not in c:
                     raise RuntimeError(f"reward {version} needs the counter {counter!r}, which this environment does not report")
                 raw[component] = float(c[counter]) - float(p[counter])
+        completed_in = None
+        if "rift" in raw:
+            for counter in ("riftsCleared", "time"):
+                if counter not in c:
+                    raise RuntimeError(f"reward {version} needs the counter {counter!r}, which this environment does not report")
+            if in_rift and self.rift_entered is None:
+                self.rift_entered = (float(p["time"]), float(p["riftsCleared"]))
+            elif not in_rift and self.rift_entered is not None:
+                entered, cleared_before = self.rift_entered
+                self.rift_entered = None
+                if float(c["riftsCleared"]) > cleared_before:
+                    completed_in = max(0.0, float(c["time"]) - entered)
+                    raw["rift"] = RIFT_HALF_SECONDS / (RIFT_HALF_SECONDS + completed_in)
         if episode is not None and episode["terminated"] and not episode["victory"]:
             raw["death"] = 1.0
         if "idle" in raw and episode is not None and ended_idle(episode):
@@ -206,6 +237,9 @@ class RewardTracker:
         self.raw["damage_taken"] += max(0.0, float(c["damageTaken"]) - float(p["damageTaken"]))
         if final_swarm:
             self.raw["swarm_kos"] += raw["ko"]
+        if completed_in is not None:
+            self.raw["rifts_completed"] += 1
+            self.raw["rift_seconds"] += completed_in
         w, s = self.config.weights, self.config.scale
         reward = 0.0
         for k, v in raw.items():

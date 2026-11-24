@@ -71,10 +71,10 @@ an episode carries its `EpisodeRecord`, the same record the Stage 1 runner store
 ## 3. Reward (`python/pokebonk_rl/reward.py`, `configs/reward-v2.yaml`)
 
 Computed in the trainer from the differences of the run's counters. Unit: one KO; the sum is multiplied by
-`scale` = 0.01. **Current version: v5** (Stage 3): the owner's order of importance (decision 8 and "The order of
-importance" below). Kept: v4 (v3 plus a real payment for a map point and an item; one run of 159,568 decisions,
-stopped), v3 (v2 plus a penalty for standing still), v2 (v1 plus a payment for using the map and a penalty for selling
-in the shop), v1 and the Stage 2 version v0 (`configs/reward-v4.yaml` … `configs/reward-v0.yaml`).
+`scale` = 0.01. **Current version: v6** (Stage 3): v5 (the owner's order of importance, decision 8) plus a payment
+for a completed rift by how quickly it was done (decision 9, "Rifts" below). Kept: v5, v4 (v3 plus a real payment for
+a map point and an item), v3 (v2 plus a penalty for standing still), v2 (v1 plus a payment for using the map and a
+penalty for selling in the shop), v1 and the Stage 2 version v0 (`configs/reward-v5.yaml` … `configs/reward-v0.yaml`).
 
 **The owner's decisions behind v1 and v2** (2026-11-24):
 1. KOs matter more than finishing the run, because the ranking counts KOs.
@@ -97,6 +97,10 @@ in the shop), v1 and the Stage 2 version v0 (`configs/reward-v4.yaml` … `confi
    everything else." Said before any more training, with: "we should really stop and check that scoring is working
    properly." v5, and the check, are under "The order of importance" below.
 
+9. "We should allow rifts infinite time, but we need a way of rewarding a rift completion based on how quickly we
+   cleared it. The quicker, the more rewards." Said after `mewtwo-v5-02`, in which most episodes were ended inside a
+   rift by the rule against going without a KO. See "Rifts" below.
+
 v3 has every weight of v2, and `idle` = −100: once, at the end of an episode that the rule against standing still
 ended.
 
@@ -105,6 +109,8 @@ v4 has every weight of v3, and `point_use` = 40 (per map point used, on top of t
 
 v5 has `spend` = 0.1 and `earn` = 0.05 (per Pokédollar spent and earned) and smaller milestones: `guardian` 25,
 `zone` 25, `legendary` 50. Everything else as v4.
+
+v6 has every weight of v5, and `rift` = 150: a rift cleared and left pays 150 × 60 / (60 + seconds inside).
 
 | Component | Paid for | v2 weight (KOs) | v1 | v0 |
 |---|---|---|---|---|
@@ -123,6 +129,7 @@ v5 has `spend` = 0.1 and `earn` = 0.05 (per Pokédollar spent and earned) and sm
 | `spend` (v5) | each Pokédollar spent (`counters.goldSpent`) | 0.1 (v5) | — | — |
 | `earn` (v5) | each Pokédollar earned (`counters.goldEarned`) | 0.05 (v5) | — | — |
 | `guardian`, `zone`, `legendary` in v5 | as above | 25, 25, 50 | | |
+| `rift` (v6) | a rift cleared and left through its portal: 60 / (60 + seconds inside) of the weight | 150 (v6) | — | — |
 
 - **`ko` + `overtime` + `overtime_void` are the objective itself**: over an episode they sum to what the ranking
   counts, the run's KOs plus the cashed overtime bonus. The other three are hints.
@@ -232,6 +239,58 @@ v5 has `spend` = 0.1 and `earn` = 0.05 (per Pokédollar spent and earned) and sm
     KOs do not follow, the payment is a distraction and the weights come down.
   - *Not changed*: the learner still samples a direction 20 times a second, which explores like a random walk, and
     still looks 50 seconds ahead. If v4 does not move the figures above, those are next.
+- **Rifts (v6, 2026-11-24).**
+  - *What `mewtwo-v5-02` did* (184 episodes, 1.1 million decisions, stopped): 116 episodes were ended by the rule
+    against going without a KO, and all 116 had cleared a rift before (none ended with no rift cleared; in 66 it was
+    the run's first rift, within 150 s). A run starts with 1 Incense. The model opened a rift in the first seconds,
+    cleared it (about 100 KOs in half a minute, the Alpha included) and then did not reach the rift's portal within
+    30 s of its last KO: a walk a random policy seldom completes in that time. It was also learning to open rifts
+    more, not less (probability of pressing `incense` when allowed: 0.56 at the first checkpoint, 0.93 at 640,000
+    decisions): the KOs come before the penalty. 28 episodes cleared a rift, left it and went on.
+  - *The owner's decision (9).* Inside a rift neither rule runs any more: not the one against going without a KO,
+    not the one against standing still (`rifts.isInside` in `koGapTooLong` and `idleTooLong`). Outside rifts both
+    are as they were.
+  - *The payment.* `rift`: when the Pokémon leaves a rift it has cleared, 150 × 60 / (60 + seconds inside). 30 s:
+    100. 60 s: 75. 2 min: 50. 5 min: 25. 47 min: 3. Never nothing and never a penalty. The seconds are the run
+    clock's from walking in to walking out, so the fight and the walk to the exit both count: the walk is what was
+    missing. Paid on leaving, not on clearing: a rift cleared and not left pays its KOs and the 10 of `map_use`, as
+    before, and no more. The trainer also stores `raw.rifts_completed` and `raw.rift_seconds` per episode.
+  - *Checked.* Six whole episodes of random play through v6: three completed a rift, in 54 s, 148 s and 151 s by the
+    trainer's count and 53 s, 147 s and 150 s by the game's own record (`rift.secs`); paid 78.9, 43.2 and 42.6. The
+    random baseline on seeds 1–30 replayed with both rules: none ended by a rule, all 30 identical to the stored
+    episodes (before the exemption: 17 ended). The 80 heuristic episodes never enter a rift.
+  - *What comes back with it.* Time inside a rift is unlimited again, and it was 30 to 41 % of all game time in
+    earlier runs (one episode: 4.5 hours in a rift). Nothing ends such an episode; the payment only makes leaving
+    sooner worth more than leaving later. If long rift episodes return and stay, the next step is a cost per second
+    inside, or a long cap: the owner's to decide.
+- **Going without a KO (`env.max_ko_gap_game_time`, 2026-11-24).** The pacing that the rule below did not catch
+  showed up, and far larger than expected.
+  - *What was found.* Episode 855 of `mewtwo-v5-01` (three minutes into the run: an untrained model) lasted 3,573 s
+    of game time in zone 1. 2,840 s of it were inside rifts (the game's record: `rift.secs`). The game does not
+    advance the zone clock inside a rift (`if (this.rifts.isInside || (this.stageTime += dt))` in the bundle), and
+    nothing comes there unless a wave is called: the zone itself was played for 733 s. Share of all game time spent
+    inside rifts, and of all KOs made there: random baseline 30 % and 2 %; `mewtwo-v3-01` 41 % and 1 % (one episode:
+    16,050 s in a rift); `mewtwo-v5-01` 41 % and 2 %. A Pokémon that wanders keeps moving, so "no KO and no movement"
+    never applied.
+  - *The owner's sentence, read strictly*: "in a real run, you'd be getting KOs extremely often. I would invalidate
+    and/punish any run where no KOs or movement happens for 30 seconds." No KO for 30 game seconds ends the episode
+    as invalid (`idle: no KO for 30 s of game time`; score 0; the `idle` penalty), whether the Pokémon moved or not.
+  - *Where a stretch without a KO is legitimate*, measured on 16 heuristic and 16 random episodes (seeds 1–16):
+    in a zone 16 s at most (in its first minute; 11 s after it); in Overtime 4 s; in a boss fight up to 50 s; in the
+    sanctuary outside Overtime more than 30 s in some complete runs (the walk to the shrine, and the heuristic's
+    rest of up to 45 s before Overtime); in a rift up to 800 s. So: a moment in which a guardian or the legendary is
+    alive counts as a KO does; in the sanctuary outside Overtime the allowance is 120 s; Overtime going live starts a
+    new stretch.
+  - *Checked.* All 80 stored heuristic episodes (seeds 1–30 and 900001–900050, 40 of them complete runs) replayed
+    with both rules: none ended by a rule, all 80 identical to the stored ones. The random baseline on seeds 1–30:
+    17 of 30 ended by the rule, every one of them after opening a rift. The stored random batches are what random
+    play scores in the game and stay the reference; a model is held to the rule.
+  - *What it costs.* A policy that opens a rift and does not call its waves and leave in time loses the episode and
+    pays the `idle` penalty. Early in training that is most rift visits, so the learner will probably stop opening
+    rifts until it can clear one. Rifts are a use of the map (a relic each); if they disappear for good, that is
+    this rule's price.
+  - `mewtwo-v5-01` was stopped at about 1.1 million decisions; `mewtwo-v5-02` had the same reward and this rule.
+    Since v6 the rule does not run inside a rift ("Rifts" above), which is where it had been made for.
 - **Standing still (v3, and `env.max_idle_game_time`).** What was found: the first model (`mewtwo-v2-01`, 2 million
   decisions), taking its most probable action on seed 8, cleared a rift at 76 s and then stood 11 m from the rift's
   portal, with no enemy alive and full hit points, until the evaluation's one-hour cap (124 KOs; seed 5 the same with
@@ -440,7 +499,7 @@ baselines on the same seeds (docs/baseline.md):
 
 ## 9. Tests
 
-`python -m pytest` (37 tests): `python/tests/test_units.py` (no game process, 2 s) and
+`python -m pytest` (38 tests): `python/tests/test_units.py` (no game process, 2 s) and
 `python/tests/test_game.py` (real game processes, about 60 s on the MacBook; `-m "not game"` skips them).
 
 | Requirement of the specification | Test |

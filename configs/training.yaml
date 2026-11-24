@@ -14,6 +14,10 @@ env:
   # The owner's rule (2026-11-24): an episode with no KO and no movement for this many game seconds ends there and is
   # invalid (a run like that never ends in the game either). 0 = no such rule. What it costs: `idle` in the reward file.
   max_idle_game_time: 30
+  # The same rule read strictly, after episodes that spent up to 4.5 hours inside a rift (where the zone clock stands
+  # still and nothing comes unless a wave is called): no KO for this many game seconds ends the episode as invalid,
+  # whether the Pokémon moved or not. The time a guardian or the legendary is alive does not count. 0 = no such rule.
+  max_ko_gap_game_time: 30
   ranked: true
 
 # Each episode draws one of each, uniformly, decided by the episode's number.
@@ -35,7 +39,7 @@ workers:
   step_timeout: 300
   reset_timeout: 600
 
-reward_file: reward-v5.yaml
+reward_file: reward-v6.yaml
 
 ppo:
   n_steps: 1024         # per environment per update

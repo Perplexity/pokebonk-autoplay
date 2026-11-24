@@ -147,7 +147,7 @@ function ProgressionScreen({ curve }: { curve: Curve }) {
       <h3 className="type-label mt-5 mb-2">Episodes by the zone they ended in</h3>
       <SegmentedBar label="Episodes by the zone they ended in" parts={['1', '2', '3', '4'].map((z) => ({ label: z === '4' ? 'Sanctuary' : `Zone ${z}`, value: s.zones[z] ?? 0 }))} />
       <p className="mt-4 text-ink-2">
-        Ended for standing still (no KO and no movement for 30 game seconds; such a run is invalid and scores 0): <span className="type-num text-ink">{s.invalid} of {s.episodes}</span>
+        Ended for going 30 game seconds without a KO (such a run is invalid and scores 0): <span className="type-num text-ink">{s.invalid} of {s.episodes}</span>
         {recent !== s ? <>, recently <span className="type-num text-ink">{recent.invalid} of {recent.episodes}</span></> : null}.
       </p>
       {last ? <p className="mt-2 text-ink-2">Map uses per episode, latest stretch: <span className="type-num text-ink">{num1(last.counters.mapUse)}</span>. Items sold in the shop: <span className="type-num text-ink">{num1(last.counters.shopSold)}</span>.</p> : null}

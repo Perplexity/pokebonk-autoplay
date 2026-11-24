@@ -58,6 +58,13 @@ await env.close();
   `truncated` with `info.endCause` = `idle: no KO and no movement for 30 s of game time`. The game's run stays
   open, as after the time cap, and the next `reset` closes it. Read-only: the run clock, the KO count and the
   player's position.
+- **Going without a KO** (`createEnvironment({ maxKoGapGameTime: 30 })`, default: no such rule; the same rule of the
+  owner read strictly, docs/training.md §3). When the run clock advances by that many seconds without a KO, moving
+  or not, the episode ends as `truncated` with `info.endCause` = `idle: no KO for 30 s of game time`. A moment in
+  which a guardian or the legendary is alive, and the moment Overtime goes live, count as a KO does. In the
+  sanctuary outside Overtime the allowance is four times as long (`idle: no KO for 120 s …`). Inside a rift neither
+  this rule nor the one against standing still runs (the owner: "We should allow rifts infinite time"). Read-only: the run
+  clock, the KO count, `boss.alive`, `sanctuary`, `overtime.live`.
 - **Unknown situations stop the episode with an `UnknownSituationError`** carrying seed, species, map, tier, step, simulation
   step, run state and time, the HUD method and a summary of its arguments: a dialog of another mode, a window opened by a
   HUD method nobody replaced, the run in `modal` without a captured dialog, the game pausing itself, a non-interactive state

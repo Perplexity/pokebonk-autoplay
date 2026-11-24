@@ -72,7 +72,7 @@ To change the schema: add `002_….sql` (never edit an applied file), update thi
 | `seed` | INTEGER | Episode seed (0 … 2³²−1). |
 | `species`, `final_species` | INTEGER | Pokédex number the run started with, and at its end (evolution). |
 | `map`, `tier`, `ranked` | TEXT, INTEGER, INTEGER | Map id, difficulty tier 0–2, Ranked (1) or Classic (0). |
-| `end_cause` | TEXT | The environment's cause of end: `died`, `won (victory)`, `won (victory), overtime cashed`, `won (victory), overtime lost`, `truncated: game time reached the cap of N s`, `idle: no KO and no movement for N s of game time` (the rule against standing still; such a run is invalid and scores 0, docs/training.md §3; stored with `truncated` = 1). |
+| `end_cause` | TEXT | The environment's cause of end: `died`, `won (victory)`, `won (victory), overtime cashed`, `won (victory), overtime lost`, `truncated: game time reached the cap of N s`, `idle: no KO for N s of game time` (the rule against going without a KO), `idle: no KO and no movement for N s of game time` (the rule against standing still; such a run is invalid and scores 0, docs/training.md §3; stored with `truncated` = 1). |
 | `end_how` | TEXT NULL | The game's own `end.how` (`died`, `won`, …; docs/game-mechanics.md §1.6). NULL when truncated: the run never closed. |
 | `terminated`, `truncated` | INTEGER | Exactly one is 1. |
 | `victory` | INTEGER | The game's `victory`: the map was cleared (legendary beaten or direct path taken). It says nothing about overtime. |
