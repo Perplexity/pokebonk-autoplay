@@ -1,0 +1,209 @@
+{
+ "source": "a leaderboard run record given by the owner on 2026-11-24 (Nidoran, final form Nidoking, coast, tier 2, Ranked; shown as over 30 million). The player's name and the record ids are left out.",
+ "species": 32,
+ "finalSpecies": 34,
+ "biome": "coast",
+ "tier": 2,
+ "time": 5982.175,
+ "kills": 6648953,
+ "level": 5702,
+ "build": {
+  "held": {
+   "relics": [
+    "e-whistle",
+    "l-star",
+    "l-chalice"
+   ],
+   "moves": {
+    "fu-194": 6,
+    "fissure": 9,
+    "mud-shot": 4,
+    "gunk-shot": 10,
+    "mud-sport": 10,
+    "stockpile": 10,
+    "earthquake": 10,
+    "poison-jab": 10,
+    "earth-power": 10,
+    "horn-attack": 10,
+    "cross-poison": 10,
+    "sandsear-storm": 10
+   }
+  },
+  "vits": [
+   {
+    "k": "protein",
+    "lv": 12
+   },
+   {
+    "k": "loaded-dice",
+    "lv": 12
+   },
+   {
+    "k": "hp-up",
+    "lv": 12
+   },
+   {
+    "k": "enigma-berry",
+    "lv": 12
+   },
+   {
+    "k": "poke-radar",
+    "lv": 12
+   }
+  ],
+  "items": {
+   "stick": 4,
+   "magnet": 7,
+   "pp-max": 10,
+   "bicycle": 2,
+   "tm-case": 1,
+   "card-key": 1,
+   "charcoal": 9,
+   "ice-heal": 3,
+   "life-orb": 5,
+   "snowball": 5,
+   "up-grade": 1,
+   "awakening": 3,
+   "coin-case": 1,
+   "exp-share": 10,
+   "fast-ball": 1,
+   "flame-orb": 5,
+   "full-heal": 3,
+   "grip-claw": 5,
+   "love-ball": 3,
+   "lure-ball": 3,
+   "max-ether": 1,
+   "metronome": 10,
+   "poke-doll": 2,
+   "soft-sand": 10,
+   "spell-tag": 6,
+   "ss-ticket": 1,
+   "sun-stone": 2,
+   "black-belt": 8,
+   "clear-bell": 1,
+   "dawn-stone": 2,
+   "dusk-stone": 10,
+   "focus-sash": 1,
+   "gold-teeth": 3,
+   "guard-spec": 2,
+   "hard-stone": 4,
+   "heavy-ball": 2,
+   "level-ball": 2,
+   "max-revive": 3,
+   "metal-coat": 9,
+   "moon-stone": 2,
+   "oran-berry": 6,
+   "poke-flute": 1,
+   "razor-claw": 10,
+   "razor-fang": 4,
+   "sharp-beak": 3,
+   "silk-scarf": 5,
+   "thick-club": 2,
+   "x-accuracy": 3,
+   "adamant-orb": 1,
+   "berry-juice": 8,
+   "choice-band": 5,
+   "cleanse-tag": 10,
+   "comet-shard": 10,
+   "dragon-fang": 5,
+   "friend-ball": 2,
+   "macho-brace": 3,
+   "master-ball": 1,
+   "muscle-band": 10,
+   "poison-barb": 10,
+   "shiny-stone": 10,
+   "soothe-bell": 7,
+   "white-flute": 5,
+   "binding-band": 5,
+   "choice-scarf": 5,
+   "dragon-scale": 2,
+   "griseous-orb": 2,
+   "lustrous-orb": 1,
+   "miracle-seed": 10,
+   "mystic-water": 8,
+   "rainbow-wing": 1,
+   "reaper-cloth": 2,
+   "silver-powder": 10,
+   "twisted-spoon": 10,
+   "never-melt-ice": 10,
+   "dowsing-machine": 2
+  },
+  "moves": [
+   {
+    "k": "poison-jab",
+    "lv": 10,
+    "dmg": 1.2536922239992366e+21
+   },
+   {
+    "k": "gunk-shot",
+    "lv": 10,
+    "dmg": 6.182057360005922e+21
+   },
+   {
+    "k": "sandsear-storm",
+    "lv": 10,
+    "dmg": 1.6053133900276645e+21
+   },
+   {
+    "k": "earth-power",
+    "lv": 10,
+    "dmg": 3.5938848590378094e+21
+   },
+   {
+    "k": "fu-194",
+    "p": [
+     "mud-sport",
+     "earthquake"
+    ],
+    "lv": 6,
+    "dmg": 3.268674581546848e+22
+   },
+   {
+    "k": "stockpile",
+    "lv": 10,
+    "dmg": 0
+   }
+  ],
+  "stats": {
+   "area": 17.18,
+   "gold": 43.3,
+   "luck": 878.33,
+   "slam": 1,
+   "armor": 307.79,
+   "maxHp": 3791.27,
+   "regen": 10.86,
+   "damage": 311.57,
+   "thorns": 31.5,
+   "xpGain": 34.29,
+   "evasion": 0.25,
+   "healing": 5.76,
+   "powerup": 4.32,
+   "special": 1.33,
+   "duration": 1,
+   "megaCrit": 1,
+   "overheal": 1,
+   "physical": 68.46,
+   "lifesteal": 0.09,
+   "moveSpeed": 2.25,
+   "projSpeed": 1.38,
+   "shieldMax": 0,
+   "critChance": 1,
+   "critDamage": 12.43,
+   "eliteSpawn": 1.45,
+   "extraJumps": 0,
+   "jumpHeight": 1,
+   "attackSpeed": 8.02,
+   "eliteDamage": 7.19,
+   "pickupRange": 29,
+   "projectiles": 16,
+   "statusChance": 1.41,
+   "statusDamage": 1.5,
+   "superEffective": 1
+  },
+  "passive": "rivalry",
+  "peak": {
+   "vits": 1,
+   "items": 352
+  }
+ }
+}
