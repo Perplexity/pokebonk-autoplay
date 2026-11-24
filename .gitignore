@@ -1,0 +1,13 @@
+node_modules/
+# Local copy of the game's public static assets. Never commit or redistribute.
+mirror/
+# Local sandbox state: sessions, profiles, runs, saves, logs, browser profile.
+data/
+config.json
+*.log
+.venv/
+models/
+logs/
+__pycache__/
+*.egg-info/
+.pytest_cache/

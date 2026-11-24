@@ -1,0 +1,48 @@
+# Evaluation configuration (python -m pokebonk_rl.evaluate --config configs/evaluation.yaml --model <checkpoint>).
+# Every key is listed with its default in python/pokebonk_rl/config.py; an unknown key is an error.
+
+game:
+  build: mwsewi0r
+
+env:
+  hz: 60
+  action_repeat: 3
+  max_game_time: 3600   # the cap the stored baselines were played with (never reached by them)
+  ranked: true
+
+# One scenario per evaluation: results of different Pokémon, maps or tiers are not pooled.
+scenario:
+  species: 150          # Mewtwo
+  map: forest
+  tier: 0
+
+# The held-out seeds (docs/baseline.md §10): idle, random and heuristic are stored on them (labels heldout-mewtwo-*),
+# so a model is compared episode by episode. Nothing is tuned on these seeds. For a look while tuning, use the
+# development seeds instead:  --seeds 1-30 --reference baseline-mewtwo-random   (information, never a verdict).
+seeds: "900001-900050"
+
+workers:
+  envs: 5
+  recycle_after: 8
+  recycle_rss_mb: 1500
+  step_timeout: 300
+  reset_timeout: 600
+
+deterministic: true     # the most probable action at every step; false = sample
+device: cpu
+reward_file: reward-v2.yaml
+
+# What a model must do to be promotable to stable: `metric` over the seeds, divided by the reference's, must reach
+# `min_ratio`, and no episode may be lost to an error. The reference is the stable model's own evaluation on the same
+# seeds and scenario when a stable model exists, else the stored batch with the label `first_reference`.
+# Only an evaluation on exactly `seeds` below, against that reference, counts as a verdict (`evaluations.passed`).
+promotion:
+  metric: score_median  # score = KOs + cashed overtime bonus
+  min_ratio: 1.0
+  first_reference: heldout-mewtwo-random
+  seeds: "900001-900050"
+
+paths:
+  database: data/pokebonk.sqlite
+  models: models
+  logs: logs/evaluation

@@ -1,0 +1,197 @@
+/**
+ * Environment server for a trainer in another process (Python): one headless game environment, driven over this
+ * process's stdin / stdout pipes. No socket is opened; nothing here touches the network.
+ *
+ *   node src/ipc/server.ts          (started by python/pokebonk_rl/bridge.py, not by hand)
+ *
+ * Frames, the same in both directions:
+ *
+ *   uint32 LE  length of the JSON header in bytes
+ *   uint32 LE  length of the binary payload in bytes (0 when there is none)
+ *   header     UTF-8 JSON
+ *   payload    for an observation: float32[floatSize] | int32[intSize] | uint8[maskSize], little endian, sizes in the
+ *              header's `n` (they are those of the layout descriptors in data/encoding/<build>/)
+ *
+ * Requests (header only):
+ *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, species, map, tier, ranked}, recordDecisions}  → hello
+ *   {cmd: 'reset', seed, species?, map?, tier?}                                                     → obs
+ *   {cmd: 'step', a: [move, jump, dash, ultimate, interact, form, incense, fuse, choice]}                                → obs
+ *   {cmd: 'close'}                                                                                  → (exit 0)
+ *
+ * Replies:
+ *   {t: 'hello', pid, protocol}     (the game is loaded by the first reset, not here)
+ *   {t: 'obs', phase, step, term, trunc, n: [floatSize, intSize, maskSize], c: <counters>, ot: <overtime or null>, hp, maxHp, rss,
+ *     metadata?: <BatchMetadata, with the first reset of the process>,
+ *     episode?: <EpisodeRecord, with the step that ended the episode>}  + payload
+ *   {t: 'error', name, message, stack, details}  then the process exits with code 1: after an error the environment's
+ *     state is not trusted, the trainer starts a fresh process.
+ *
+ * The reward is not computed here. The reply carries the run's cumulative counters (the game's own figures); the
+ * trainer turns their differences into a reward (python/pokebonk_rl/reward.py), so a reward version can change without
+ * touching the environment.
+ *
+ * stdout carries frames only: `process.stdout.write` is pointed at stderr before anything else is loaded.
+ */
+import { writeSync } from 'node:fs';
+import { decodeAction } from '../actions/codec.ts';
+import { createEnvironment } from '../environment/index.ts';
+import type { HeadlessGameEnvironment } from '../environment/GameEnvironment.ts';
+import type { ChoiceMask, Observation, StepResult } from '../environment/types.ts';
+import { batchMetadata, chosenId, defeated, finalBuild } from '../runner/episode.ts';
+import { real } from '../sim/clock.ts';
+import type { DecisionRecord, EpisodeRecord } from '../storage/records.ts';
+
+export const IPC_PROTOCOL = 1;
+
+// ---------------------------------------------------------------- framing
+
+const out = (header: Record<string, unknown>, payload?: Uint8Array): void => {
+  const json = Buffer.from(JSON.stringify(header), 'utf8');
+  const head = Buffer.alloc(8);
+  head.writeUInt32LE(json.length, 0);
+  head.writeUInt32LE(payload?.length ?? 0, 4);
+  const frame = payload ? Buffer.concat([head, json, payload]) : Buffer.concat([head, json]);
+  for (let off = 0; off < frame.length;) {
+    try { off += writeSync(1, frame, off, frame.length - off); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EAGAIN') throw e; }
+  }
+};
+// Anything else that prints goes to stderr: a stray line on stdout would break the framing.
+process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => (process.stderr.write as (...a: unknown[]) => boolean)(chunk, ...rest)) as typeof process.stdout.write;
+
+// ---------------------------------------------------------------- state
+
+interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean }
+type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a: number[] } | { cmd: 'close' };
+
+let env: HeadlessGameEnvironment | null = null;
+let recordDecisions = false;
+let obs: Observation | null = null;
+let episodes = 0;
+let sentMetadata = false;
+let ep: { seed: number; ranked: boolean; startedAt: string; t0: number; resetSeconds: number; firstSpecies: number; decisions: DecisionRecord[]; decisionCount: number; overtimeStarted: boolean } | null = null;
+
+function payloadOf(o: Observation): Uint8Array {
+  const e = o.encoded;
+  if (!e) throw new Error('ipc: the environment returned an observation without its encoding');
+  return Buffer.concat([Buffer.from(e.float.buffer, e.float.byteOffset, e.float.byteLength), Buffer.from(e.int.buffer, e.int.byteOffset, e.int.byteLength), Buffer.from(e.mask.buffer, e.mask.byteOffset, e.mask.byteLength)]);
+}
+
+function reply(o: Observation, res: StepResult | null, extra: Record<string, unknown>): void {
+  const p = o.snapshot.player;
+  out({
+    t: 'obs', phase: o.phase, step: o.step, n: [o.encoded!.float.length, o.encoded!.int.length, o.encoded!.mask.length], term: res?.terminated ?? false, trunc: res?.truncated ?? false,
+    c: res ? res.info.counters : o.state.counters, ot: res?.info.overtime ?? null, hp: p.hp, maxHp: p.maxHp,
+    rss: Math.round(process.memoryUsage().rss / 1048576), ...extra,
+  }, payloadOf(o));
+}
+
+function episodeRecord(o: Observation, res: StepResult): EpisodeRecord {
+  const e = ep!, info = res.info, s = o.snapshot;
+  const record = info.end ? (JSON.parse(JSON.stringify(info.end.record)) as Record<string, unknown>) : null;
+  const ot = info.overtime, recOt = record?.ot as { rounds?: unknown[]; cashed?: boolean } | undefined;
+  const beaten = defeated(info.counters);
+  return {
+    seed: e.seed, species: e.firstSpecies, finalSpecies: s.player.species, map: s.biome, tier: s.tier, ranked: e.ranked,
+    terminated: res.terminated, truncated: res.truncated, endCause: info.endCause ?? 'unknown', endHow: info.end?.how ?? null, victory: info.end?.victory ?? false,
+    gameTime: info.time, kills: info.kills,
+    overtime: {
+      started: e.overtimeStarted || !!recOt, bonus: ot?.bonus ?? 0,
+      rounds: Array.isArray(recOt?.rounds) ? recOt.rounds.length : e.overtimeStarted ? ot?.round ?? 0 : 0, cashed: !!(ot?.cashed || recOt?.cashed),
+    },
+    level: info.level, zone: info.zone, guardiansDefeated: beaten.guardians, legendariesDefeated: beaten.legendaries, sealsKept: info.sealsKept,
+    steps: o.step, simSteps: o.simStep, wallSeconds: (real.performanceNow() - e.t0) / 1000, resetSeconds: e.resetSeconds,
+    finalBuild: finalBuild(o), counters: { ...info.counters }, record, blockedNetwork: [...info.blockedNetwork], decisions: e.decisions,
+    worker: { id: 0, pid: process.pid, episode: episodes, rssMB: Math.round(process.memoryUsage().rss / 1048576) },
+    startedAt: e.startedAt, finishedAt: new real.Date().toISOString(),
+  };
+}
+
+async function handle(req: Request): Promise<void> {
+  if (req.cmd === 'init') {
+    if (env) throw new Error('ipc: init was sent twice');
+    recordDecisions = !!req.recordDecisions;
+    env = createEnvironment({ ...req.env, encode: true });
+    out({ t: 'hello', protocol: IPC_PROTOCOL, pid: process.pid });
+    return;
+  }
+  if (req.cmd === 'close') {
+    try { await env?.close(); } catch { /* leaving anyway */ }
+    process.exit(0);
+  }
+  if (!env) throw new Error(`ipc: "${req.cmd}" was sent before init`);
+  if (req.cmd === 'reset') {
+    const startedAt = new real.Date().toISOString(), t0 = real.performanceNow();
+    const { cmd: _cmd, ...setup } = req;
+    obs = await env.reset(setup);
+    episodes++;
+    const md = env.getMetadata();
+    ep = { seed: req.seed, ranked: md.mode.ranked, startedAt, t0: real.performanceNow(), resetSeconds: (real.performanceNow() - t0) / 1000, firstSpecies: obs.snapshot.player.species, decisions: [], decisionCount: 0, overtimeStarted: false };
+    reply(obs, null, sentMetadata ? {} : { metadata: batchMetadata(md) });
+    sentMetadata = true;
+    return;
+  }
+  if (req.cmd === 'step') {
+    if (!obs || !ep) throw new Error('ipc: step was sent before reset');
+    const action = decodeAction(req.a, obs);
+    if (obs.phase === 'choice' && action.type === 'choice') {
+      ep.decisionCount++;
+      if (recordDecisions) {
+        const d = obs.decision!, s = obs.snapshot;
+        ep.decisions.push({
+          serial: d.serial, step: obs.step, gameTime: s.t, zone: s.stage, level: s.player.level, kind: d.kind, method: d.method,
+          options: d.options as DecisionRecord['options'], context: d.context, mask: obs.mask as ChoiceMask, chosen: action, chosenId: chosenId(d, action),
+        });
+      }
+    }
+    const res = await env.step(action);
+    obs = res.observation;
+    if (res.info.overtime?.live) ep.overtimeStarted = true;
+    const over = res.terminated || res.truncated;
+    reply(obs, res, over ? { episode: { ...episodeRecord(obs, res), decisionCount: ep.decisionCount } } : {});
+    if (over) { obs = null; ep = null; }
+    return;
+  }
+  throw new Error(`ipc: unknown command ${JSON.stringify((req as { cmd?: unknown }).cmd)}`);
+}
+
+// ---------------------------------------------------------------- request loop
+
+function fail(e: unknown): never {
+  const err = e instanceof Error ? e : new Error(String(e));
+  const details = (err as { details?: unknown }).details;
+  let plain: unknown = null;
+  try { plain = details && typeof details === 'object' ? JSON.parse(JSON.stringify(details)) : null; } catch { /* not serialisable */ }
+  out({ t: 'error', name: err.name, message: err.message.split('\n')[0], stack: String(err.stack ?? err.message), details: plain, seed: ep?.seed ?? null, step: obs?.step ?? null });
+  process.exit(1);
+}
+
+let buffered: Buffer = Buffer.alloc(0);
+const queue: Request[] = [];
+let busy = false;
+
+async function drain(): Promise<void> {
+  if (busy) return;
+  busy = true;
+  try { for (let r = queue.shift(); r; r = queue.shift()) await handle(r); } catch (e) { fail(e); }
+  busy = false;
+}
+
+process.stdin.on('data', (chunk: Buffer) => {
+  buffered = buffered.length ? Buffer.concat([buffered, chunk]) : chunk;
+  for (;;) {
+    if (buffered.length < 8) break;
+    const jsonLen = buffered.readUInt32LE(0), binLen = buffered.readUInt32LE(4);
+    if (buffered.length < 8 + jsonLen + binLen) break;
+    try { queue.push(JSON.parse(buffered.subarray(8, 8 + jsonLen).toString('utf8')) as Request); } catch (e) { fail(e); }
+    buffered = buffered.subarray(8 + jsonLen + binLen);
+  }
+  void drain();
+});
+// The trainer went away: there is nobody to play for.
+process.stdin.on('end', () => process.exit(0));
+process.on('uncaughtException', fail);
+// A rejected promise nobody handles is NOT an error here, as in the Stage 1 runner: src/sim/browser.ts records it as a
+// page problem, the way a browser prints a console message. The first training run met the case that matters: once a
+// Pokémon has learned everything, each level-up calls the HUD's `trained`, which cancels a running Web Animation; the
+// DOM library then rejects that animation's `finished` promise, which nobody awaits. (A browser marks that promise as
+// handled and prints nothing.) Ending the episode for it lost two long episodes of that run.

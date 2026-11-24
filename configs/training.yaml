@@ -1,0 +1,70 @@
+# Training configuration (python -m pokebonk_rl.train --config configs/training.yaml).
+# Every key is listed with its default in python/pokebonk_rl/config.py; an unknown key is an error.
+
+name: null              # run name; null = ppo-<UTC date and time>
+seed: 1                 # the learner's own seed (network initialisation, action sampling)
+
+game:
+  build: mwsewi0r
+
+env:
+  hz: 60
+  action_repeat: 3      # 20 decisions per game second
+  max_game_time: 0      # 0 = no cap: an episode ends when the run ends
+  ranked: true
+
+# Each episode draws one of each, uniformly, decided by the episode's number.
+scenarios:
+  species: [150]        # Mewtwo (the owner's choice for Stage 3: one Pokémon for now)
+  maps: [forest]
+  tiers: [0]
+
+# Episode k of a run is played on seed first + k. Kept far from the evaluation seeds (configs/evaluation.yaml).
+episode_seeds:
+  first: 1000000
+
+workers:
+  envs: 5               # game processes stepped together
+  spares: 2             # extra processes kept reset, so that an ending episode does not stall the others
+  recycle_after: 8      # episodes per game process before it is replaced (its memory grows)
+  recycle_rss_mb: 1500
+  max_errors: 20        # environment errors per session before training stops
+  step_timeout: 300
+  reset_timeout: 600
+
+reward_file: reward-v2.yaml
+
+ppo:
+  n_steps: 1024         # per environment per update
+  batch_size: 1024
+  n_epochs: 4
+  learning_rate: 3.0e-4
+  gamma: 0.999          # horizon of about 1000 decisions = 50 game seconds
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  target_kl: null
+
+network:
+  architecture: sets-v1
+  features_dim: 512
+  pi: [256]
+  vf: [256]
+
+normalize_reward: true  # divide rewards by a running estimate of the return's spread (saved with every checkpoint)
+
+total_timesteps: 2000000
+checkpoint_every_timesteps: 100000
+# cpu is the measured choice for this network: decisions are made for a handful of game processes at a time, and such
+# small batches cost more on the GPU than on the CPU (392 against 252 decisions per second with 5 processes,
+# docs/training.md). "cuda" and "auto" (the GPU when there is one) are accepted.
+device: cpu
+store_decisions: false  # true = keep every dialog of every training episode in the database (large)
+
+paths:
+  database: data/pokebonk.sqlite
+  models: models
+  tensorboard: logs/tensorboard
+  logs: logs/training

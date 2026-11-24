@@ -1,0 +1,253 @@
+{
+ "levelup": {
+  "kind": "levelup",
+  "title": "Level 4!",
+  "options": [
+   {
+    "text": "Common UPGRADE Burning Jealousy Level 1 → 2 (max 8) +20% duration +25% status chance Damage per hit 5.6 → 6.3 [1]",
+    "cls": "card offer",
+    "x": 388,
+    "y": 364,
+    "w": 238,
+    "h": 302,
+    "disabled": false,
+    "name": "Burning Jealousy",
+    "rarity": "Common",
+    "tag": "UPGRADE",
+    "sub": "Level 1 → 2 (max 8)",
+    "effects": [
+     "+20% duration",
+     "+25% status chance"
+    ]
+   },
+   {
+    "text": "Common NEW Nugget New vitamin +15% pokédollars PokéDollars 100% → 115% [2]",
+    "cls": "card offer",
+    "x": 640,
+    "y": 363,
+    "w": 238,
+    "h": 303,
+    "disabled": false,
+    "name": "Nugget",
+    "rarity": "Common",
+    "tag": "NEW",
+    "sub": "New vitamin",
+    "effects": [
+     "+15% pokédollars"
+    ]
+   },
+   {
+    "text": "Uncommon NEW Star Piece New vitamin +12 luck Luck 0 → 12 [3]",
+    "cls": "card offer",
+    "x": 892,
+    "y": 366,
+    "w": 236,
+    "h": 300,
+    "disabled": false,
+    "name": "Star Piece",
+    "rarity": "Uncommon",
+    "tag": "NEW",
+    "sub": "New vitamin",
+    "effects": [
+     "+12 luck"
+    ]
+   }
+  ],
+  "actions": [
+   {
+    "text": "Refresh (2) F",
+    "cls": "btn blue small",
+    "x": 477,
+    "y": 552,
+    "w": 167,
+    "h": 36,
+    "disabled": false
+   },
+   {
+    "text": "Skip (2) X",
+    "cls": "btn ghost small",
+    "x": 644,
+    "y": 552,
+    "w": 143,
+    "h": 36,
+    "disabled": false
+   },
+   {
+    "text": "Banish (1) Z",
+    "cls": "btn red small",
+    "x": 807,
+    "y": 552,
+    "w": 159,
+    "h": 36,
+    "disabled": false
+   },
+   {
+    "text": "View my team Tab",
+    "cls": "btn ghost small pk-btn",
+    "x": 640,
+    "y": 656,
+    "w": 196,
+    "h": 36,
+    "disabled": false
+   }
+  ],
+  "cls": "modal | modal"
+ },
+ "item": {
+  "kind": "unknown",
+  "title": "You found an item!",
+  "options": [
+   {
+    "text": "Uncommon Muscle Band +15% physical damage. None of your moves use it An item to be held by a Pokémon. This headband exudes strength, slightly boosting the power",
+    "cls": "card",
+    "x": 640,
+    "y": 369,
+    "w": 291,
+    "h": 301,
+    "disabled": false,
+    "name": "Muscle Band",
+    "rarity": "Uncommon",
+    "tag": "",
+    "sub": "",
+    "effects": []
+   }
+  ],
+  "actions": [
+   {
+    "text": "Take E",
+    "cls": "btn green big",
+    "x": 539,
+    "y": 586,
+    "w": 161,
+    "h": 65,
+    "disabled": false
+   },
+   {
+    "text": "Sell (+18 ₽) V",
+    "cls": "btn ghost",
+    "x": 727,
+    "y": 586,
+    "w": 190,
+    "h": 65,
+    "disabled": false
+   },
+   {
+    "text": "View my team Tab",
+    "cls": "btn ghost small pk-btn",
+    "x": 640,
+    "y": 663,
+    "w": 196,
+    "h": 36,
+    "disabled": false
+   }
+  ],
+  "cls": "modal | modal"
+ },
+ "pause": {
+  "kind": "pause",
+  "title": "Cyndaquil",
+  "options": [],
+  "actions": [
+   {
+    "text": "Glossary",
+    "cls": "btn small ghost pz-gloss",
+    "x": 886,
+    "y": 695,
+    "w": 105,
+    "h": 13,
+    "disabled": false
+   },
+   {
+    "text": "Give up",
+    "cls": "btn red pz-end",
+    "x": 157,
+    "y": 670,
+    "w": 112,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Save and quit",
+    "cls": "btn ghost pz-save pz-end",
+    "x": 306,
+    "y": 670,
+    "w": 164,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Restart",
+    "cls": "btn ghost pz-end",
+    "x": 457,
+    "y": 670,
+    "w": 115,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Big map",
+    "cls": "btn ghost",
+    "x": 584,
+    "y": 670,
+    "w": 116,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Fullscreen",
+    "cls": "btn ghost",
+    "x": 690,
+    "y": 670,
+    "w": 73,
+    "h": 44,
+    "disabled": false
+   },
+   {
+    "text": "Stuck",
+    "cls": "btn ghost",
+    "x": 787,
+    "y": 670,
+    "w": 97,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Map",
+    "cls": "btn ghost",
+    "x": 890,
+    "y": 670,
+    "w": 84,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Settings",
+    "cls": "btn ghost",
+    "x": 1004,
+    "y": 670,
+    "w": 123,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Report",
+    "cls": "btn ghost pz-bug",
+    "x": 1146,
+    "y": 670,
+    "w": 137,
+    "h": 47,
+    "disabled": false
+   },
+   {
+    "text": "Continue",
+    "cls": "btn green big",
+    "x": 1129,
+    "y": 730,
+    "w": 170,
+    "h": 62,
+    "disabled": false
+   }
+  ],
+  "cls": "modal sm-modal | panel sm pz"
+ }
+}

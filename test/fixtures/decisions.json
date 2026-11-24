@@ -1,0 +1,1519 @@
+[
+ {
+  "name": "levelup: first level, new moves and new vitamins",
+  "seed": 2001,
+  "t": 33.57,
+  "zone": 1,
+  "level": 2,
+  "gold": 1,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 1,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "levelup",
+   "method": "showLevelUp",
+   "title": "level 2",
+   "options": [
+    {
+     "id": "newMove:m915",
+     "label": "m915",
+     "data": {
+      "kind": "newMove",
+      "id": 915,
+      "rarity": 0,
+      "key": "m915"
+     }
+    },
+    {
+     "id": "newVit:vstar-piece-v",
+     "label": "vstar-piece-v",
+     "data": {
+      "kind": "newVit",
+      "vit": "star-piece-v",
+      "rarity": 0,
+      "key": "vstar-piece-v"
+     }
+    },
+    {
+     "id": "newVit:vpoke-radar",
+     "label": "vpoke-radar",
+     "data": {
+      "kind": "newVit",
+      "vit": "poke-radar",
+      "rarity": 0,
+      "key": "vpoke-radar"
+     }
+    },
+    {
+     "id": "newVit:vpp-up",
+     "label": "vpp-up",
+     "data": {
+      "kind": "newVit",
+      "vit": "pp-up",
+      "rarity": 1,
+      "key": "vpp-up"
+     }
+    }
+   ],
+   "extras": {
+    "refresh": {
+     "needsTarget": false,
+     "effect": "new offers (uses one refresh)"
+    },
+    "skip": {
+     "needsTarget": false,
+     "effect": "take nothing, gain Pokédollars (uses one skip)"
+    },
+    "banish": {
+     "needsTarget": true,
+     "effect": "remove the target from future offers, then new offers (uses one banish)"
+    },
+    "banishKit": {
+     "needsTarget": true,
+     "effect": "banish the target and every move of the same kit (new moves that come from another League member only)"
+    }
+   },
+   "context": {
+    "rerolls": 9,
+    "skips": 9,
+    "banishes": 8,
+    "pendingLevels": 1,
+    "level": 2
+   },
+   "serial": 2
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "refresh": true,
+    "skip": true,
+    "banish": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "banishKit": [
+     false,
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "levelup: an upgrade of an owned move among the offers",
+  "seed": 2001,
+  "t": 34.58,
+  "zone": 1,
+  "level": 3,
+  "gold": 2,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 1,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 1,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "levelup",
+   "method": "showLevelUp",
+   "title": "level 3",
+   "options": [
+    {
+     "id": "upMove:m807",
+     "label": "m807",
+     "data": {
+      "kind": "upMove",
+      "slot": 0,
+      "rarity": 1,
+      "ups": [
+       {
+        "key": "dmg",
+        "value": 0.264,
+        "label": "+26% damage"
+       },
+       {
+        "key": "dur",
+        "value": 0.24,
+        "label": "+24% duration"
+       }
+      ],
+      "key": "m807"
+     }
+    },
+    {
+     "id": "newVit:vstar-piece-v",
+     "label": "vstar-piece-v",
+     "data": {
+      "kind": "newVit",
+      "vit": "star-piece-v",
+      "rarity": 0,
+      "key": "vstar-piece-v"
+     }
+    },
+    {
+     "id": "newVit:vexp-candy",
+     "label": "vexp-candy",
+     "data": {
+      "kind": "newVit",
+      "vit": "exp-candy",
+      "rarity": 0,
+      "key": "vexp-candy"
+     }
+    },
+    {
+     "id": "newVit:vcalcium",
+     "label": "vcalcium",
+     "data": {
+      "kind": "newVit",
+      "vit": "calcium",
+      "rarity": 0,
+      "key": "vcalcium"
+     }
+    }
+   ],
+   "extras": {
+    "refresh": {
+     "needsTarget": false,
+     "effect": "new offers (uses one refresh)"
+    },
+    "skip": {
+     "needsTarget": false,
+     "effect": "take nothing, gain Pokédollars (uses one skip)"
+    },
+    "banish": {
+     "needsTarget": true,
+     "effect": "remove the target from future offers, then new offers (uses one banish)"
+    },
+    "banishKit": {
+     "needsTarget": true,
+     "effect": "banish the target and every move of the same kit (new moves that come from another League member only)"
+    }
+   },
+   "context": {
+    "rerolls": 9,
+    "skips": 9,
+    "banishes": 8,
+    "pendingLevels": 1,
+    "level": 3
+   },
+   "serial": 3
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "refresh": true,
+    "skip": true,
+    "banish": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "banishKit": [
+     false,
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "levelup: only vitamins",
+  "seed": 2001,
+  "t": 530.07,
+  "zone": 1,
+  "level": 33,
+  "gold": 1135,
+  "player": {
+   "hp": 103.43,
+   "maxHp": 197,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 8,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 8,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 8,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    },
+    {
+     "key": "blast-burn",
+     "name": "Blast Burn",
+     "level": 8,
+     "type": "fire",
+     "arch": "meteor",
+     "cls": "special",
+     "cd": 4.24,
+     "area": 4.2
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1,
+    "charcoal": 1
+   },
+   "species": 156
+  },
+  "decision": {
+   "kind": "levelup",
+   "method": "showLevelUp",
+   "title": "level 33",
+   "options": [
+    {
+     "id": "newVit:vmax-potion",
+     "label": "vmax-potion",
+     "data": {
+      "kind": "newVit",
+      "vit": "max-potion",
+      "rarity": 0,
+      "key": "vmax-potion"
+     }
+    },
+    {
+     "id": "newVit:vether",
+     "label": "vether",
+     "data": {
+      "kind": "newVit",
+      "vit": "ether",
+      "rarity": 1,
+      "key": "vether"
+     }
+    },
+    {
+     "id": "newVit:vexp-candy",
+     "label": "vexp-candy",
+     "data": {
+      "kind": "newVit",
+      "vit": "exp-candy",
+      "rarity": 0,
+      "key": "vexp-candy"
+     }
+    },
+    {
+     "id": "newVit:vx-attack",
+     "label": "vx-attack",
+     "data": {
+      "kind": "newVit",
+      "vit": "x-attack",
+      "rarity": 0,
+      "key": "vx-attack"
+     }
+    }
+   ],
+   "extras": {
+    "refresh": {
+     "needsTarget": false,
+     "effect": "new offers (uses one refresh)"
+    },
+    "skip": {
+     "needsTarget": false,
+     "effect": "take nothing, gain Pokédollars (uses one skip)"
+    },
+    "banish": {
+     "needsTarget": true,
+     "effect": "remove the target from future offers, then new offers (uses one banish)"
+    },
+    "banishKit": {
+     "needsTarget": true,
+     "effect": "banish the target and every move of the same kit (new moves that come from another League member only)"
+    }
+   },
+   "context": {
+    "rerolls": 9,
+    "skips": 9,
+    "banishes": 8,
+    "pendingLevels": 1,
+    "level": 33
+   },
+   "serial": 39
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "refresh": true,
+    "skip": true,
+    "banish": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "banishKit": [
+     false,
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 3
+  }
+ },
+ {
+  "name": "levelup: a move borrowed from another League member",
+  "seed": 2001,
+  "t": 102.61,
+  "zone": 1,
+  "level": 7,
+  "gold": 32,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 2,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 3,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 1,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 2,
+    "old-rod": 1,
+    "charcoal": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "levelup",
+   "method": "showLevelUp",
+   "title": "level 7",
+   "options": [
+    {
+     "id": "newMove:m52",
+     "label": "m52",
+     "data": {
+      "kind": "newMove",
+      "id": 52,
+      "rarity": 0,
+      "key": "m52",
+      "from": 4
+     }
+    },
+    {
+     "id": "upMove:m915",
+     "label": "m915",
+     "data": {
+      "kind": "upMove",
+      "slot": 1,
+      "rarity": 0,
+      "ups": [
+       {
+        "key": "cd",
+        "value": 0.08,
+        "label": "-8% cooldown"
+       },
+       {
+        "key": "crit",
+        "value": 0.05,
+        "label": "+5% crit"
+       }
+      ],
+      "key": "m915"
+     }
+    },
+    {
+     "id": "newVit:vexp-candy",
+     "label": "vexp-candy",
+     "data": {
+      "kind": "newVit",
+      "vit": "exp-candy",
+      "rarity": 0,
+      "key": "vexp-candy"
+     }
+    },
+    {
+     "id": "newMove:m307",
+     "label": "m307",
+     "data": {
+      "kind": "newMove",
+      "id": 307,
+      "rarity": 0,
+      "key": "m307"
+     }
+    }
+   ],
+   "extras": {
+    "refresh": {
+     "needsTarget": false,
+     "effect": "new offers (uses one refresh)"
+    },
+    "skip": {
+     "needsTarget": false,
+     "effect": "take nothing, gain Pokédollars (uses one skip)"
+    },
+    "banish": {
+     "needsTarget": true,
+     "effect": "remove the target from future offers, then new offers (uses one banish)"
+    },
+    "banishKit": {
+     "needsTarget": true,
+     "effect": "banish the target and every move of the same kit (new moves that come from another League member only)"
+    }
+   },
+   "context": {
+    "rerolls": 9,
+    "skips": 9,
+    "banishes": 8,
+    "pendingLevels": 1,
+    "level": 7
+   },
+   "serial": 10
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "refresh": true,
+    "skip": true,
+    "banish": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "banishKit": [
+     true,
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 1
+  }
+ },
+ {
+  "name": "levelup: vitamin upgrades",
+  "seed": 2001,
+  "t": 543.75,
+  "zone": 1,
+  "level": 35,
+  "gold": 1256,
+  "player": {
+   "hp": 189.11,
+   "maxHp": 197,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 8,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 8,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 8,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    },
+    {
+     "key": "blast-burn",
+     "name": "Blast Burn",
+     "level": 8,
+     "type": "fire",
+     "arch": "meteor",
+     "cls": "special",
+     "cd": 4.24,
+     "area": 4.2
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {
+    "x-attack": 1,
+    "x-speed": 1
+   },
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1,
+    "charcoal": 1
+   },
+   "species": 156
+  },
+  "decision": {
+   "kind": "levelup",
+   "method": "showLevelUp",
+   "title": "level 35",
+   "options": [
+    {
+     "id": "newVit:vpp-up",
+     "label": "vpp-up",
+     "data": {
+      "kind": "newVit",
+      "vit": "pp-up",
+      "rarity": 2,
+      "key": "vpp-up"
+     }
+    },
+    {
+     "id": "newVit:vescape-rope",
+     "label": "vescape-rope",
+     "data": {
+      "kind": "newVit",
+      "vit": "escape-rope",
+      "rarity": 0,
+      "key": "vescape-rope"
+     }
+    },
+    {
+     "id": "upVit:vx-speed",
+     "label": "vx-speed",
+     "data": {
+      "kind": "upVit",
+      "vit": "x-speed",
+      "rarity": 1,
+      "key": "vx-speed"
+     }
+    },
+    {
+     "id": "newVit:vnugget",
+     "label": "vnugget",
+     "data": {
+      "kind": "newVit",
+      "vit": "nugget",
+      "rarity": 0,
+      "key": "vnugget"
+     }
+    }
+   ],
+   "extras": {
+    "refresh": {
+     "needsTarget": false,
+     "effect": "new offers (uses one refresh)"
+    },
+    "skip": {
+     "needsTarget": false,
+     "effect": "take nothing, gain Pokédollars (uses one skip)"
+    },
+    "banish": {
+     "needsTarget": true,
+     "effect": "remove the target from future offers, then new offers (uses one banish)"
+    },
+    "banishKit": {
+     "needsTarget": true,
+     "effect": "banish the target and every move of the same kit (new moves that come from another League member only)"
+    }
+   },
+   "context": {
+    "rerolls": 8,
+    "skips": 9,
+    "banishes": 8,
+    "pendingLevels": 1,
+    "level": 35
+   },
+   "serial": 42
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "refresh": true,
+    "skip": true,
+    "banish": [
+     true,
+     true,
+     true,
+     true
+    ],
+    "banishKit": [
+     false,
+     false,
+     false,
+     false
+    ]
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 2
+  }
+ },
+ {
+  "name": "item",
+  "seed": 2001,
+  "t": 4.92,
+  "zone": 1,
+  "level": 1,
+  "gold": 0,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 1,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "item",
+   "method": "showItem",
+   "title": "found an item",
+   "options": [
+    {
+     "id": "old-rod",
+     "label": "old-rod",
+     "data": {
+      "key": "old-rod",
+      "owned": 0
+     }
+    }
+   ],
+   "extras": {
+    "sell": {
+     "needsTarget": false,
+     "effect": "sell it for Pokédollars instead of taking it"
+    }
+   },
+   "context": {
+    "gold": 0
+   },
+   "serial": 1
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true
+   ],
+   "extras": {
+    "sell": true
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "itemChoice",
+  "seed": 2001,
+  "t": 43.5,
+  "zone": 1,
+  "level": 3,
+  "gold": 20,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 2,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 1,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "itemChoice",
+   "method": "showItemChoice",
+   "title": "found items: take one",
+   "options": [
+    {
+     "id": "charcoal",
+     "label": "charcoal",
+     "data": {
+      "key": "charcoal",
+      "owned": 0
+     }
+    },
+    {
+     "id": "x-accuracy",
+     "label": "x-accuracy",
+     "data": {
+      "key": "x-accuracy",
+      "owned": 0
+     }
+    },
+    {
+     "id": "metal-powder",
+     "label": "metal-powder",
+     "data": {
+      "key": "metal-powder",
+      "owned": 0
+     }
+    }
+   ],
+   "extras": {
+    "sell": {
+     "needsTarget": false,
+     "effect": "take none, gain Pokédollars"
+    }
+   },
+   "context": {
+    "gold": 20
+   },
+   "serial": 4
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "sell": true
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "blessing",
+  "seed": 2001,
+  "t": 65.98,
+  "zone": 1,
+  "level": 5,
+  "gold": 26,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 2,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 2,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 1,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1,
+    "charcoal": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "blessing",
+   "method": "showBlessing",
+   "title": "Unown altar",
+   "options": [
+    {
+     "id": "+20% duration",
+     "label": "+20% duration",
+     "data": {
+      "label": "+20% duration",
+      "mods": [
+       {
+        "stat": "duration",
+        "mul": 1.2
+       }
+      ],
+      "rarity": 0
+     }
+    },
+    {
+     "id": "+24 max HP",
+     "label": "+24 max HP",
+     "data": {
+      "label": "+24 max HP",
+      "mods": [
+       {
+        "stat": "maxHp",
+        "add": 24
+       }
+      ],
+      "rarity": 1
+     }
+    },
+    {
+     "id": "+3.0% evasion",
+     "label": "+3.0% evasion",
+     "data": {
+      "label": "+3.0% evasion",
+      "mods": [
+       {
+        "stat": "evasion",
+        "add": 0.03
+       }
+      ],
+      "rarity": 0
+     }
+    }
+   ],
+   "extras": {},
+   "context": {
+    "subtitle": null
+   },
+   "serial": 7
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true
+   ],
+   "extras": {}
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "seals",
+  "seed": 2001,
+  "t": 474.74,
+  "zone": 1,
+  "level": 30,
+  "gold": 920,
+  "player": {
+   "hp": 197,
+   "maxHp": 197,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 8,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 8,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 8,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    },
+    {
+     "key": "blast-burn",
+     "name": "Blast Burn",
+     "level": 6,
+     "type": "fire",
+     "arch": "meteor",
+     "cls": "special",
+     "cd": 4.24,
+     "area": 4.2
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 2,
+    "old-rod": 1,
+    "charcoal": 1
+   },
+   "species": 156
+  },
+  "decision": {
+   "kind": "seals",
+   "method": "showSeals",
+   "title": "wake species 26",
+   "options": [
+    {
+     "id": "none",
+     "label": "wake without seals",
+     "data": {
+      "seals": []
+     }
+    },
+    {
+     "id": "heal",
+     "label": "wake with heal",
+     "data": {
+      "seals": [
+       "heal"
+      ]
+     }
+    },
+    {
+     "id": "horde",
+     "label": "wake with horde",
+     "data": {
+      "seals": [
+       "horde"
+      ]
+     }
+    },
+    {
+     "id": "heal+horde",
+     "label": "wake with heal + horde",
+     "data": {
+      "seals": [
+       "heal",
+       "horde"
+      ]
+     }
+    },
+    {
+     "id": "echo",
+     "label": "wake with echo",
+     "data": {
+      "seals": [
+       "echo"
+      ]
+     }
+    },
+    {
+     "id": "heal+echo",
+     "label": "wake with heal + echo",
+     "data": {
+      "seals": [
+       "heal",
+       "echo"
+      ]
+     }
+    },
+    {
+     "id": "horde+echo",
+     "label": "wake with horde + echo",
+     "data": {
+      "seals": [
+       "horde",
+       "echo"
+      ]
+     }
+    },
+    {
+     "id": "heal+horde+echo",
+     "label": "wake with heal + horde + echo",
+     "data": {
+      "seals": [
+       "heal",
+       "horde",
+       "echo"
+      ]
+     }
+    }
+   ],
+   "extras": {
+    "decline": {
+     "needsTarget": false,
+     "effect": "not now: the guardian stays asleep"
+    }
+   },
+   "context": {
+    "species": 26,
+    "legendary": false,
+    "offers": [
+     "heal",
+     "horde",
+     "echo"
+    ],
+    "kept": 0
+   },
+   "serial": 36
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "decline": true
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "ditto",
+  "seed": 2001,
+  "t": 71.55,
+  "zone": 1,
+  "level": 5,
+  "gold": 27,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 2,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 2,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 1,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1,
+    "old-rod": 1,
+    "charcoal": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "ditto",
+   "method": "showDitto",
+   "title": "Ditto: which item to copy",
+   "options": [
+    {
+     "id": "max-revive",
+     "label": "max-revive",
+     "data": {
+      "key": "max-revive",
+      "owned": 1
+     }
+    },
+    {
+     "id": "old-rod",
+     "label": "old-rod",
+     "data": {
+      "key": "old-rod",
+      "owned": 1
+     }
+    },
+    {
+     "id": "charcoal",
+     "label": "charcoal",
+     "data": {
+      "key": "charcoal",
+      "owned": 1
+     }
+    }
+   ],
+   "extras": {
+    "decline": {
+     "needsTarget": false,
+     "effect": "not now"
+    }
+   },
+   "context": {},
+   "serial": 8
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [
+    true,
+    true,
+    true
+   ],
+   "extras": {
+    "decline": true
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "option": 0
+  }
+ },
+ {
+  "name": "fusion",
+  "seed": 2002,
+  "t": 19.97,
+  "zone": 1,
+  "level": 1,
+  "gold": 0,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 1,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "fusion",
+   "method": "$fvt0na",
+   "title": "Bill's fusion machine",
+   "options": [],
+   "extras": {
+    "leave": {
+     "needsTarget": false,
+     "effect": "close without using it"
+    }
+   },
+   "context": {
+    "fusions": [
+     {
+      "r": null,
+      "a": -1,
+      "b": -1,
+      "names": null,
+      "types": null,
+      "ready": false,
+      "need": null,
+      "t1": "fire",
+      "t2": "fire",
+      "cls": "special"
+     }
+    ],
+    "notExposed": "everything but leaving: the choices of this dialog are implemented inside the HUD"
+   },
+   "serial": 1
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [],
+   "extras": {
+    "leave": true
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "extra": "leave"
+  }
+ },
+ {
+  "name": "forget",
+  "seed": 2002,
+  "t": 52.1,
+  "zone": 1,
+  "level": 4,
+  "gold": 8,
+  "player": {
+   "hp": 183,
+   "maxHp": 183,
+   "moves": [
+    {
+     "key": "burning-jealousy",
+     "name": "Burning Jealousy",
+     "level": 2,
+     "type": "fire",
+     "arch": "cone",
+     "cls": "special",
+     "cd": 1.8,
+     "area": 7
+    },
+    {
+     "key": "temper-flare",
+     "name": "Temper Flare",
+     "level": 1,
+     "type": "fire",
+     "arch": "nova",
+     "cls": "physical",
+     "cd": 2.37,
+     "area": 6.5
+    },
+    {
+     "key": "fire-pledge",
+     "name": "Fire Pledge",
+     "level": 1,
+     "type": "fire",
+     "arch": "wave",
+     "cls": "special",
+     "cd": 2.21,
+     "area": 4
+    }
+   ],
+   "moveSlots": 4,
+   "vitamins": {},
+   "vitaminSlots": 5,
+   "items": {
+    "max-revive": 1
+   },
+   "species": 155
+  },
+  "decision": {
+   "kind": "forget",
+   "method": "showForget",
+   "title": "move tutor (forget / relearn)",
+   "options": [],
+   "extras": {
+    "leave": {
+     "needsTarget": false,
+     "effect": "close without using it"
+    }
+   },
+   "context": {
+    "notExposed": "everything but leaving: the choices of this dialog are implemented inside the HUD"
+   },
+   "serial": 6
+  },
+  "mask": {
+   "phase": "choice",
+   "options": [],
+   "extras": {
+    "leave": true
+   }
+  },
+  "answered": {
+   "type": "choice",
+   "extra": "leave"
+  }
+ }
+]

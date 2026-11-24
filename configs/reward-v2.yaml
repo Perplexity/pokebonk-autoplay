@@ -1,0 +1,28 @@
+# Reward v2 (python/pokebonk_rl/reward.py). Unit: one KO. Changing a weight means a new version name: the version
+# is recorded with every training run, batch and episode, and a run refuses to resume under another reward.
+#
+# v1 plus the owner's decision of 2026-11-24: "without using everything on the map, you will never play optimally …
+# we should reward using things on the map as much as possible."
+#
+# KOs and the overtime bonus stay the objective, exactly as the ranking counts them, and a model is still promoted on
+# KOs alone (configs/evaluation.yaml): the payment for map use is there so that the agent tries everything, not to be
+# an aim of its own. If using something costs KOs, the evaluation shows it and this weight is what gets lowered.
+version: v2
+# Everything is multiplied by this before it reaches the learner (the learner also normalises returns).
+scale: 0.01
+weights:
+  ko: 1.0             # per KO
+  overtime: 1.0       # per overtime bonus KO, paid as the bonus builds up; taken back if overtime is lost by fainting
+  overtime_void: -1.0 # per KO made during an overtime that was lost by fainting (the game: "its KOs are voided")
+  guardian: 100.0     # per zone guardian beaten
+  zone: 100.0         # per zone entered through a portal (zones 2, 3 and the sanctuary)
+  legendary: 200.0    # the sanctuary's legendary beaten
+  death: -100.0       # fainting before the map is cleared
+  # Per use of the map: a map point used (each point once), a shop purchase, a slot-machine spin, a lesson of Hypno,
+  # a rift cleared, a Max form. A zone of the forest has under 90 map points (docs/training.md §3). A first setting,
+  # not a tuned value.
+  map_use: 10.0
+  # Per owned item sold in the shop. The owner (2026-11-24): "Selling in the shop should take rewards away not add
+  # to it." Three times a map use: more than the Pokédollars of a sale can buy back in paid uses (the best sale of
+  # zone 1, 90 ₽, pays for two slot-machine spins), so that selling to buy or to spin never comes out ahead.
+  shop_sale: -30.0
