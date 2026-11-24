@@ -27,7 +27,7 @@ BUILD = "mwsewi0r"
 # ---------------------------------------------------------------- reward
 
 def counters(**over):
-    c = {"kills": 0, "guardiansDefeated": 0, "legendariesDefeated": 0, "zonesEntered": 1, "damageTaken": 0.0, "mapUse": 0, "shopSold": 0}
+    c = {"kills": 0, "guardiansDefeated": 0, "legendariesDefeated": 0, "zonesEntered": 1, "damageTaken": 0.0, "mapUse": 0, "shopSold": 0, "pointsUsed": 0, "itemsPeak": 0, "goldSpent": 0, "goldEarned": 0}
     c.update(over)
     return c
 
@@ -221,6 +221,122 @@ def test_reward_v2_pays_for_each_use_of_the_map_and_stays_small_next_to_kos():
         RewardConfig(version="v2", weights={**w, "map_use": -1.0})
 
 
+def test_reward_v4_pays_for_a_map_point_and_for_an_item_added_to_the_collection():
+    r = default_reward("v4")
+    v3 = default_reward("v3").weights
+    assert r.version == "v4" and {k: r.weights[k] for k in v3} == v3 and set(r.weights) - set(v3) == {"point_use", "item"}, "v4 is v3 plus two payments"
+    t = RewardTracker(r)
+    t.reset(counters(kills=10, itemsPeak=1))
+    # A paid Poké Ball is opened: the point is used (map_use as before, and point_use on top), no item yet.
+    assert t.step(counters(kills=10, itemsPeak=1, mapUse=1, pointsUsed=1), None, None) == pytest.approx((r.weights["map_use"] + r.weights["point_use"]) * 0.01)
+    # Its item is taken: the collection is larger than it ever was.
+    assert t.step(counters(kills=10, itemsPeak=2, mapUse=1, pointsUsed=1), None, None) == pytest.approx(r.weights["item"] * 0.01)
+    # A slot-machine spin, a shop purchase, a Max form: a use of the map, not a point. Paid as in v3 and no more.
+    assert t.step(counters(kills=10, itemsPeak=2, mapUse=2, pointsUsed=1), None, None) == pytest.approx(r.weights["map_use"] * 0.01)
+    # Selling an item and buying another does not raise the peak: nothing is paid twice.
+    assert t.step(counters(kills=10, itemsPeak=2, mapUse=2, pointsUsed=1), None, None) == 0.0
+    s = t.summary()
+    assert s["raw"]["point_use"] == 1 and s["raw"]["item"] == 1 and s["raw"]["map_use"] == 2
+    # A point must be worth walking to in the first minutes, when there are few KOs; a milestone stays worth more.
+    assert r.weights["map_use"] + r.weights["point_use"] >= 50 and r.weights["point_use"] < r.weights["guardian"] and 0 < r.weights["item"] <= -r.weights["shop_sale"]
+    # The counters must be there: an environment that does not report them is refused, not paid 0.
+    for missing in ("pointsUsed", "itemsPeak"):
+        other = RewardTracker(r)
+        other.reset(counters())
+        with pytest.raises(RuntimeError, match=missing):
+            other.step({k: v for k, v in counters(kills=1).items() if k != missing}, None, None)
+    with pytest.raises(ValueError, match="wrong sign"):
+        RewardConfig(version="v4", weights={**r.weights, "item": -1.0})
+    # v3 does not know them: an old run is paid as it always was.
+    old = RewardTracker(default_reward("v3"))
+    old.reset(counters())
+    assert old.step(counters(mapUse=1, pointsUsed=1, itemsPeak=1), None, None) == pytest.approx(0.1) and "point_use" not in old.summary()["raw"]
+
+
+def test_reward_v5_follows_the_owners_order_of_importance():
+    """KOs first, then the KOs of staying (final swarms, Overtime), then spending Pokédollars and using the map,
+    then earning Pokédollars, then everything else."""
+    r = default_reward("v5")
+    w = r.weights
+    v4 = default_reward("v4").weights
+    assert r.version == "v5" and set(w) - set(v4) == {"spend", "earn"} and set(v4) <= set(w)
+    # 1 and 2: a KO is a KO wherever it is made, and an Overtime bonus KO is one too: the ranking's own count.
+    assert w["ko"] == 1.0 and w["overtime"] == 1.0 and w["overtime_void"] == -1.0
+    # 3 before 4: a Pokédollar spent is worth more than a Pokédollar earned, so earning and keeping it never beats spending it.
+    assert w["spend"] > w["earn"] > 0
+    # 3: a Poké Ball bought (a point used, its price spent, its item taken) is worth more than anything of "the rest".
+    ball = w["map_use"] + w["point_use"] + w["item"] + 60 * w["spend"]
+    assert ball > max(w["guardian"], w["zone"], w["legendary"])
+    # 5: leaving a zone pays less than one more map point in it: nothing pulls the run out of a zone early.
+    assert w["guardian"] + w["zone"] <= w["map_use"] + w["point_use"]
+    # Over a run that does well on every count (figures of the stored baselines, rounded up), the groups come in order.
+    kos = 12000 * w["ko"]
+    map_and_spending = 40 * (w["map_use"] + w["point_use"]) + 10 * w["item"] + 4000 * w["spend"]
+    earning = 5000 * w["earn"]
+    rest = 3 * w["guardian"] + 3 * w["zone"] + w["legendary"]
+    assert kos > map_and_spending > earning > rest > 0
+    t = RewardTracker(r)
+    t.reset(counters(kills=100, goldEarned=500.5, goldSpent=0))
+    # 40 Pokédollars picked up, 3 KOs made while the zone's final swarm is on.
+    assert t.step(counters(kills=103, goldEarned=540.5), None, None, True) == pytest.approx((3 + 40 * w["earn"]) * 0.01)
+    # A Poké Ball bought for 60: the point, the price, and then its item.
+    assert t.step(counters(kills=103, goldEarned=540.5, goldSpent=60, mapUse=1, pointsUsed=1), None, None, True) == pytest.approx((w["map_use"] + w["point_use"] + 60 * w["spend"]) * 0.01)
+    assert t.step(counters(kills=105, goldEarned=540.5, goldSpent=60, mapUse=1, pointsUsed=1, itemsPeak=1), None, None, False) == pytest.approx((2 + w["item"]) * 0.01)
+    s = t.summary()
+    assert s["raw"]["spend"] == 60 and s["raw"]["earn"] == pytest.approx(40) and s["raw"]["ko"] == 5
+    # Measured, not paid on top: how many of the KOs were made in a final swarm.
+    assert s["raw"]["swarm_kos"] == 3 and "swarm_kos" not in s["components"]
+    for missing in ("goldSpent", "goldEarned"):
+        other = RewardTracker(r)
+        other.reset(counters())
+        with pytest.raises(RuntimeError, match=missing):
+            other.step({k: v for k, v in counters(kills=1).items() if k != missing}, None, None)
+    with pytest.raises(ValueError, match="wrong sign"):
+        RewardConfig(version="v5", weights={**w, "earn": -1.0})
+    # v4 does not know them.
+    old = RewardTracker(default_reward("v4"))
+    old.reset(counters())
+    assert old.step(counters(goldSpent=100, goldEarned=100), None, None) == 0.0 and "spend" not in old.summary()["raw"]
+
+
+def test_reward_v3_punishes_an_episode_ended_for_standing_still_and_its_score_is_zero():
+    from pokebonk_rl.evaluate import score, summarize
+    from pokebonk_rl.reward import ended_idle
+    r = default_reward("v3")
+    v2 = default_reward("v2").weights
+    assert r.version == "v3" and {k: r.weights[k] for k in v2} == v2 and set(r.weights) - set(v2) == {"idle"}, "v3 is v2 plus the idle penalty"
+    # Standing still must never come out ahead of playing on and fainting.
+    assert r.weights["idle"] <= r.weights["death"] < 0
+    idle_end = {**episode_end(terminated=False), "truncated": True, "endCause": "idle: no KO and no movement for 30 s of game time"}
+    capped = {**episode_end(terminated=False), "truncated": True, "endCause": "truncated: game time reached the cap of 3600 s"}
+    assert ended_idle(idle_end) and not ended_idle(capped) and not ended_idle(episode_end())
+    t = RewardTracker(r)
+    t.reset(counters(kills=100))
+    assert t.step(counters(kills=124), None, None) == pytest.approx(24 * 0.01)
+    assert t.step(counters(kills=124), idle_end, None) == pytest.approx(-100 * 0.01)
+    s = t.summary()
+    assert s["raw"]["idle"] == 1 and s["raw"]["death"] == 0 and s["components"]["idle"] == pytest.approx(-1.0) and s["total"] == pytest.approx(-0.76)
+    # The safety cap is not standing still, and fainting is not either.
+    for end, component in [(capped, None), (episode_end(), "death")]:
+        other = RewardTracker(r)
+        other.reset(counters())
+        other.step(counters(), end, None)
+        assert other.summary()["raw"]["idle"] == 0 and (component is None or other.summary()["raw"][component] == 1)
+    with pytest.raises(ValueError, match="wrong sign"):
+        RewardConfig(version="v3", weights={**r.weights, "idle": 5.0})
+    # v2 does not know the component: an old run is paid as it always was.
+    old = RewardTracker(default_reward("v2"))
+    old.reset(counters())
+    assert old.step(counters(kills=3), idle_end, None) == pytest.approx(0.03) and "idle" not in old.summary()["raw"]
+    # Evaluation: an invalid run scores 0 whatever it had made, as a stored row and as an episode record.
+    row = {"kills": 5000, "overtime_bonus": 0, "overtime_cashed": 0, "game_time": 400.0, "level": 30, "guardians_defeated": 0, "victory": 0, "terminated": 0, "truncated": 1, "zone": 1}
+    assert score({**row, "end_cause": "idle: no KO and no movement for 30 s of game time"}) == 0.0
+    assert score({**row, "end_cause": "truncated: game time reached the cap of 3600 s"}) == 5000.0
+    assert score({"kills": 5000, "overtime": {"bonus": 0, "cashed": False}, "endCause": "idle: no KO and no movement for 30 s of game time"}) == 0.0
+    summary = summarize([{**row, "end_cause": "idle: no KO and no movement for 30 s of game time"}, {**row, "end_cause": "died", "terminated": 1, "truncated": 0}])
+    assert summary["invalid"] == 1 and summary["score_mean"] == 2500 and summary["kos_mean"] == 5000
+
+
 def test_a_reference_played_on_other_rules_or_with_other_actions_is_not_comparable():
     from pokebonk_rl.evaluate import incomparable
     mine = {"game_build": "b", "bundle_sha256": "s", "profile_preset": "unlocked-v3", "ranked": 1, "hz": 60, "action_repeat": 3, "action_schema": 2, "decision_schema": 2, "label": "x"}
@@ -245,11 +361,14 @@ def test_reward_weights_must_have_the_sign_of_their_component():
 
 def test_configuration_files_load_and_unknown_keys_are_errors(tmp_path):
     training = cfg.load(REPO / "configs" / "training.yaml", cfg.TRAINING_DEFAULTS)
-    assert training["reward"]["version"] == "v2" and training["env"]["action_repeat"] == 3 and training["device"] == "cpu"
+    assert training["reward"]["version"] == "v5" and training["env"]["action_repeat"] == 3 and training["device"] == "cpu"
     assert training["scenarios"]["species"] == [150]
+    assert cfg.env_options(training)["maxIdleGameTime"] == 30 == cfg.env_options(cfg.load(REPO / "configs" / "evaluation.yaml", cfg.EVALUATION_DEFAULTS))["maxIdleGameTime"]
+    # A run created before the rule existed has no such key in its stored configuration: it is resumed without it.
+    assert cfg.env_options({"env": {k: v for k, v in training["env"].items() if k != "max_idle_game_time"}})["maxIdleGameTime"] == 0
     evaluation = cfg.load(REPO / "configs" / "evaluation.yaml", cfg.EVALUATION_DEFAULTS, ["workers.envs=2", "seeds=4-6"])
     assert evaluation["workers"]["envs"] == 2 and cfg.parse_seeds(evaluation["seeds"]) == [4, 5, 6]
-    assert evaluation["scenario"]["species"] == 150 and evaluation["reward"]["version"] == "v2" and len(cfg.parse_seeds(evaluation["promotion"]["seeds"])) == 50
+    assert evaluation["scenario"]["species"] == 150 and evaluation["reward"]["version"] == "v5" and len(cfg.parse_seeds(evaluation["promotion"]["seeds"])) == 50
     # The files spell out every default: a default changed in code without the file (or the reverse) shows here.
     for path, defaults in [("training.yaml", cfg.TRAINING_DEFAULTS), ("evaluation.yaml", cfg.EVALUATION_DEFAULTS)]:
         loaded = cfg.load(REPO / "configs" / path, defaults)

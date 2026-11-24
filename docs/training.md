@@ -11,6 +11,8 @@ python -m pokebonk_rl.train        trainer (one process)                 configs
         └── …
 python -m pokebonk_rl.evaluate     plays a saved model on fixed seeds    configs/evaluation.yaml
 python -m pokebonk_rl.registry     candidate and stable models
+python -m pokebonk_rl.watch        plays one episode with a saved model and prints it frame by frame (docs/dashboard.md)
+node dashboard/server/main.ts      the dashboard over all of it                                       docs/dashboard.md
 data/pokebonk.sqlite               every episode, reward, checkpoint, evaluation, model (docs/storage.md)
 models/                            checkpoints, candidates, stable models (git-ignored)
 logs/tensorboard, logs/training    metrics, and the stderr of every game process (git-ignored)
@@ -69,9 +71,10 @@ an episode carries its `EpisodeRecord`, the same record the Stage 1 runner store
 ## 3. Reward (`python/pokebonk_rl/reward.py`, `configs/reward-v2.yaml`)
 
 Computed in the trainer from the differences of the run's counters. Unit: one KO; the sum is multiplied by
-`scale` = 0.01. **Current version: v2** (Stage 3): v1 plus a payment for using what is on the map and a penalty for
-selling in the shop. v1 and the
-Stage 2 version v0 are kept (`configs/reward-v1.yaml`, `configs/reward-v0.yaml`).
+`scale` = 0.01. **Current version: v5** (Stage 3): the owner's order of importance (decision 8 and "The order of
+importance" below). Kept: v4 (v3 plus a real payment for a map point and an item; one run of 159,568 decisions,
+stopped), v3 (v2 plus a penalty for standing still), v2 (v1 plus a payment for using the map and a penalty for selling
+in the shop), v1 and the Stage 2 version v0 (`configs/reward-v4.yaml` … `configs/reward-v0.yaml`).
 
 **The owner's decisions behind v1 and v2** (2026-11-24):
 1. KOs matter more than finishing the run, because the ranking counts KOs.
@@ -84,6 +87,24 @@ Stage 2 version v0 are kept (`configs/reward-v1.yaml`, `configs/reward-v0.yaml`)
    (docs/environment.md §4, docs/baseline.md §12), and v2 pays for each use.
 6. "Selling in the shop should take rewards away not add to it." v2 takes reward away for each owned item sold in
    the shop.
+7. "Honestly, in a real run, you'd be getting KOs extremely often. I would invalidate and/punish any run where no
+   KOs or movement happens for 30 seconds." So an episode with no KO and no movement for 30 game seconds ends there,
+   is invalid (it scores 0 in an evaluation) and costs the learner the `idle` penalty of v3. See "Standing still"
+   below.
+
+8. "KOs are most important, overtime KOs per zone is next, so the longer the run goes per zone the better, spending
+   pokedollars and opening item chests and other map interactions is next, then earning pokedollars, and then its
+   everything else." Said before any more training, with: "we should really stop and check that scoring is working
+   properly." v5, and the check, are under "The order of importance" below.
+
+v3 has every weight of v2, and `idle` = −100: once, at the end of an episode that the rule against standing still
+ended.
+
+v4 has every weight of v3, and `point_use` = 40 (per map point used, on top of the 10 of `map_use`: 50 in all) and
+`item` = 30 (per item by which the collection grows beyond the largest it has been).
+
+v5 has `spend` = 0.1 and `earn` = 0.05 (per Pokédollar spent and earned) and smaller milestones: `guardian` 25,
+`zone` 25, `legendary` 50. Everything else as v4.
 
 | Component | Paid for | v2 weight (KOs) | v1 | v0 |
 |---|---|---|---|---|
@@ -96,6 +117,12 @@ Stage 2 version v0 are kept (`configs/reward-v1.yaml`, `configs/reward-v0.yaml`)
 | `death` | fainting before the map is cleared | −100 | −100 | −100 |
 | `map_use` | each use of the map (`counters.mapUse`): a map point used, a shop purchase, a slot-machine spin, a lesson of Hypno, a rift cleared, a Max form | 10 | — | — |
 | `shop_sale` | each owned item sold in the shop (`counters.shopSold`) | −30 | — | — |
+| `idle` (v3) | an episode ended by the rule against standing still | −100 (v3, v4) | — | — |
+| `point_use` (v4) | each map point used (`counters.pointsUsed`), on top of `map_use` | 40 (v4) | — | — |
+| `item` (v4) | each item by which the collection grows beyond its largest so far (`counters.itemsPeak`) | 30 (v4) | — | — |
+| `spend` (v5) | each Pokédollar spent (`counters.goldSpent`) | 0.1 (v5) | — | — |
+| `earn` (v5) | each Pokédollar earned (`counters.goldEarned`) | 0.05 (v5) | — | — |
+| `guardian`, `zone`, `legendary` in v5 | as above | 25, 25, 50 | | |
 
 - **`ko` + `overtime` + `overtime_void` are the objective itself**: over an episode they sum to what the ranking
   counts, the run's KOs plus the cashed overtime bonus. The other three are hints.
@@ -143,6 +170,94 @@ Stage 2 version v0 are kept (`configs/reward-v1.yaml`, `configs/reward-v0.yaml`)
 - **A known side of it.** Spins and purchases are limited only by Pokédollars, and the price of a spin rises 8 %
   with each one (40 spins cost about 10,000 ₽), so the payment for them is bounded in practice; but a policy can
   learn to spend on spins what would have bought better items. That is one of the things to look at first.
+- **The order of importance (v5), and the check of the scoring** (2026-11-24, no training running).
+  - *What the game has.* Each zone has its own clock; at minute 10 the **final swarm** begins (up to 800 enemies), and
+    8 minutes into it the collapse starts to drain HP until the portal is taken. Its KOs are plain KOs. **Overtime**
+    in the game's own sense exists once per run, after the legendary: rounds whose KOs are multiplied. "Overtime KOs
+    per zone" is read here as both: the KOs of staying in a zone after its clock ran out, and the game's Overtime.
+  - *Where the KOs are.* Six whole episodes of random play (seeds 2, 9, 11, 17, 21, 29): the four that reached the
+    final swarm made 4,490 to 6,612 KOs in the ten minutes before it and 7,597 to 14,680 in the two to three and a
+    half minutes they survived in it: 63 to 74 % of the run. The trainer now counts them (`raw.swarm_kos`, from the
+    bridge's `sw`); they are paid as KOs, not more: a swarm KO counts once in the ranking.
+  - *Checked, and right.* (a) The evaluation's score, KOs + cashed Overtime bonus, is the figure of the game's own
+    KO goal (`stats.kills + (overtime.live || overtime.cashed ? overtime.bonus : 0)` in the bundle). (b) All 578
+    stored training episodes: the KOs, map uses, shop sales and faintings that were paid are those of the episode's
+    final counters, and the total is the sum of the components. (c) The six episodes above, stepped through v5: every
+    component paid equals the change of the game's counter, and the counters agree with the game's end-of-run record
+    (`econ.gold` = Pokédollars earned, `econ.balls` = Poké Balls bought, `build.peak.items` = `itemsPeak`).
+  - *Found.* (1) The stored KOs of an episode are 1 to 18 above the `kills` of the game's end-of-run record in 44 of
+    the 240 baseline episodes (0.1 % at most): the environment reads the counter a moment after the game wrote its
+    record, and moves still in flight make KOs. Not changed: the same figure is used for every policy. (2) A lost
+    Overtime: the reward voids its KOs (the profile's text: "its kills are voided"), the evaluation's score keeps them
+    (the in-run goal does). 2 of the 80 stored heuristic episodes are affected, no other. Not changed. (3) Before v5
+    nothing was paid for Pokédollars, earned or spent, and a guardian or a zone (100) paid more than a map point (10 in
+    v2 and v3, 50 in v4): against the order. (4) The game has a run score of its own for the history screen
+    (`kills·2 + time·3 + damage/200 + 1500 per zone + 800 per boss + 6000 for the victory`); the rankings count KOs,
+    so it is not used.
+  - *What each group pays under v5, per episode, on stored episodes* (KOs' worth; the order holds in each row):
+
+    | Episodes | KOs | Overtime bonus | Map, items, spending | Earning | The rest (v4 weights) |
+    |---|---|---|---|---|---|
+    | random, seeds 1–30 | 11,801 | 0 | 506 | 269 | 0 (0) |
+    | heuristic, seeds 1–30 | 5,988 | 942 | 765 | 173 | 123 (490) |
+    | heuristic, held-out | 7,454 | 440 | 794 | 205 | 144 (576) |
+    | `mewtwo-v3-01`, last 100 | 12,124 | 0 | 269 | 215 | 0 (0) |
+
+  - *What follows from the order.* With the milestones this small, almost nothing but KOs speaks for leaving a zone.
+    The learner has to find out by itself that the collapse ends a run that stays, and that Overtime lies behind the
+    legendary. If it never leaves zone 1, that is this decision at work, and the weights to look at are these three.
+  - *First settings, all of them*: 0.1, 0.05 and the three milestones are not tuned values.
+- **What v3 taught, and v4.** `mewtwo-v3-01` was stopped at 8,456,328 decisions (416 episodes). Found on 2026-11-24:
+  - *KOs as the random policy.* Mean KOs per quarter of the run: 9,306, 8,095, 11,329, 12,138; the random baseline
+    makes 11,801 on the development seeds. Guardians beaten in all 416 episodes: 5; episodes that left zone 1: 2.
+  - *It used less and less of the map.* Episodes that spent any Pokédollars: 40 % in the first quarter of the run,
+    9 % in the last (random baseline: 83 %). Poké Balls bought per episode: 0.43 → 0.06 (random: 1.5). Items at the
+    peak: 2.3 → 2.0, with 1.2 in the third quarter (random: 3.5, heuristic: 9.0).
+  - *Why: it stands in a corner.* The newest checkpoint, played with sampled actions on three seeds, walks to the
+    south-west corner of the map (−166, 166 of ±168) within one to three minutes and stays there for the rest of
+    the run, 80 to 110 m from the nearest unused Poké Ball. The first checkpoint of the same run wanders around the
+    start. The buttons were not unlearned: when `interact` is allowed, the newest checkpoint presses it with
+    probability 0.46 to 0.83. It is allowed in 0.1 % of its moments, against 0.3 to 1.7 % for the first checkpoint.
+  - *Why the reward let it.* KOs arrive whatever the Pokémon does (the moves fire by themselves), and in the runs that
+    were tracked three quarters of the KOs were made in the last two minutes. Per episode the learner was paid 119.9 for KOs and 0.47 for
+    using the map: 0.4 %. What an item is worth shows minutes later, beyond what the learner looks ahead (γ = 0.999:
+    about 50 game seconds). The rule against standing still does not see the corner: the KOs keep coming.
+  - *v4.* A map point used pays 50 in all, an item added to the collection 30. In the first five minutes of a run
+    (one or two KOs a second) that is half a minute of KOs: worth walking to. Next to a late swarm it is nothing, so
+    it cannot outweigh surviving. Repeatable uses (spins, purchases, lessons, Max forms) stay at 10: they are
+    limited only by Pokédollars, and at 50 a slot machine would pay more than everything else on the map.
+    `itemsPeak` and not `itemsHeld`, so selling and buying again pays nothing. Both weights are first settings.
+  - *What to look at in the next run*: map points used per ten minutes of game time (random: 5.5; v3 fell from 4.4
+    to about 2.5), Poké Balls bought, items at the peak, and whether the KOs follow. If it collects points and the
+    KOs do not follow, the payment is a distraction and the weights come down.
+  - *Not changed*: the learner still samples a direction 20 times a second, which explores like a random walk, and
+    still looks 50 seconds ahead. If v4 does not move the figures above, those are next.
+- **Standing still (v3, and `env.max_idle_game_time`).** What was found: the first model (`mewtwo-v2-01`, 2 million
+  decisions), taking its most probable action on seed 8, cleared a rift at 76 s and then stood 11 m from the rift's
+  portal, with no enemy alive and full hit points, until the evaluation's one-hour cap (124 KOs; seed 5 the same with
+  286). Nothing attacks there and nothing is earned, so without a cap such an episode never ends; in training, which
+  has no cap, it would hold a game process for the rest of the session.
+  - *The rule* is the environment's (`maxIdleGameTime`, `src/environment/GameEnvironment.ts`): the mark of "last
+    activity" moves when a KO is made or the player leaves a circle of 3 m around the place of the last activity;
+    30 s of the run clock without either ends the episode with the cause `idle: no KO and no movement for 30 s of
+    game time`. Dialogs take no game time. Pushing against an obstacle is standing still (tested).
+  - *Invalid.* The game's run did not end and would not have: a run like that is never counted. An evaluation gives
+    it the score 0 (`evaluate.score`), counts it under `invalid`, and the dashboard does the same.
+  - *Punished.* v3's `idle` component, −100, the same as fainting: standing still must never come out ahead of
+    playing on and fainting. A first setting. For the learner the episode is a true end, not a cut: nothing is
+    estimated from the state it stopped in (`TimeLimit.truncated` is false for it; it is true for the time cap).
+  - *What it does not catch*: a policy that makes no KO but keeps moving more than 3 m every 30 s (pacing inside a
+    cleared rift). During training, actions are sampled and a parked model wanders; the rule is aimed at the decided
+    policy that stands. If pacing shows up, the next step is a rule on KOs alone, which needs a look at the
+    guardian fights and the walk through the sanctuary first (legitimate stretches without a KO).
+  - *The learner cannot see the clock*: how long it has been idle is not part of the observation (adding it would
+    change the observation layout and with it every stored model). It can see that it is standing where nothing is
+    alive.
+  - *The heuristic and the random baseline never meet the rule* (0 of 30 episodes each on seeds 1–30, every episode
+    identical to the stored one; docs/baseline.md §13), so the stored reference batches stay valid. The baseline that
+    never moves met it once in 30.
+  - A run created before the rule existed has no `max_idle_game_time` in its stored configuration and is resumed
+    without it.
 - Nothing is paid for time survived, damage dealt, levels or pickups. Damage taken is measured per episode
   (`raw.damage_taken`) and has no weight.
 - The version, the weights and each episode's components are stored (`training_runs.reward_json`,
@@ -178,6 +293,8 @@ python -m pokebonk_rl.train --config configs/training.yaml --set workers.envs=8 
   resume uses that file and accepts only a higher `--timesteps`. A run name is used once.
 - **Stopping.** Ctrl+C, or creating `models/runs/<name>/STOP`: the current step finishes, a checkpoint of kind
   `interrupt` is written, the session is recorded as `interrupted`. A second Ctrl+C aborts without a checkpoint.
+  A `STOP` file belongs to the session that was running when it was written: the next session of the run removes it
+  when it starts (a file left behind used to stop a resumed run at its first step).
 - **Configuration.** Every key has its default in `python/pokebonk_rl/config.py` and appears in the YAML file; an
   unknown key is an error.
 
@@ -200,7 +317,7 @@ Besides the library's own `rollout/`, `train/` and `time/` series:
 
 | Series | Meaning |
 |---|---|
-| `game/kos_mean`, `score_mean`, `time_mean`, `level_mean`, `zone_mean`, `guardians_mean`, `completed_share` | over the last 100 finished episodes (score = KOs + cashed overtime bonus) |
+| `game/kos_mean`, `score_mean`, `time_mean`, `level_mean`, `zone_mean`, `guardians_mean`, `completed_share`, `invalid_share` | over the last 100 finished episodes (score = KOs + cashed overtime bonus, 0 for a run ended for standing still; `invalid_share` = the share of those) |
 | `reward/<component>_mean`, `reward/total_mean` | reward per episode, by component, same window |
 | `perf/decisions_per_second`, `episodes_per_hour` | throughput since the previous update |
 | `perf/waiting_for_game_share` | share of wall time spent waiting for game processes |
@@ -323,8 +440,8 @@ baselines on the same seeds (docs/baseline.md):
 
 ## 9. Tests
 
-`python -m pytest` (27 tests): `python/tests/test_units.py` (20, no game process, 2 s) and
-`python/tests/test_game.py` (7, real game processes, about 100 s; `-m "not game"` skips them).
+`python -m pytest` (37 tests): `python/tests/test_units.py` (no game process, 2 s) and
+`python/tests/test_game.py` (real game processes, about 60 s on the MacBook; `-m "not game"` skips them).
 
 | Requirement of the specification | Test |
 |---|---|

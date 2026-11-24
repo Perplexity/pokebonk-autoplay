@@ -8,6 +8,9 @@ env:
   hz: 60
   action_repeat: 3
   max_game_time: 3600   # the cap the stored baselines were played with (never reached by them)
+  # An episode with no KO and no movement for this many game seconds ends there as invalid and scores 0 (the owner's
+  # rule, 2026-11-24). The random and heuristic baselines never meet it (docs/baseline.md §13). 0 = no such rule.
+  max_idle_game_time: 30
   ranked: true
 
 # One scenario per evaluation: results of different Pokémon, maps or tiers are not pooled.
@@ -30,7 +33,7 @@ workers:
 
 deterministic: true     # the most probable action at every step; false = sample
 device: cpu
-reward_file: reward-v2.yaml
+reward_file: reward-v5.yaml
 
 # What a model must do to be promotable to stable: `metric` over the seeds, divided by the reference's, must reach
 # `min_ratio`, and no episode may be lost to an error. The reference is the stable model's own evaluation on the same

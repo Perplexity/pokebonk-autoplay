@@ -1,0 +1,33 @@
+# Reward v4 (python/pokebonk_rl/reward.py). Unit: one KO. Changing a weight means a new version name: the version
+# is recorded with every training run, batch and episode, and a run refuses to resume under another reward.
+#
+# v3 plus two payments, after what `mewtwo-v3-01` did (docs/training.md §3, "What v3 taught"): by 8 million decisions
+# it walked to a corner of the map in the first minute and stayed there, 80 m and more from the nearest Poké Ball, so
+# it bought nothing and held next to nothing. Its KOs were those of the random policy. The 10 KOs v2 pays per use of
+# the map came to 0.4 % of what an episode earned: too little to be noticed next to the KOs, which arrive whatever
+# the Pokémon does.
+#
+# The owner (decision 5): "we should reward using things on the map as much as possible."
+version: v4
+# Everything is multiplied by this before it reaches the learner (the learner also normalises returns).
+scale: 0.01
+weights:
+  ko: 1.0             # per KO
+  overtime: 1.0       # per overtime bonus KO, paid as the bonus builds up; taken back if overtime is lost by fainting
+  overtime_void: -1.0 # per KO made during an overtime that was lost by fainting (the game: "its KOs are voided")
+  guardian: 100.0     # per zone guardian beaten
+  zone: 100.0         # per zone entered through a portal (zones 2, 3 and the sanctuary)
+  legendary: 200.0    # the sanctuary's legendary beaten
+  death: -100.0       # fainting before the map is cleared
+  map_use: 10.0       # per use of the map, as in v2: a map point, a shop purchase, a slot-machine spin, a lesson, a rift, a Max form
+  shop_sale: -30.0    # per owned item sold in the shop
+  idle: -100.0        # an episode ended by the rule against standing still
+  # On top of map_use, for a map point used (each point pays once: a Poké Ball opened, an altar, a cage, a rock, …):
+  # 50 in all. In the first five minutes of a run a Pokémon makes one or two KOs a second, so a point is worth half a
+  # minute of them and is worth walking to; next to a late swarm (thousands of KOs a minute) it is nothing. What can
+  # be repeated for Pokédollars (spins, purchases) stays at 10, so the payment cannot be farmed at a slot machine.
+  point_use: 40.0
+  # Per item by which the collection grows beyond the largest it has been (`counters.itemsPeak`, the game's own
+  # count). Taking the item a Poké Ball gave pays; selling one and getting another does not pay again. Not larger than
+  # the penalty for selling in the shop. Both are first settings, not tuned values.
+  item: 30.0

@@ -1,0 +1,203 @@
+@import 'tailwindcss';
+/* Archivo with its width axis: wide for names, condensed for columns of figures. Bundled; nothing is fetched at run time. */
+@import '@fontsource-variable/archivo/wdth.css';
+
+/*
+ * The look: a handheld instrument. The page is the housing (pale LCD sage), data sits in lighter "screens" set into
+ * it, ink is a deep moss, and one violet marks what can be pressed. Chart colours are the validated data-viz palette
+ * (blue, orange, aqua), checked against the screen colour of each theme.
+ */
+:root {
+  color-scheme: light;
+  --housing: #dce3ce;
+  --housing-deep: #cdd6bc;
+  --screen: #f2f5e9;
+  --screen-2: #e7ecda;
+  --ink: #18201a;
+  --ink-2: #44503f;
+  --ink-3: #636d5c;
+  --rule: #c3ccb1;
+  --action: #5b3fc4;
+  --action-press: #4a31a8;
+  --action-ink: #ffffff;
+  --action-soft: #e2dcf3;
+  --good: #0ca30c;
+  --good-ink: #006300;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --critical-ink: #a82323;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --seq-1: #86b6ef;
+  --seq-2: #5598e7;
+  --seq-3: #256abf;
+  --seq-4: #104281;
+  --grid: #d6ddc6;
+  --axis: #b3bd9f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) {
+    color-scheme: dark;
+    --housing: #121713;
+    --housing-deep: #0b0f0c;
+    --screen: #1a211b;
+    --screen-2: #222b23;
+    --ink: #e6ecd9;
+    --ink-2: #b9c2ab;
+    --ink-3: #8f9984;
+    --rule: #313c32;
+    --action: #a893f2;
+    --action-press: #bdaef6;
+    --action-ink: #15101f;
+    --action-soft: #2a2444;
+    --good: #0ca30c;
+    --good-ink: #3fc23f;
+    --warning: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --critical-ink: #ee7a7a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --seq-1: #184f95;
+    --seq-2: #256abf;
+    --seq-3: #5598e7;
+    --seq-4: #9ec5f4;
+    --grid: #262f27;
+    --axis: #3b473c;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --housing: #121713;
+  --housing-deep: #0b0f0c;
+  --screen: #1a211b;
+  --screen-2: #222b23;
+  --ink: #e6ecd9;
+  --ink-2: #b9c2ab;
+  --ink-3: #8f9984;
+  --rule: #313c32;
+  --action: #a893f2;
+  --action-press: #bdaef6;
+  --action-ink: #15101f;
+  --action-soft: #2a2444;
+  --good: #0ca30c;
+  --good-ink: #3fc23f;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --critical-ink: #ee7a7a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #5598e7;
+  --seq-4: #9ec5f4;
+  --grid: #262f27;
+  --axis: #3b473c;
+}
+
+@theme inline {
+  --font-sans: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --color-housing: var(--housing);
+  --color-housing-deep: var(--housing-deep);
+  --color-screen: var(--screen);
+  --color-screen-2: var(--screen-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-action: var(--action);
+  --color-action-press: var(--action-press);
+  --color-action-ink: var(--action-ink);
+  --color-action-soft: var(--action-soft);
+  --color-good: var(--good);
+  --color-good-ink: var(--good-ink);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --color-critical-ink: var(--critical-ink);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-grid: var(--grid);
+  --color-axis: var(--axis);
+  /* A classical scale: 12, 14, 16, 18, 21, 28, 40. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.3125rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.5rem;
+}
+
+@layer base {
+  html { background: var(--housing); }
+  body {
+    margin: 0;
+    background: var(--housing);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.45;
+    font-stretch: 100%;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  :focus-visible { outline: 2px solid var(--action); outline-offset: 2px; border-radius: 2px; }
+  button, select, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  dialog { color: var(--ink); }
+  dialog::backdrop { background: color-mix(in srgb, var(--housing-deep) 70%, transparent); }
+  table { border-collapse: collapse; }
+  ::selection { background: var(--action-soft); }
+}
+
+@layer components {
+  /* The run's name and the page titles: Archivo pulled wide. */
+  .type-display { font-size: var(--text-3xl); line-height: 1.05; font-weight: 760; font-stretch: 118%; letter-spacing: -0.012em; }
+  .type-title { font-size: var(--text-lg); line-height: 1.25; font-weight: 680; font-stretch: 108%; }
+  .type-figure { font-size: var(--text-2xl); line-height: 1.1; font-weight: 640; font-stretch: 96%; }
+  /* Columns of numbers: condensed and aligned. */
+  .type-num { font-stretch: 88%; font-variant-numeric: tabular-nums; font-weight: 520; }
+  .type-label { font-size: 0.8125rem; color: var(--ink-2); font-weight: 520; }
+
+  /* A screen set into the housing. */
+  .screen { min-width: 0; background: var(--screen); border: 1px solid var(--rule); border-radius: 3px; box-shadow: inset 0 1px 0 color-mix(in srgb, var(--housing-deep) 55%, transparent); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; min-height: 2.25rem; padding: 0 0.9rem; border-radius: 3px; border: 1px solid var(--ink); background: transparent;
+    font-weight: 620; font-stretch: 104%; white-space: nowrap; transition: background-color 120ms, border-color 120ms; }
+  .btn:hover:not(:disabled) { background: var(--screen-2); }
+  .btn:disabled { opacity: 0.45; }
+  .btn-primary { background: var(--action); border-color: var(--action); color: var(--action-ink); }
+  .btn-primary:hover:not(:disabled) { background: var(--action-press); border-color: var(--action-press); }
+  .btn-quiet { border-color: transparent; color: var(--action); padding: 0 0.4rem; min-height: 1.75rem; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  .btn-quiet:hover:not(:disabled) { background: var(--action-soft); }
+
+  .field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.3rem; min-width: 0; }
+  .field > span { font-size: 0.8125rem; font-weight: 560; color: var(--ink-2); }
+  .field input, .field select { width: 100%; min-width: 0; min-height: 2.25rem; padding: 0 0.6rem; background: var(--screen); border: 1px solid var(--axis); border-radius: 3px; }
+  .field small { color: var(--ink-3); font-size: 0.75rem; }
+
+  .data-table { width: 100%; }
+  .data-table th { text-align: left; font-size: 0.8125rem; font-weight: 560; color: var(--ink-2); padding: 0.4rem 0.75rem 0.4rem 0; border-bottom: 1px solid var(--axis); white-space: nowrap; }
+  .data-table td { padding: 0.45rem 0.75rem 0.45rem 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .data-table th.num, .data-table td.num { text-align: right; }
+  .data-table tbody tr { content-visibility: auto; contain-intrinsic-size: auto 2.2rem; }
+  .data-table tbody tr.is-link { cursor: pointer; }
+  .data-table tbody tr.is-link:hover { background: var(--screen-2); }
+
+  .lamp { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex: none; border: 1.5px solid var(--ink-3); }
+  .lamp-on { background: var(--good); border-color: var(--good); }
+  .lamp-busy { background: var(--warning); border-color: var(--warning); }
+  @media (prefers-reduced-motion: no-preference) {
+    .lamp-on, .lamp-busy { animation: lamp 2.4s ease-in-out infinite; }
+  }
+  @keyframes lamp { 50% { opacity: 0.45; } }
+}

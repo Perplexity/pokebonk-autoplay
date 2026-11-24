@@ -13,14 +13,16 @@
  *              header's `n` (they are those of the layout descriptors in data/encoding/<build>/)
  *
  * Requests (header only):
- *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, species, map, tier, ranked}, recordDecisions}  → hello
+ *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, maxIdleGameTime?, species, map, tier, ranked}, recordDecisions, view?}  → hello
+ *       (view: every obs reply also carries `v`, a top-down picture of the moment for somebody watching)
  *   {cmd: 'reset', seed, species?, map?, tier?}                                                     → obs
  *   {cmd: 'step', a: [move, jump, dash, ultimate, interact, form, incense, fuse, choice]}                                → obs
  *   {cmd: 'close'}                                                                                  → (exit 0)
  *
  * Replies:
  *   {t: 'hello', pid, protocol}     (the game is loaded by the first reset, not here)
- *   {t: 'obs', phase, step, term, trunc, n: [floatSize, intSize, maskSize], c: <counters>, ot: <overtime or null>, hp, maxHp, rss,
+ *   {t: 'obs', phase, step, term, trunc, n: [floatSize, intSize, maskSize], c: <counters>, ot: <overtime or null>,
+ *    sw: 1 while the zone's final swarm is on (the zone clock ran out), else 0, hp, maxHp, rss,
  *     metadata?: <BatchMetadata, with the first reset of the process>,
  *     episode?: <EpisodeRecord, with the step that ended the episode>}  + payload
  *   {t: 'error', name, message, stack, details}  then the process exits with code 1: after an error the environment's
@@ -60,11 +62,12 @@ process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => (process.stderr.
 
 // ---------------------------------------------------------------- state
 
-interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean }
+interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean }
 type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a: number[] } | { cmd: 'close' };
 
 let env: HeadlessGameEnvironment | null = null;
 let recordDecisions = false;
+let withView = false;
 let obs: Observation | null = null;
 let episodes = 0;
 let sentMetadata = false;
@@ -80,9 +83,27 @@ function reply(o: Observation, res: StepResult | null, extra: Record<string, unk
   const p = o.snapshot.player;
   out({
     t: 'obs', phase: o.phase, step: o.step, n: [o.encoded!.float.length, o.encoded!.int.length, o.encoded!.mask.length], term: res?.terminated ?? false, trunc: res?.truncated ?? false,
-    c: res ? res.info.counters : o.state.counters, ot: res?.info.overtime ?? null, hp: p.hp, maxHp: p.maxHp,
-    rss: Math.round(process.memoryUsage().rss / 1048576), ...extra,
+    c: res ? res.info.counters : o.state.counters, ot: res?.info.overtime ?? null, sw: o.state.zone.finalSwarm ? 1 : 0, hp: p.hp, maxHp: p.maxHp,
+    rss: Math.round(process.memoryUsage().rss / 1048576), ...(withView ? { v: viewOf(o) } : {}), ...extra,
   }, payloadOf(o));
+}
+
+/**
+ * What somebody watching needs to draw the moment from above (`init` with `view: true`; python/pokebonk_rl/watch.py):
+ * positions on the ground, hit points, the open dialog. Read from the frozen observation; the game is not touched.
+ */
+function viewOf(o: Observation): Record<string, unknown> {
+  const s = o.snapshot, p = s.player, r1 = (n: number): number => Math.round(n * 10) / 10;
+  return {
+    time: r1(s.t), zone: s.stage, kills: s.kills, level: p.level, hp: Math.round(p.hp), maxHp: Math.round(p.maxHp), x: r1(p.x), z: r1(p.z), phase: o.phase, enemies: s.enemies.count,
+    near: s.enemies.list.map((e) => [r1(e[1]), r1(e[2]), r1(e[7]), e[10]]),
+    boss: s.boss && s.boss.hp > 0 ? { x: r1(s.boss.x), z: r1(s.boss.z), hp: Math.round(s.boss.hp), maxHp: Math.round(s.boss.maxHp), name: s.boss.name } : null,
+    points: s.points.map((q) => [q.sub ? `${q.kind}:${q.sub}` : q.kind, r1(q.x), r1(q.z), q.used ? 1 : 0]),
+    hazards: s.hazards.map((h) => [r1(h.x), r1(h.z), r1(h.r)]),
+    shots: s.shots.map((h) => [r1(h[0]), r1(h[1])]),
+    decision: o.decision ? { kind: o.decision.kind, options: o.decision.options.map((d) => String(d.label || d.id)) } : null,
+    bounds: s.terrain?.bounds ?? null,
+  };
 }
 
 function episodeRecord(o: Observation, res: StepResult): EpisodeRecord {
@@ -110,6 +131,7 @@ async function handle(req: Request): Promise<void> {
   if (req.cmd === 'init') {
     if (env) throw new Error('ipc: init was sent twice');
     recordDecisions = !!req.recordDecisions;
+    withView = !!req.view;
     env = createEnvironment({ ...req.env, encode: true });
     out({ t: 'hello', protocol: IPC_PROTOCOL, pid: process.pid });
     return;

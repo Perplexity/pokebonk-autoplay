@@ -1,0 +1,26 @@
+# Reward v3 (python/pokebonk_rl/reward.py). Unit: one KO. Changing a weight means a new version name: the version
+# is recorded with every training run, batch and episode, and a run refuses to resume under another reward.
+#
+# v2 plus the owner's decision of 2026-11-24: "in a real run, you'd be getting KOs extremely often. I would invalidate
+# and/punish any run where no KOs or movement happens for 30 seconds."
+#
+# The rule itself is the environment's (env.max_idle_game_time in configs/training.yaml and configs/evaluation.yaml:
+# an episode with no KO and no movement for that long ends there and is invalid). This file sets what such an end
+# costs the learner. Why it was needed: taking its most probable action, the first model cleared a rift and then stood
+# still inside it, where nothing attacks and nothing is earned, until the one-hour cap (docs/training.md §3).
+version: v3
+# Everything is multiplied by this before it reaches the learner (the learner also normalises returns).
+scale: 0.01
+weights:
+  ko: 1.0             # per KO
+  overtime: 1.0       # per overtime bonus KO, paid as the bonus builds up; taken back if overtime is lost by fainting
+  overtime_void: -1.0 # per KO made during an overtime that was lost by fainting (the game: "its KOs are voided")
+  guardian: 100.0     # per zone guardian beaten
+  zone: 100.0         # per zone entered through a portal (zones 2, 3 and the sanctuary)
+  legendary: 200.0    # the sanctuary's legendary beaten
+  death: -100.0       # fainting before the map is cleared
+  map_use: 10.0       # per use of the map (v2); a first setting, not a tuned value
+  shop_sale: -30.0    # per owned item sold in the shop (v2)
+  # An episode ended by the rule against standing still. The same as fainting: standing still must never come out
+  # ahead of playing on and fainting. A first setting, not a tuned value.
+  idle: -100.0

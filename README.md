@@ -43,6 +43,15 @@ py -3.13 -m venv .venv                                 # once: Python side (trai
 .venv\Scripts\tensorboard --logdir logs/tensorboard --host 127.0.0.1
 ```
 
+```sh
+npm run dashboard:install && npm run dashboard:build   # once: the training dashboard's page
+npm run dashboard                                       # http://127.0.0.1:8090 (this machine only)
+```
+
+On macOS and Linux the Python commands above are `python3.13 -m venv .venv`, `.venv/bin/python -m pip install torch`
+and `.venv/bin/python -m pokebonk_rl.…`. `device: cpu` is the measured choice on an Apple-silicon Mac too (914 against
+249 decisions a second on its GPU).
+
 Training and evaluation use no network: the game processes and the trainer each refuse connections in their own
 process, and they talk to each other over pipes. Installing the Python packages is the only step that downloads
 anything.
@@ -53,6 +62,7 @@ anything.
 | `docs/observation.md`, `docs/game-knowledge.md` | what the policy sees, and the exported game data |
 | `docs/baseline.md`, `docs/storage.md` | the episode runner, the scripted baselines, the database |
 | `docs/training.md` | training, checkpoints, evaluation, candidate and stable models |
+| `docs/dashboard.md` | the training dashboard: what it shows, what its buttons run, why it cannot damage the stable model |
 | `docs/fidelity.md` | how the headless game was compared with the game in Chrome |
 | `docs/stage-1-report.md`, `docs/stage-2-report.md` | what each stage delivered and measured |
 

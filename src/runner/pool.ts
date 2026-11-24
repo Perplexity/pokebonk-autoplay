@@ -43,6 +43,8 @@ export interface BatchConfig {
   ranked: boolean;
   /** Safety cap on the run clock in game seconds (0 = none): reaching it ends the episode as `truncated`. */
   maxGameTime: number;
+  /** The rule against standing still (GameEnvironmentOptions.maxIdleGameTime); absent or 0: no such rule. */
+  maxIdleGameTime?: number;
   hz: number;
   actionRepeat: number;
   /** Episodes a worker plays before it is replaced by a fresh process (memory growth). 1: every episode in a fresh process. */
@@ -243,7 +245,7 @@ export async function runBatch(config: BatchConfig, hooks: BatchHooks = {}): Pro
     });
     child.on('error', (e) => { slot.output += `\n[fork error] ${e.message}`; });
 
-    send(slot, { type: 'init', workerId: id, policy: config.policy, policyOptions: config.policyOptions ?? {}, env: { hz: config.hz, actionRepeat: config.actionRepeat, maxGameTime: config.maxGameTime, species: config.species, map: config.map, tier: config.tier, ranked: config.ranked }, ...(config.faults ? { faults: config.faults } : {}) });
+    send(slot, { type: 'init', workerId: id, policy: config.policy, policyOptions: config.policyOptions ?? {}, env: { hz: config.hz, actionRepeat: config.actionRepeat, maxGameTime: config.maxGameTime, maxIdleGameTime: config.maxIdleGameTime ?? 0, species: config.species, map: config.map, tier: config.tier, ranked: config.ranked }, ...(config.faults ? { faults: config.faults } : {}) });
   };
 
   const onAbort = (): void => {

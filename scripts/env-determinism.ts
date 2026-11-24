@@ -55,7 +55,10 @@ async function child(): Promise<void> {
   for (let i = 0; i < before.length; i++) await play(before[i], i === before.length - 1 ? 400 : Infinity);
   const t0 = real.performanceNow();
   const out = await play(SEED);
-  say('@@RESULT@@' + JSON.stringify({ ...out, wallMs: real.performanceNow() - t0, blocked: env.getMetadata().offline.blocked }));
+  // Wait for the write: stdout to a pipe is blocking on Windows but asynchronous on macOS and Linux, where the
+  // process.exit() below would cut a line longer than the pipe's buffer (64 KB) short.
+  const result = '@@RESULT@@' + JSON.stringify({ ...out, wallMs: real.performanceNow() - t0, blocked: env.getMetadata().offline.blocked }) + '\n';
+  await new Promise<void>((done) => { process.stdout.write(result, () => done()); });
   await env.close();
 }
 

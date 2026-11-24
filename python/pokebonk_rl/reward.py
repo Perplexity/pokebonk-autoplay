@@ -33,7 +33,38 @@ rewarded as much as possible. Everything of v1, and:
                  shop should take rewards away not add to it." A found item turned down for Pokédollars and what is
                  forgotten at Hypno are not sales in the shop: nothing is paid or taken for them.
 
-Nothing is paid for time survived, damage dealt, levels or pickups. Damage taken is measured (`raw`) but has weight 0.
+Version v3 (configs/reward-v3.yaml), after the owner's decision of 2026-11-24 ("in a real run, you'd be getting KOs
+extremely often. I would invalidate and/punish any run where no KOs or movement happens for 30 seconds"). Everything
+of v2, and:
+
+  idle           the episode was ended by the environment's rule against standing still (`env.max_idle_game_time`:
+                 no KO and no movement for that long; src/environment, `maxIdleGameTime`), counted once, at the end
+                 (weight negative). Such an episode is a true end for the learner, like fainting: nothing is
+                 bootstrapped from the state it stopped in (python/pokebonk_rl/vec_env.py).
+
+Version v4 (configs/reward-v4.yaml), after `mewtwo-v3-01` learned to stand in a corner of the map and use nothing
+(docs/training.md §3): the 10 KOs of `map_use` were 0.4 % of an episode's reward. Everything of v3, and:
+
+  point_use      map points used (`counters.pointsUsed`: the part of `mapUse` that is a point, each point once), paid
+                 on top of `map_use`. Not the repeatable uses (shop purchases, slot-machine spins, lessons, Max forms),
+                 which stay at `map_use` alone: those are limited only by Pokédollars.
+  item           items by which the collection grew beyond the largest it has been (`counters.itemsPeak`, the game's
+                 own `peakItems`). Selling and buying again does not raise the peak, so it is paid once per item.
+
+Version v5 (configs/reward-v5.yaml), after the owner's order of importance of 2026-11-24: "KOs are most important,
+overtime KOs per zone is next, so the longer the run goes per zone the better, spending pokedollars and opening item
+chests and other map interactions is next, then earning pokedollars, and then its everything else." Everything of v4,
+with the milestones (guardian, zone, legendary: "everything else") made smaller than a map point, and:
+
+  spend          Pokédollars spent (`counters.goldSpent`, the game's own `run.goldSpent`: Poké Balls, the shop and its
+                 rerolls, cages, slot machines, …), per Pokédollar.
+  earn           Pokédollars earned (`counters.goldEarned`, the game's own `stats.gold`), per Pokédollar; less than
+                 `spend`, so that keeping them never pays as much as spending them.
+
+Also measured in every version (`raw`, weight 0, like damage taken): `swarm_kos`, the KOs made while the zone's final
+swarm was on (the bridge's `sw`). They are KOs and are paid as KOs.
+
+Nothing is paid for time survived, damage dealt or levels. Damage taken is measured (`raw`) but has weight 0.
 """
 from __future__ import annotations
 
@@ -43,9 +74,22 @@ from typing import Any
 COMPONENTS_V0 = ("ko", "guardian", "zone", "legendary", "overtime", "death")
 COMPONENTS_V1 = (*COMPONENTS_V0, "overtime_void")
 COMPONENTS_V2 = (*COMPONENTS_V1, "map_use", "shop_sale")
-COMPONENTS = {"v0": COMPONENTS_V0, "v1": COMPONENTS_V1, "v2": COMPONENTS_V2}
+COMPONENTS_V3 = (*COMPONENTS_V2, "idle")
+COMPONENTS_V4 = (*COMPONENTS_V3, "point_use", "item")
+COMPONENTS_V5 = (*COMPONENTS_V4, "spend", "earn")
+COMPONENTS = {"v0": COMPONENTS_V0, "v1": COMPONENTS_V1, "v2": COMPONENTS_V2, "v3": COMPONENTS_V3, "v4": COMPONENTS_V4, "v5": COMPONENTS_V5}
 #: Components whose weight is a penalty: the count is positive, the weight must not be.
-PENALTIES = ("death", "overtime_void", "shop_sale")
+PENALTIES = ("death", "overtime_void", "shop_sale", "idle")
+
+
+def ended_idle(episode: Any) -> bool:
+    """The episode was ended by the rule against standing still, which makes the run invalid. `episode` is an episode
+    record of the bridge (`endCause`) or a stored row of `episodes` (`end_cause`)."""
+    try:
+        cause = episode["end_cause"] if "end_cause" in episode.keys() else episode["endCause"]
+    except (KeyError, IndexError):
+        return False
+    return str(cause or "").startswith("idle")
 
 
 @dataclass(frozen=True)
@@ -91,6 +135,7 @@ class RewardTracker:
         self.components = {k: 0.0 for k in self.config.components}
         self.raw = {k: 0.0 for k in self.config.components}
         self.raw["damage_taken"] = 0.0
+        self.raw["swarm_kos"] = 0.0
         self.total = 0.0
         self.steps = 0
         self.bonus_paid = 0.0            # v1: overtime bonus KOs paid so far
@@ -120,9 +165,10 @@ class RewardTracker:
         raw["overtime"] = target - self.bonus_paid
         self.bonus_paid = target
 
-    def step(self, counters: dict[str, Any], episode: dict[str, Any] | None, overtime: dict[str, Any] | None = None) -> float:
+    def step(self, counters: dict[str, Any], episode: dict[str, Any] | None, overtime: dict[str, Any] | None = None, final_swarm: bool = False) -> float:
         """`counters` after the step; `episode` is the end-of-episode record on the step that ended it, else None;
-        `overtime` is the step's overtime state as the environment reports it (`ot` of the bridge's reply), or None."""
+        `overtime` is the step's overtime state as the environment reports it (`ot` of the bridge's reply), or None;
+        `final_swarm`: the zone's final swarm is on after the step (`sw` of the bridge's reply)."""
         if self.prev is None:
             raise RuntimeError("RewardTracker.step before reset")
         p, c = self.prev, counters
@@ -145,12 +191,21 @@ class RewardTracker:
             if "shopSold" not in c:
                 raise RuntimeError(f"reward {version} needs the counter 'shopSold', which this environment does not report")
             raw["shop_sale"] = float(c["shopSold"]) - float(p["shopSold"])
+        for component, counter in (("point_use", "pointsUsed"), ("item", "itemsPeak"), ("spend", "goldSpent"), ("earn", "goldEarned")):
+            if component in raw:
+                if counter not in c:
+                    raise RuntimeError(f"reward {version} needs the counter {counter!r}, which this environment does not report")
+                raw[component] = float(c[counter]) - float(p[counter])
         if episode is not None and episode["terminated"] and not episode["victory"]:
             raw["death"] = 1.0
+        if "idle" in raw and episode is not None and ended_idle(episode):
+            raw["idle"] = 1.0
         for k, v in raw.items():
             if v < 0 and not (k == "overtime" and version != "v0"):
                 raise RuntimeError(f"reward {version}: the counter behind {k!r} went down by {-v} in one step; counters are expected to be cumulative")
         self.raw["damage_taken"] += max(0.0, float(c["damageTaken"]) - float(p["damageTaken"]))
+        if final_swarm:
+            self.raw["swarm_kos"] += raw["ko"]
         w, s = self.config.weights, self.config.scale
         reward = 0.0
         for k, v in raw.items():

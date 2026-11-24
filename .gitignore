@@ -11,3 +11,7 @@ logs/
 __pycache__/
 *.egg-info/
 .pytest_cache/
+# The training dashboard's page: its packages and its built files (npm run dashboard:install, dashboard:build).
+dashboard/node_modules/
+dashboard/dist/
+.DS_Store

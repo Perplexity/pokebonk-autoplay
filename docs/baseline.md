@@ -474,3 +474,27 @@ the environment waits for it without moving the virtual clock.
 **Not done.** These features were not compared step by step with the browser (the fidelity runs of
 docs/fidelity.md predate them); what is verified is that each answer has the effect the game's own code describes.
 No baseline has been played on the new environment yet.
+
+## 13. The rule against standing still, checked on the baselines (added 2026-11-24)
+
+The owner's rule (docs/training.md §3): an episode with no KO and no movement for 30 game seconds ends there and is
+invalid. Before it was switched on for training and evaluation, the three scripted policies were played again on
+seeds 1–30 with the rule on (`node scripts/run-episodes.ts … --max-idle=30`, Mewtwo, forest, tier 0, cap 3600 s; a
+scratch database, not `data/pokebonk.sqlite`) and compared seed by seed with batches 1 to 3 (KOs, game time, steps,
+cause of end):
+
+| Policy | Episodes ended by the rule | Identical to the stored baseline |
+|---|---|---|
+| heuristic | 0 of 30 | 30 of 30 |
+| random | 0 of 30 | 30 of 30 |
+| idle (never moves) | 1 of 30 | 29 of 30 |
+
+- **The heuristic plays the whole lifecycle** (guardian fights, the walk to each portal, the sanctuary, overtime;
+  13 complete runs on these seeds) and never goes 30 s without a KO and without moving 3 m. The rule ends nothing
+  that play of that kind does.
+- **Random never meets it either**, so the reference of the promotion rule (`heldout-mewtwo-random`) and
+  `baseline-mewtwo-random` are what they would have been with the rule on. They were not played again.
+- **The one episode it ended** is the standing-still policy on seed 14: no enemy reached it in the first 30 s, so
+  it had 0 KOs and had not moved (32 KOs in 77 s without the rule). That is the rule doing what it says.
+- Not checked: the held-out seeds, and the same on other Pokémon and maps.
+

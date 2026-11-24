@@ -22,10 +22,15 @@ from pathlib import Path
 from typing import Any
 
 from . import offline
+from .reward import ended_idle as _ended_idle
 
 
 def score(e: dict[str, Any]) -> float:
-    """KOs plus the overtime bonus when it was cashed. `e` is a stored episode row or an episode record."""
+    """KOs plus the overtime bonus when it was cashed. `e` is a stored episode row or an episode record.
+    A run ended by the rule against standing still is invalid and scores 0: in the game it would never have ended,
+    and a run that does not end is never counted."""
+    if _ended_idle(e):
+        return 0.0
     if "overtime" in e:
         return float(e["kills"]) + (float(e["overtime"]["bonus"]) if e["overtime"]["cashed"] else 0.0)
     return float(e["kills"]) + (float(e["overtime_bonus"]) if e["overtime_cashed"] else 0.0)
@@ -48,6 +53,7 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "guardians_mean": statistics.fmean(float(r["guardians_defeated"]) for r in rows),
         "completed": sum(1 for r in rows if r["victory"]), "overtime_cashed": sum(1 for r in rows if r["overtime_cashed"]),
         "died": sum(1 for r in rows if r["terminated"] and not r["victory"]), "truncated": sum(1 for r in rows if r["truncated"]),
+        "invalid": sum(1 for r in rows if _ended_idle(r)),
         "zones": dict(sorted(zones.items())),
     }
 
@@ -161,7 +167,7 @@ def play_seeds(model, *, layouts, env_options: dict[str, Any], scenario: dict[st
                         still.append(s)
                     continue
                 episode = s.frame.header.get("episode")
-                s.tracker.step(s.frame.header["c"], episode, s.frame.header.get("ot"))
+                s.tracker.step(s.frame.header["c"], episode, s.frame.header.get("ot"), bool(s.frame.header.get("sw")))
                 if episode is None:
                     still.append(s)
                     continue
@@ -347,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nevaluation {evaluation_id} (batch {batch_id}): {summary['episodes']} of {len(seeds)} episodes, {lost} lost to errors")
         if summary["episodes"]:
             line = lambda name, s: (f"  {name:<10} KOs mean {s['kos_mean']:.0f}, median {s['kos_median']:.0f}, max {s['kos_max']:.0f}; score mean {s['score_mean']:.0f}, median {s['score_median']:.0f}; "  # noqa: E731
-                                    f"completed {s['completed']}, died {s['died']}; zones {s['zones']}")
+                                    f"completed {s['completed']}, died {s['died']}, invalid (stood still) {s.get('invalid', 0)}; zones {s['zones']}")
             print(line("model", summary))
             if comparison is not None and comparison["seeds_compared"]:
                 print(line("reference", comparison["reference"]) + f"   [{ref_text}]")

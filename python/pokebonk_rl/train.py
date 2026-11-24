@@ -60,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
     from .bridge import WorkerError
     from .checkpoints import latest_checkpoint, read_checkpoint, save_checkpoint
     from .layout import load_layouts
-    from .reward import RewardConfig
+    from .evaluate import score
+    from .reward import RewardConfig, ended_idle
     from .storage import Store
     from .vec_env import NodeVecEnv, Scenarios
 
@@ -123,6 +124,9 @@ def main(argv: list[str] | None = None) -> int:
         run_id = store.create_training_run(name=name, algorithm="MaskablePPO", config=config, reward=reward.to_dict(), observation_layout_hash=layouts.observation_hash,
                                            action_layout_hash=layouts.action_hash, game_build=layouts.build, directory=str(run_dir))
     (run_dir / "config.json").write_text(json.dumps(config, indent=1), "utf-8")
+    # A STOP file is a request to the session that was running when it was written. One left behind (that session
+    # obeyed it and exited) would stop this session at its first step.
+    (run_dir / "STOP").unlink(missing_ok=True)
 
     # ------------------------------------------------------------ records
     w = config["workers"]
@@ -217,7 +221,8 @@ def main(argv: list[str] | None = None) -> int:
                     mean = lambda xs: sum(xs) / n  # noqa: E731
                     self.logger.record("game/episodes_in_window", n)
                     self.logger.record("game/kos_mean", mean([e["kills"] for e in eps]))
-                    self.logger.record("game/score_mean", mean([e["kills"] + (e["overtime"]["bonus"] if e["overtime"]["cashed"] else 0) for e in eps]))
+                    self.logger.record("game/score_mean", mean([score(e) for e in eps]))
+                    self.logger.record("game/invalid_share", mean([1.0 if ended_idle(e) else 0.0 for e in eps]))
                     self.logger.record("game/time_mean", mean([e["gameTime"] for e in eps]))
                     self.logger.record("game/level_mean", mean([e["level"] for e in eps]))
                     self.logger.record("game/zone_mean", mean([e["zone"] for e in eps]))

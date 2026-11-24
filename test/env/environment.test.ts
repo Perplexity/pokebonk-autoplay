@@ -234,6 +234,39 @@ test('truncation: only by the configured cap on game time; the next reset closes
   } finally { (env.options as { maxGameTime: number }).maxGameTime = 0; }
 });
 
+test('standing still: with maxIdleGameTime, no KO and no movement for that long ends the episode as invalid', async () => {
+  const o = env.options as { maxIdleGameTime: number };
+  /** Hold one direction (answering any dialog with its first option) until the episode ends or the run clock passes `until`. */
+  const hold = async (move: 'none' | 'w' | 'e', until: number): Promise<StepResult> => {
+    let obs = await env.reset({ seed: 33 });
+    for (;;) {
+      const res = await env.step(obs.phase === 'choice' ? { type: 'choice', option: 0 } : { type: 'play', move });
+      obs = res.observation;
+      if (res.terminated || res.truncated || res.info.time >= until) return res;
+    }
+  };
+  o.maxIdleGameTime = 2;
+  try {
+    // The first two seconds of a run, not moving: nothing has been knocked out yet.
+    const still = await hold('none', 10);
+    assert.deepEqual([still.terminated, still.truncated, still.observation.phase, still.info.kills], [false, true, 'over', 0]);
+    assert.equal(still.info.endCause, 'idle: no KO and no movement for 2 s of game time');
+    assert.equal(still.info.end, undefined, 'the game\'s run did not end: there is no record of it');
+    assert.ok(still.info.time >= 2 && still.info.time < 2.06, `ended at ${still.info.time} s`);
+    await assert.rejects(env.step({ type: 'play', move: 0 }), /the episode is over/);
+    // Walking is movement: the same seed, walking east over open ground, goes on past those two seconds.
+    const walking = await hold('e', 4);
+    assert.deepEqual([walking.terminated, walking.truncated], [false, false]);
+    // Holding a direction is not: to the west something stands in the way after 12 m, and pushing against it is standing still.
+    const pushing = await hold('w', 10);
+    assert.equal(pushing.info.endCause, 'idle: no KO and no movement for 2 s of game time');
+    assert.ok(pushing.info.time > 3 && pushing.info.time < 5 && pushing.observation.snapshot.player.x < -10, `ended at ${pushing.info.time} s`);
+  } finally { o.maxIdleGameTime = 0; }
+  // Without the option there is no such rule.
+  const free = await hold('none', 4);
+  assert.deepEqual([free.terminated, free.truncated], [false, false]);
+});
+
 test('terminal: a fainted run ends the episode with the game\'s own record; another species, map and tier start', async () => {
   const { last, kinds } = await playAndDigest(11, Infinity, { species: 25, map: 'coast', tier: 2 });
   assert.deepEqual([last.terminated, last.truncated, last.observation.phase], [true, false, 'over']);

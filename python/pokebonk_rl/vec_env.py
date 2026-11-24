@@ -31,7 +31,7 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 from .bridge import Frame, NodeWorker, WorkerError
 from .layout import Layouts, check_against_metadata
-from .reward import RewardConfig, RewardTracker
+from .reward import RewardConfig, RewardTracker, ended_idle
 
 
 class Scenarios:
@@ -209,7 +209,7 @@ class NodeVecEnv(VecEnv):
                 self._place(i, new, first)
                 continue
             episode = frame.header.get("episode")
-            rewards[i] = slot.tracker.step(frame.header["c"], episode, frame.header.get("ot"))
+            rewards[i] = slot.tracker.step(frame.header["c"], episode, frame.header.get("ot"), bool(frame.header.get("sw")))
             if episode is None:
                 self._obs["float"][i], self._obs["int"][i], self._masks[i] = frame.float, frame.int, frame.mask.astype(bool)
                 continue
@@ -218,7 +218,9 @@ class NodeVecEnv(VecEnv):
             self.episodes_finished += 1
             infos[i] = {
                 "terminal_observation": {"float": frame.float.copy(), "int": frame.int.copy()},
-                "TimeLimit.truncated": bool(episode["truncated"] and not episode["terminated"]),
+                # The safety cap on game time cuts an episode that would have gone on: the learner estimates what was
+                # still to come. An episode ended for standing still is over for good, like one that ended by fainting.
+                "TimeLimit.truncated": bool(episode["truncated"] and not episode["terminated"] and not ended_idle(episode)),
                 "episode": {"r": summary["total"], "l": summary["steps"], "t": episode["wallSeconds"]},
                 "pokebonk": {"episode": episode, "reward": summary, "scenario": slot.scenario, "episode_index": slot.episode_index, "worker_id": slot.worker.worker_id},
             }

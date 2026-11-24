@@ -82,6 +82,34 @@ def test_bridge_reports_an_action_the_mask_forbids_and_the_process_ends(tmp_path
         w.kill()
 
 
+def test_bridge_adds_a_top_down_view_only_when_asked_and_the_episode_stays_the_same(tmp_path):
+    """`view: true` (python/pokebonk_rl/watch.py, the dashboard's Watch page) adds a picture of the moment to every
+    reply. It is read from the observation: the episode it describes is the one played without it."""
+    plain, _ = play(41, 40, tmp_path / "plain.log")
+    rng = np.random.default_rng(123)
+    w = NodeWorker(default_env_options(), log_path=tmp_path / "view.log", view=True)
+    try:
+        frame = w.reset(41, species=155, map="forest", tier=0)
+        views = [frame.header["v"]]
+        for k in range(40):
+            frame = w.step(masked_random(frame.mask, rng))
+            views.append(frame.header["v"])
+            assert np.array_equal(frame.float, plain[k + 1][0]) and frame.header["c"] == plain[k + 1][3], f"the watched episode differs at step {k + 1}"
+    finally:
+        w.close()
+    first, last = views[0], views[-1]
+    assert set(first) == {"time", "zone", "kills", "level", "hp", "maxHp", "x", "z", "phase", "enemies", "near", "boss", "points", "hazards", "shots", "decision", "bounds"}
+    assert first["time"] == 0 and first["phase"] == "play" and first["hp"] == first["maxHp"] > 0 and first["zone"] == 1
+    assert any(kind == "boss" for kind, _x, _z, _used in first["points"]), "the guardian altar is always on the map"
+    assert last["time"] > 0 and all(len(e) == 4 for e in last["near"]) and len(last["near"]) <= last["enemies"]
+    # Without the option the reply is what it always was.
+    w = NodeWorker(default_env_options(), log_path=tmp_path / "none.log")
+    try:
+        assert "v" not in w.reset(41, species=155, map="forest", tier=0).header
+    finally:
+        w.close()
+
+
 # ---------------------------------------------------------------- vectorised environment
 
 def test_vec_env_swaps_in_spares_recycles_processes_and_accounts_for_every_episode(tmp_path):
@@ -174,20 +202,20 @@ def test_short_training_run_completes_and_leaves_recoverable_checkpoints(trained
     last = root / "models" / "runs" / "tiny" / "checkpoints" / "ckpt_000000000256"
     assert {p.name for p in last.iterdir()} == {"model.zip", "vecnormalize.pkl", "state.json"}
     state = json.loads((last / "state.json").read_text("utf-8"))
-    assert state["timesteps"] == 256 and state["run"] == "tiny" and state["reward_version"] == "v2" and state["model_sha256"] == sha256_file(last / "model.zip")
+    assert state["timesteps"] == 256 and state["run"] == "tiny" and state["reward_version"] == "v5" and state["model_sha256"] == sha256_file(last / "model.zip")
     assert state["observation_layout_hash"] == LAYOUTS.observation_hash and state["action_layout_hash"] == LAYOUTS.action_hash
     con = db(root)
     run_row = con.execute("SELECT * FROM training_runs WHERE name = 'tiny'").fetchone()
-    assert run_row["algorithm"] == "MaskablePPO" and run_row["reward_version"] == "v2" and run_row["game_build"] == BUILD
+    assert run_row["algorithm"] == "MaskablePPO" and run_row["reward_version"] == "v5" and run_row["game_build"] == BUILD
     session = con.execute("SELECT * FROM training_sessions").fetchone()
     assert session["status"] == "completed" and session["start_timesteps"] == 0 and session["end_timesteps"] == 256 and session["resumed_from"] is None
     batch = con.execute("SELECT * FROM batches WHERE id = ?", (session["batch_id"],)).fetchone()
-    assert batch["status"] == "completed" and batch["policy_name"] == "ppo-train" and batch["reward_version"] == "v2" and batch["profile_preset"] == "unlocked-v3" and batch["error_count"] == 0
+    assert batch["status"] == "completed" and batch["policy_name"] == "ppo-train" and batch["reward_version"] == "v5" and batch["profile_preset"] == "unlocked-v3" and batch["error_count"] == 0
     assert [(c["kind"], c["timesteps"]) for c in con.execute("SELECT * FROM checkpoints ORDER BY id")] == [("periodic", 128), ("periodic", 256)]
     # Episodes that ended while training are stored with their reward split into components, and no network attempt.
     episodes = con.execute("SELECT e.*, r.total, r.components_json, r.reward_version AS rv FROM episodes e JOIN episode_rewards r ON r.episode_id = e.id WHERE e.batch_id = ?", (batch["id"],)).fetchall()
-    assert len(episodes) >= 2 and all(e["seed"] >= 1_000_000 and e["truncated"] == 1 and e["blocked_network"] == 0 and e["rv"] == "v2" for e in episodes)
-    assert all(json.loads(e["components_json"]).keys() == {"ko", "guardian", "zone", "legendary", "overtime", "overtime_void", "map_use", "shop_sale", "death"} for e in episodes)
+    assert len(episodes) >= 2 and all(e["seed"] >= 1_000_000 and e["truncated"] == 1 and e["blocked_network"] == 0 and e["rv"] == "v5" for e in episodes)
+    assert all(json.loads(e["components_json"]).keys() == {"ko", "guardian", "zone", "legendary", "overtime", "overtime_void", "map_use", "shop_sale", "death", "idle", "point_use", "item", "spend", "earn"} for e in episodes)
     assert any(f.name.startswith("events.out.tfevents") for f in (root / "tb").rglob("*"))
     assert "Using cpu device" in trained["first"].stdout
 

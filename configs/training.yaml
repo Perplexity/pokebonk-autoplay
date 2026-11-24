@@ -11,6 +11,9 @@ env:
   hz: 60
   action_repeat: 3      # 20 decisions per game second
   max_game_time: 0      # 0 = no cap: an episode ends when the run ends
+  # The owner's rule (2026-11-24): an episode with no KO and no movement for this many game seconds ends there and is
+  # invalid (a run like that never ends in the game either). 0 = no such rule. What it costs: `idle` in the reward file.
+  max_idle_game_time: 30
   ranked: true
 
 # Each episode draws one of each, uniformly, decided by the episode's number.
@@ -32,7 +35,7 @@ workers:
   step_timeout: 300
   reset_timeout: 600
 
-reward_file: reward-v2.yaml
+reward_file: reward-v5.yaml
 
 ppo:
   n_steps: 1024         # per environment per update

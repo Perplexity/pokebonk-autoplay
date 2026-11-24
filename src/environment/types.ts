@@ -246,6 +246,15 @@ export interface GameEnvironmentOptions {
   invalidAction?: 'throw' | 'penalty';
   /** Safety cap on the run clock in seconds; reaching it ends the episode as `truncated`. Default: none. */
   maxGameTime?: number;
+  /**
+   * The owner's rule against standing still (2026-11-24): an episode in which, for this many seconds of the run clock,
+   * no KO was made AND the player did not leave a circle of `idleRadius` metres, ends there as `truncated` with the
+   * end cause `idle: …`. Such a run is invalid: it never ends in the game either. Dialogs take no game time and do
+   * not count. Default 0: no such rule.
+   */
+  maxIdleGameTime?: number;
+  /** What counts as having moved, for `maxIdleGameTime`: leaving a circle of this radius (metres). Default 3. */
+  idleRadius?: number;
   /** Defaults for `reset()`. */
   species?: number;
   map?: string;

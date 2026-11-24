@@ -52,6 +52,12 @@ await env.close();
 - **`terminated`** when the game's run reaches `over` (fainted, or its real end); `info.end` then holds `how`, `victory` and
   the game's own end-of-run record. **`truncated`** only when `maxGameTime` (default: none) is reached; the open run is closed
   at the next `reset` through the game's own Restart path. `reward` is always 0 in this stage.
+- **Standing still** (`createEnvironment({ maxIdleGameTime: 30 })`, default: no such rule; the owner's rule of
+  2026-11-24, docs/training.md §3). When the run clock advances by that many seconds with no KO and without the
+  player leaving a circle of `idleRadius` (3 m) around the place of the last activity, the episode ends as
+  `truncated` with `info.endCause` = `idle: no KO and no movement for 30 s of game time`. The game's run stays
+  open, as after the time cap, and the next `reset` closes it. Read-only: the run clock, the KO count and the
+  player's position.
 - **Unknown situations stop the episode with an `UnknownSituationError`** carrying seed, species, map, tier, step, simulation
   step, run state and time, the HUD method and a summary of its arguments: a dialog of another mode, a window opened by a
   HUD method nobody replaced, the run in `modal` without a captured dialog, the game pausing itself, a non-interactive state

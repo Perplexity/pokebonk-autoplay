@@ -61,7 +61,7 @@ class NodeWorker:
     """
 
     def __init__(self, env: dict[str, Any], *, record_decisions: bool = False, log_path: Path | None = None,
-                 node: str = "node", repo: Path = REPO, worker_id: int = 0):
+                 node: str = "node", repo: Path = REPO, worker_id: int = 0, view: bool = False):
         self.worker_id = worker_id
         self.env_options = dict(env)
         self.log_path = log_path
@@ -78,7 +78,10 @@ class NodeWorker:
         self.metadata: dict[str, Any] | None = None
         self.closed = False
         self._hello_seen = False
-        self.send({"cmd": "init", "env": self.env_options, "recordDecisions": record_decisions})
+        init: dict[str, Any] = {"cmd": "init", "env": self.env_options, "recordDecisions": record_decisions}
+        if view:
+            init["view"] = True   # every observation reply then carries `v`, a top-down picture (watch.py)
+        self.send(init)
 
     # ---------------------------------------------------------------- pipes
 
