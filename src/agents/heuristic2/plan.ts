@@ -125,6 +125,15 @@ export interface Plan {
   leash: number;
   /** Overtime: also cash when the HP lost to hits and the tide in the last `cashWindow` seconds is at least this share of max HP (above 1 = off). */
   cashLoss: number; cashWindow: number;
+  // ---- added with plan-3 ----
+  /**
+   * Rhydon's totem answers three times per zone (each roar: guardian +30 % HP and +12 % damage, one more Great Ball at
+   * its fall), and only while the guardian sleeps. With this on, a wake that is due waits until the zone's totem is
+   * used up: the walk there is ordered through the horde at any distance, and given up for the zone after
+   * `roarTimeout` seconds. Measured with plan-2 on tier 2, seeds 1 to 10: three roars in 28 of 30 zones and none in
+   * two, where the totem was never the nearest errand within `lootRange` before the wake (once passed at 19 m).
+   */
+  roarsFirst: boolean; roarTimeout: number;
 }
 
 export const PLAN_V1: Plan = {
@@ -149,6 +158,7 @@ export const PLAN_V1: Plan = {
   stayHp: 2, stayWindow: 20, leaveBySec: [650, 650, 650], stayLeash: 0, leaveHit: 2, leaveThreat: 0, cashThreat: 0, leaveThreatRevive: 0, cashThreatRevive: 0, reviveLeaves: false,
   leash: 10,
   cashLoss: 2, cashWindow: 5,
+  roarsFirst: false, roarTimeout: 120,
 };
 
 /**
@@ -173,16 +183,22 @@ export const PLAN_V2: Plan = {
   cashDrain: 1, cashLoss: 0.5, cashWindow: 4,
 };
 
-export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2 };
+/**
+ * plan-3: plan-2, and the guardian is not woken before Rhydon has roared three times (the owner: "things like Rhydon
+ * can be activated 3 times and should be activated 3 times").
+ */
+export const PLAN_V3: Plan = { ...PLAN_V2, version: 'plan-3', roarsFirst: true };
+
+export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3 };
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). The key `base` names the plan to start from
- * ('plan-1', 'plan-2'; default: the newest). Unknown keys are an error: a typo must not play silently.
+ * ('plan-1', 'plan-2', 'plan-3'; default: the newest). Unknown keys are an error: a typo must not play silently.
  */
 export function planWith(over: Record<string, unknown> | undefined, from?: Plan): Plan {
   const name = over?.base;
   if (name !== undefined && !(String(name) in PLANS)) throw new Error(`heuristic2 has no plan "${String(name)}" (it has: ${Object.keys(PLANS).join(', ')})`);
-  const base = from ?? (name !== undefined ? PLANS[String(name)] : PLAN_V2);
+  const base = from ?? (name !== undefined ? PLANS[String(name)] : PLAN_V3);
   const out: Plan = { ...base, tuning: { ...base.tuning } };
   for (const [k, v] of Object.entries(base)) if (Array.isArray(v)) (out as unknown as Record<string, unknown>)[k] = [...v];
   for (const [k, v] of Object.entries(over ?? {})) {

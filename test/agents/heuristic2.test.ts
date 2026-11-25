@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import type { Snapshot } from '../../src/bot/snapshot.ts';
 import { choose2, scoreLevelUp2, worthNow } from '../../src/agents/heuristic2/chooser.ts';
 import type { Chooser2Context } from '../../src/agents/heuristic2/chooser.ts';
-import { PLAN_V1, PLAN_V2, planWith } from '../../src/agents/heuristic2/plan.ts';
+import { PLAN_V1, PLAN_V2, PLAN_V3, planWith } from '../../src/agents/heuristic2/plan.ts';
 import { directiveFor2, errandFor, heaviestHit, hordeHit, hpLost, lootGoal, lowestHp, newLife, spawnEstimate } from '../../src/agents/heuristic2/policy.ts';
 import type { World } from '../../src/agents/heuristic2/policy.ts';
 import { ARCHIVES, itemArchive, itemWorth, kitOf, loadValuationKnowledge, textMultiplier, vitaminWorth } from '../../src/agents/heuristic2/values.ts';
@@ -76,7 +76,8 @@ test('the plan: unknown keys are refused, tuning is merged', () => {
   const p = planWith({ leaveHp: 0.5, tuning: { lootRange: 10 } });
   assert.deepEqual([p.leaveHp, p.tuning.lootRange, p.tuning.hordeSize, PLAN_V1.leaveHp], [0.5, 10, PLAN_V1.tuning.hordeSize, 0.65]);
   // The newest plan is the default; an older one is played by naming it, and stays what it was.
-  assert.equal(planWith(undefined).version, 'plan-2');
+  assert.equal(planWith(undefined).version, 'plan-3');
+  assert.deepEqual(planWith({ base: 'plan-2' }), PLAN_V2);
   assert.equal(planWith({ base: 'plan-1' }).version, 'plan-1');
   assert.deepEqual(planWith({ base: 'plan-1' }), PLAN_V1);
   assert.throws(() => planWith({ base: 'plan-9' }), /no plan "plan-9"/);
@@ -200,6 +201,29 @@ test('plan-2 run plan: the altar through the horde, prizes before the portal, st
   // The tide alone does not cash in plan-2 (it did in plan-1 at 6 % of max HP a second).
   assert.ok(directiveFor2(snap({ stage: 4, points: [portal], t: 104 }), { ...live, round: 11, drain: 60 }, newLife(), P, false, [], w).leash);
   assert.equal(directiveFor2(snap({ stage: 4, points: [portal], t: 104 }), { ...live, round: 11, drain: 60 }, newLife(), planWith({ cashDrain: 0.06 }), false, [], w).goto?.kind, 'cash');
+});
+
+test('plan-3: Rhydon roars three times before the guardian is woken, however far the totem is', () => {
+  const P = PLAN_V3, ot = { live: false, over: false, direct: false, round: 0 }, w = world({ gold: 500 });
+  const altar = point('boss', 12), totem = point('rhydon', 260), due = { stageTime: P.wakeAfterSec[0], t: 1000 };
+  const dir = (s: Record<string, unknown>, l = newLife(), plan = P) => directiveFor2(snap(s), ot, l, plan, false, [], w);
+  // The wake is due and the totem still answers (the game marks it used after the third roar): the totem first.
+  const l = newLife(), go = dir({ points: [altar, totem], ...due }, l).goto!;
+  assert.deepEqual([go.kind, go.x, go.force, go.interact], ['errand', 260, true, true]);
+  assert.match(go.note, /Rhydon/);
+  assert.equal(dir({ points: [altar, totem], ...due, t: 1050 }, l).goto?.x, 260, 'one or two roars made: it is pressed again');
+  assert.equal(dir({ points: [altar, { ...totem, used: true }], ...due, t: 1060 }, l).goto?.kind, 'wake', 'three roars made: the guardian');
+  // A totem that cannot be reached is given up after `roarTimeout` seconds, for the zone.
+  const stuck = newLife();
+  assert.equal(dir({ points: [altar, totem], ...due }, stuck).goto?.kind, 'errand');
+  assert.equal(dir({ points: [altar, totem], ...due, t: 1000 + P.roarTimeout + 1 }, stuck).goto?.kind, 'wake');
+  assert.equal(dir({ points: [altar, totem], ...due, t: 1000 + P.roarTimeout + 2 }, stuck).goto?.kind, 'wake');
+  assert.equal(dir({ points: [altar, totem], ...due, stage: 2, stageTime: P.wakeAfterSec[1], t: 2000 }, stuck).goto?.kind, 'errand', 'the next zone has its own totem');
+  // Hurt: neither walk is ordered. No totem in the zone: the guardian. plan-2 is what it was: the guardian at once.
+  assert.deepEqual(dir({ points: [altar, totem], ...due, player: { ...snap({}).player, hp: 100 } }), {});
+  assert.equal(dir({ points: [altar], ...due }).goto?.kind, 'wake');
+  assert.equal(dir({ points: [altar, totem], ...due }, newLife(), PLAN_V2).goto?.kind, 'wake');
+  assert.deepEqual([PLAN_V2.roarsFirst, PLAN_V1.roarsFirst, P.roarsFirst], [false, false, true]);
 });
 
 test('plan-2 answers: slot spins by price, restocks, seals from the list, borrowed special moves', () => {

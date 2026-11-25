@@ -6,6 +6,8 @@ specification's seven (docs/spec.md §16). "Measured" figures were played headle
 databases and named by letter, the gate batches are in `data/pokebonk.sqlite` under the labels given. "Expected" is
 said where it is only that.
 
+Since then: plan-3 (Rhydon's three roars before every guardian) is the default; see the addendum at the end.
+
 **Result.** On the 50 held-out seeds, played once with the plan fixed: median **1,505,704**, mean 2,219,726, p90 4,195,666,
 best **9,052,797**; 49 of 50 reach Overtime and all 49 cash it. plan-1 on the same seeds: median 71,181, best 269,223, 24 of 50. The 1 million
 milestone is passed at the median and the 5 million milestone by single runs; **no run reaches 20 million**, and §6
@@ -213,3 +215,45 @@ leave, when to cash). Three things would raise the default further and could com
    what the leaderboard builds hold), the dojo, Bill's machine, altars by valuation.
 
 The owner's call.
+
+## Addendum (2026-11-25): plan-3, Rhydon's three roars before every guardian
+
+The owner: "things like Rhydon can be activated 3 times and should be activated 3 times."
+
+**What the game does** (read in the bundle): one Rhydon totem per zone; each press is one roar, up to three, and only
+while the guardian sleeps. Each roar: guardian +30 % HP and +12 % damage, a longer fight clock, more escorts, and one
+more free Great Ball at its fall. The game marks the totem used after the third roar.
+
+**What plan-2 did** (measured, seeds 1–10, zones 1–3): three roars in 28 of 30 zones, none in 2 (seeds 4 and 7, zone
+2), never one or two. Cause, traced on those two runs: the totem was an errand like any other, taken only when it was
+the nearest wanted point within 120 m, and nothing held the wake back for it. Seed 7 walked past it at 19 m on the
+way to the guardian's altar.
+
+**plan-3** = plan-2 plus one rule (`roarsFirst`, `roarTimeout` 120 s): when the wake is due and the zone's totem
+still answers, the walk goes to the totem first, ordered through the horde at any distance, and is given up for the
+zone after 120 s. plan-3 is the default; plan-2 and plan-1 are kept (`{"plan":{"base":"plan-2"}}`).
+
+Measured, tier 2, Mewtwo, forest, balanced archive, policy `heuristic2 2+564e04e1e85d`:
+
+| Plan | Seeds | Median | Mean | p90 | Best | ≥ 1M | ≥ 5M | Reached Overtime |
+|---|---|---|---|---|---|---|---|---|
+| plan-2 | 1–30 | 2,079,272 | 2,236,326 | 4,242,066 | 6,024,651 | 22 | 3 | 30 of 30 |
+| **plan-3** (scratch, `i-plan3`) | 1–30 | 2,157,262 | 2,392,647 | 5,522,269 | 7,069,176 | 23 | 4 | 30 of 30 |
+| plan-2 (`heldout-…-h2p2-…`) | 900001–900050 | 1,505,704 | 2,219,726 | 4,195,666 | 9,052,797 | 37 | 4 | 49 of 50 |
+| **plan-3** (`heldout-tier2-mewtwo-h2p3-balanced`) | 900001–900050 | 1,552,786 | 2,313,503 | 4,195,666 | 9,052,797 | 39 | 4 | 50 of 50 |
+
+- The two zones that had no roar now have three (seed 4 at zone time 386–388 s, seed 7 at 382–383 s; the guardian
+  woke 6 and 4 s later).
+- Seeds 1–30: 17 runs are identical to plan-2 to the KO (their totems were already used up), 9 score higher, 4 lower.
+  Held-out: 23 identical, 14 higher, 13 lower. Every Overtime reached was cashed; 0 errors; no run reaches 20 million.
+- The differences between the plans are within what one changed decision does to a run (§6): this measures that the
+  rule does no harm, not that it is worth 4 %.
+- Held-out seed 900029, which stalled against a sanctuary wall under plan-2, did not stall under plan-3 (3,285,080).
+  The stall itself is not fixed: the run simply took another path.
+- plan-2 replayed with the new code: seed 7 → 236,872, as in its gate batch.
+- Tests: 187 TypeScript pass (one new: the totem before the wake, pressed until used, given up after the time-out,
+  per zone, not when hurt, plan-2 unchanged).
+
+Not checked: whether any other map point answers more than once and is left early. The errand rule returns to a
+point as long as the game does not mark it used, so a multi-press point is pressed again when it is the nearest; no
+count per kind is stored per episode to confirm it.

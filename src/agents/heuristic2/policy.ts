@@ -50,8 +50,10 @@ export interface Lifecycle2 {
   gengar: number;
   /** Revives held when last seen; run time a revive was last spent; run time the current zone was cleared and Overtime began. */
   revives: number | null; revivedAt: number; clearedAt: number | null; otAt: number | null;
+  /** plan-3. Run time the walk to this zone's Rhydon totem was first ordered ahead of the wake. */
+  roarSince: number | null;
 }
-export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null });
+export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, roarSince: null });
 
 /** The limit on the horde's hits that applies now: the plan's own, or the one for a held revive. */
 const limitOf = (plain: number, withRevive: number, life: Lifecycle2): number => ((life.revives ?? 0) > 0 ? withRevive : plain);
@@ -174,7 +176,7 @@ export function lootGoal(s: Snapshot, hp: number, swarm: boolean, skip: string[]
 export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live' | 'over' | 'direct' | 'round'> & { drain?: number }, life: Lifecycle2, plan: Plan, swarm = false, skip: string[] = [], world?: World): Directive {
   const hp = s.player.maxHp > 0 ? s.player.hp / s.player.maxHp : 0;
   if (ot.over) return {};
-  if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; }
+  if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; life.roarSince = null; }
   if (s.stageCleared) life.clearedAt ??= s.t;
   if (ot.live || ot.direct) life.otAt ??= s.t;
   if (!(ot.live || ot.direct)) {
@@ -195,6 +197,13 @@ export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live'
       // Time to wake the guardian: the walk is the plan's, so that its last metres are made through the horde.
       const wakeLv = plan.wakeLevel[Math.min(plan.wakeLevel.length - 1, Math.max(0, s.stage - 1))];
       if (!s.bossSpawned && (s.stageTime >= wakeAfter(plan, s.stage) || s.player.level >= wakeLv)) {
+        // plan-3: Rhydon answers only while the guardian sleeps, three times. The roars still owed come first.
+        const totem = plan.roarsFirst && hp >= plan.wakeHp ? s.points.find((q) => q.kind === 'rhydon' && !q.used && !life.skip.has(pointKey(q)) && !skip.includes(pointKey(q))) : undefined;
+        if (totem) {
+          life.roarSince ??= s.t;
+          if (s.t - life.roarSince <= plan.roarTimeout) return { goto: { kind: 'errand', x: totem.x, z: totem.z, reach: Math.max(1, totem.r * 0.6), interact: true, force: true, note: `Rhydon's roars before the guardian (${Math.round(totem.d)} m)` } };
+          life.skip.add(pointKey(totem));
+        }
         const altar = s.points.filter((q) => q.kind === 'boss' && !q.used).sort((a, b) => a.d - b.d)[0];
         if (altar && hp >= plan.wakeHp) return { goto: { kind: 'wake', x: altar.x, z: altar.z, reach: Math.max(1.5, altar.r * 0.6), interact: true, force: altar.d <= plan.forceWithin || hp >= plan.forceHp, note: `wake guardian (lv ${s.player.level}, ${Math.round(s.stageTime)}s)` } };
         return {};
