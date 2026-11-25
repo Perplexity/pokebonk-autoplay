@@ -266,6 +266,14 @@ export interface GameEnvironmentOptions {
    * comes unless a wave is called, up to 800 s. Default 0: no such rule.
    */
   maxKoGapGameTime?: number;
+  /**
+   * A grace for the opening of a run (the owner, 2026-11-25): `maxKoGapGameTime` does not run during the first this
+   * many seconds of the run clock; its stretch without a KO starts at that moment at the earliest. A level-1 Pokémon
+   * that walks to the free chests first can go more than 30 s without a KO there (the second heuristic on tier 2:
+   * about one run in 25, docs/phase-2-report.md §6). `maxIdleGameTime` is not affected: standing still in the opening
+   * still ends the episode. Default 0: no grace.
+   */
+  koGapGraceGameTime?: number;
   /** Defaults for `reset()`. */
   species?: number;
   map?: string;

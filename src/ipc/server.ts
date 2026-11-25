@@ -13,7 +13,7 @@
  *              header's `n` (they are those of the layout descriptors in data/encoding/<build>/)
  *
  * Requests (header only):
- *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, maxIdleGameTime?, maxKoGapGameTime?, species, map, tier, ranked}, recordDecisions, view?}  → hello
+ *   {cmd: 'init', env: {hz, actionRepeat, maxGameTime, maxIdleGameTime?, maxKoGapGameTime?, koGapGraceGameTime?, species, map, tier, ranked}, recordDecisions, view?}  → hello
  *       (view: every obs reply also carries `v`, a top-down picture of the moment for somebody watching)
  *   {cmd: 'reset', seed, species?, map?, tier?}                                                     → obs
  *   {cmd: 'step', a: [move, jump, dash, ultimate, interact, form, incense, fuse, choice]}                                → obs
@@ -75,7 +75,7 @@ process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => (process.stderr.
 
 // ---------------------------------------------------------------- state
 
-interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; archive?: string; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean; manager?: ManagerOptions }
+interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; koGapGraceGameTime?: number; archive?: string; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean; manager?: ManagerOptions }
 type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a?: number[]; m?: number } | { cmd: 'close' };
 
 let env: HeadlessGameEnvironment | null = null;

@@ -11,6 +11,7 @@ env:
   max_game_time: 7200   # as the heuristic's batches
   max_idle_game_time: 30      # the owner's rule against standing still: an episode it ends scores 0
   max_ko_gap_game_time: 30
+  ko_gap_grace_game_time: 90  # the opening's grace, as in training (configs/manager.yaml)
   ranked: true
   archive: null         # the model's own
 

@@ -190,7 +190,9 @@ python -m pokebonk_rl.evaluate   --config configs/manager-evaluation.yaml --mode
   its seed names (docs/environment.md §3, cause 5). Found in this phase.
 - **The standing-still and no-KO rules** (`env.max_idle_game_time`, `env.max_ko_gap_game_time`) are on, as for every
   model. The heuristic's opening walk to the free chests breaks the no-KO rule in about one run in 25 on tier 2, so
-  a manager that takes every proposal loses those episodes at their start (docs/phase-2-report.md §6). Open.
+  a manager that takes every proposal would lose those episodes at their start (docs/phase-2-report.md §6). Since
+  2026-11-25 the manager's configurations give the opening a grace: the no-KO rule does not run during the first
+  90 game seconds of a run (`env.ko_gap_grace_game_time`).
 
 Reward, budget, the promotion metric and the comparison of sqrt against log are phase 3.
 

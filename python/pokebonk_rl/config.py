@@ -29,7 +29,7 @@ TRAINING_DEFAULTS: dict[str, Any] = {
     "name": None,
     "seed": 1,
     "game": {"build": "mwsewi0r"},
-    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 0, "max_idle_game_time": 30, "max_ko_gap_game_time": 30, "ranked": True, "archive": None},
+    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 0, "max_idle_game_time": 30, "max_ko_gap_game_time": 30, "ko_gap_grace_game_time": 0, "ranked": True, "archive": None},
     "scenarios": {"species": [150], "maps": ["forest"], "tiers": [0]},
     "episode_seeds": {"first": 1_000_000},
     "workers": {"envs": 5, "spares": 2, "recycle_after": 1, "recycle_rss_mb": 1500, "max_errors": 20, "step_timeout": 300, "reset_timeout": 600},
@@ -48,7 +48,7 @@ TRAINING_DEFAULTS: dict[str, Any] = {
 
 EVALUATION_DEFAULTS: dict[str, Any] = {
     "game": {"build": "mwsewi0r"},
-    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 3600, "max_idle_game_time": 30, "max_ko_gap_game_time": 30, "ranked": True, "archive": None},
+    "env": {"hz": 60, "action_repeat": 3, "max_game_time": 3600, "max_idle_game_time": 30, "max_ko_gap_game_time": 30, "ko_gap_grace_game_time": 0, "ranked": True, "archive": None},
     "scenario": {"species": 150, "map": "forest", "tier": 0},
     "seeds": "900001-900050",
     "workers": {"envs": 5, "recycle_after": 1, "recycle_rss_mb": 1500, "step_timeout": 300, "reset_timeout": 600},
@@ -120,6 +120,8 @@ def env_options(config: dict[str, Any], **scenario) -> dict[str, Any]:
     # resumed without that rule.
     out = {"hz": int(e["hz"]), "actionRepeat": int(e["action_repeat"]), "maxGameTime": float(e["max_game_time"]), "maxIdleGameTime": float(e.get("max_idle_game_time", 0)),
            "maxKoGapGameTime": float(e.get("max_ko_gap_game_time", 0)),
+           # The opening's grace for that rule (2026-11-25): absent in a stored configuration = none.
+           "koGapGraceGameTime": float(e.get("ko_gap_grace_game_time", 0)),
            "ranked": bool(e["ranked"]), "species": 155, "map": "forest", "tier": 0}
     if e.get("archive"):
         out["archive"] = str(e["archive"])     # account preset unlocked-v4 with this item archive (docs/environment.md)

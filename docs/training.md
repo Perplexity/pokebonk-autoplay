@@ -294,7 +294,12 @@ v6 has every weight of v5, and `rift` = 150: a rift cleared and left pays 150 ×
     first heuristic on tier 0. `heuristic2` opens a run by walking to the free chests with a level-1 Mewtwo, and on
     tier 2 that walk is longer than 30 s without a KO in about one run in 25: seed 19 (2 KOs by 23.7 s, the next at
     64.2 s) and seed 1000007 (the first KO at 33 s) of 50 episodes played under the rule. Its batches were played
-    with the rule off. Open: a grace for the opening, the rule as it is, or another opening (the owner's call).
+    with the rule off.
+  - *The opening's grace (`env.ko_gap_grace_game_time`, the owner's decision of 2026-11-25).* The no-KO rule does not
+    run during the first 90 game seconds of a run. On in `configs/manager.yaml` and `manager-evaluation.yaml`; 0 (no
+    grace) in `training.yaml` and `evaluation.yaml`, whose runs and evaluations so far were made without it, and in
+    the runner unless `--ko-gap-grace` is given. What it gives up: a policy may go without a KO until 120 s into a
+    run (it still has to move, by the rule against standing still).
   - `mewtwo-v5-01` was stopped at about 1.1 million decisions; `mewtwo-v5-02` had the same reward and this rule.
     Since v6 the rule does not run inside a rift ("Rifts" above), which is where it had been made for.
 - **Standing still (v3, and `env.max_idle_game_time`).** What was found: the first model (`mewtwo-v2-01`, 2 million

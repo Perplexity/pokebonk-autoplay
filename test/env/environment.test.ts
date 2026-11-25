@@ -270,6 +270,15 @@ test('standing still: with maxIdleGameTime, no KO and no movement for that long 
     assert.deepEqual([walkingWithoutKo.terminated, walkingWithoutKo.truncated, walkingWithoutKo.info.kills], [false, true, 0]);
     assert.equal(walkingWithoutKo.info.endCause, 'idle: no KO for 2 s of game time');
     assert.ok(walkingWithoutKo.info.time >= 2 && walkingWithoutKo.info.time < 2.06, `ended at ${walkingWithoutKo.info.time} s`);
+    // The opening's grace: the stretch without a KO starts when the grace is over, not at the start of the run.
+    const g = env.options as { koGapGraceGameTime: number };
+    g.koGapGraceGameTime = 1.5;
+    try {
+      const withGrace = await hold('e', 10);
+      assert.deepEqual([withGrace.truncated, withGrace.info.kills], [true, 0]);
+      assert.equal(withGrace.info.endCause, 'idle: no KO for 2 s of game time');
+      assert.ok(withGrace.info.time >= 3.5 && withGrace.info.time < 3.56, `ended at ${withGrace.info.time} s`);
+    } finally { g.koGapGraceGameTime = 0; }
   } finally { k.maxKoGapGameTime = 0; }
   // Without the option there is no such rule.
   const free = await hold('none', 4);

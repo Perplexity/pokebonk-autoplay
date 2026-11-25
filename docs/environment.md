@@ -65,6 +65,10 @@ await env.close();
   sanctuary outside Overtime the allowance is four times as long (`idle: no KO for 120 s …`). Inside a rift neither
   this rule nor the one against standing still runs (the owner: "We should allow rifts infinite time"). Read-only: the run
   clock, the KO count, `boss.alive`, `sanctuary`, `overtime.live`.
+  - **The opening's grace** (`koGapGraceGameTime: 90`, default 0: none; the owner's decision of 2026-11-25). The rule
+    does not run during the first that many seconds of the run clock: its stretch without a KO starts when the grace
+    is over, so with 30 s and a grace of 90 s the earliest such end is at 120 s. The rule against standing still is
+    not affected. Why: docs/training.md §3 and docs/phase-2-report.md §6.
 - **Account preset unlocked-v4** (`createEnvironment({ archive: 'empty' | 'loose' | 'balanced' | 'narrow' })`, default:
   unlocked-v3). The unlocked account with an item archive (`profile.itemsOff`), generated from the game's item effects
   for the kit of `species` (src/agents/heuristic2/values.ts) and kept within the account's archive slots (105: the

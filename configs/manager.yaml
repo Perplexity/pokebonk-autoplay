@@ -14,6 +14,9 @@ env:
   max_game_time: 7200   # the safety cap the heuristic's batches were played with
   max_idle_game_time: 30      # the owner's rule against standing still
   max_ko_gap_game_time: 30    # ...and against going without a KO (not inside a rift, not while a guardian is up)
+  # The opening's grace (the owner, 2026-11-25): the no-KO rule does not run during the first 90 game seconds of a
+  # run. The heuristic opens by walking to the free chests at level 1 and went up to 41 s without a KO there.
+  ko_gap_grace_game_time: 90
   ranked: true
   archive: balanced     # account preset unlocked-v4:balanced (phase 1). A model is refused on another preset.
 

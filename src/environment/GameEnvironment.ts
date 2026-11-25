@@ -138,7 +138,7 @@ export function findHuntSpecies(loaded: string[]): number[] {
 /** `maxKoGapGameTime` in the sanctuary outside Overtime: this many times the allowance (see koGapTooLong). */
 const SANCTUARY_KO_GAP_FACTOR = 4;
 
-type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; dataDir?: string; archive?: string; apiTarget?: string; encode: boolean };
+type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; koGapGraceGameTime: number; dataDir?: string; archive?: string; apiTarget?: string; encode: boolean };
 
 export class HeadlessGameEnvironment implements GameEnvironment {
   readonly options: Resolved;
@@ -182,7 +182,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   constructor(options: GameEnvironmentOptions = {}) {
     this.options = {
       hz: options.hz ?? 60, actionRepeat: options.actionRepeat ?? 3, invalidAction: options.invalidAction ?? 'throw',
-      maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, maxKoGapGameTime: options.maxKoGapGameTime ?? 0, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
+      maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, maxKoGapGameTime: options.maxKoGapGameTime ?? 0, koGapGraceGameTime: options.koGapGraceGameTime ?? 0, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
       ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', archive: options.archive, verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
       encode: !!options.encode,
     };
@@ -190,6 +190,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (!(this.options.maxIdleGameTime >= 0) || !(this.options.idleRadius > 0)) throw new Error('maxIdleGameTime must be 0 (no rule) or a positive number of game seconds, and idleRadius a positive number of metres');
     if (this.options.archive != null && !(this.options.archive in ARCHIVES)) throw new Error(`unknown archive "${this.options.archive}": use one of ${Object.keys(ARCHIVES).join(', ')}`);
     if (!(this.options.maxKoGapGameTime >= 0)) throw new Error('maxKoGapGameTime must be 0 (no rule) or a positive number of game seconds');
+    if (!(this.options.koGapGraceGameTime >= 0)) throw new Error('koGapGraceGameTime must be 0 (no grace) or a positive number of game seconds');
     if (this.options.invalidAction !== 'throw' && this.options.invalidAction !== 'penalty') throw new Error('invalidAction must be "throw" or "penalty"');
   }
 
@@ -568,15 +569,16 @@ export class HeadlessGameEnvironment implements GameEnvironment {
 
   /**
    * The rule against going without a KO (`maxKoGapGameTime`). A KO moves the mark, and so does every moment a
-   * guardian or the legendary is alive, and every moment inside a rift. Reads the run clock, the KO count,
-   * `boss.alive`, `rifts.isInside`, `sanctuary` and `overtime.live`; writes nothing.
+   * guardian or the legendary is alive, and every moment inside a rift, and every moment of the opening's grace
+   * (`koGapGraceGameTime`: the first seconds of the run clock). Reads the run clock, the KO count, `boss.alive`,
+   * `rifts.isInside`, `sanctuary` and `overtime.live`; writes nothing.
    */
   private koGapTooLong(): boolean {
     if (!(this.options.maxKoGapGameTime > 0)) return false;
     const run = this.run, kills = run.stats?.kills | 0;
     // Overtime going live is a new stretch as well: the rest before it was measured against the sanctuary's allowance.
     const overtime = !!run.overtime?.live;
-    if (kills !== this.lastKo.kills || run.boss?.alive || overtime !== this.lastKo.overtime || run.rifts?.isInside) {
+    if (kills !== this.lastKo.kills || run.boss?.alive || overtime !== this.lastKo.overtime || run.rifts?.isInside || run.time < this.options.koGapGraceGameTime) {
       this.lastKo = { time: run.time, kills, overtime };
       return false;
     }

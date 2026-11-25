@@ -16,6 +16,7 @@
  *   --max-idle=<game seconds>          end an episode as invalid after this long without a KO and without movement
  *   --archive=empty|loose|balanced|narrow   account preset unlocked-v4 with that item archive (default: unlocked-v3)
  *   --max-ko-gap=<game seconds>        end an episode as invalid after this long without a KO (boss fights do not count)
+ *   --ko-gap-grace=<game seconds>      ...but not during this long at the start of a run (the opening's grace)
  *                                      (default: no such rule; training and evaluation use 30)
  *   --recycle-after=1                  episodes per worker process before a fresh one replaces it. 1 (the default): an episode
  *                                      is named by its seed; more: it also depends on what the process played before.
@@ -42,7 +43,7 @@ import { DEFAULT_DATABASE, EpisodeStore } from '../src/storage/database.ts';
 import type { EpisodeRecord } from '../src/storage/records.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const KNOWN = new Set(['policy', 'episodes', 'seed', 'seeds', 'workers', 'species', 'map', 'tier', 'classic', 'max-time', 'max-idle', 'max-ko-gap', 'archive', 'action-repeat', 'hz', 'recycle-after', 'recycle-rss', 'episode-timeout', 'db', 'no-db', 'jsonl', 'out', 'label', 'quiet', 'policy-options']);
+const KNOWN = new Set(['policy', 'episodes', 'seed', 'seeds', 'workers', 'species', 'map', 'tier', 'classic', 'max-time', 'max-idle', 'max-ko-gap', 'ko-gap-grace', 'archive', 'action-repeat', 'hz', 'recycle-after', 'recycle-rss', 'episode-timeout', 'db', 'no-db', 'jsonl', 'out', 'label', 'quiet', 'policy-options']);
 const args = new Map<string, string>();
 const say = (s = '') => process.stdout.write(s + '\n');
 const usage = (msg: string): never => { process.stderr.write(`run-episodes: ${msg}\n`); process.exit(2); };
@@ -63,7 +64,7 @@ const config: BatchConfig = {
   policy: args.get('policy') ?? DEFAULT_BATCH.policy, episodes: num('episodes', 1), seed: num('seed', 1), workers: num('workers', 1),
   ...(args.has('seeds') ? { seeds: args.get('seeds')!.split(',').map(Number) } : {}),
   species: num('species', DEFAULT_BATCH.species), map: args.get('map') ?? DEFAULT_BATCH.map, tier: num('tier', DEFAULT_BATCH.tier), ranked: !args.has('classic'),
-  maxGameTime: num('max-time', 0), ...(args.has('max-idle') ? { maxIdleGameTime: num('max-idle', 0) } : {}), ...(args.has('max-ko-gap') ? { maxKoGapGameTime: num('max-ko-gap', 0) } : {}), ...(args.has('archive') ? { archive: String(args.get('archive')) } : {}), hz: num('hz', 60), actionRepeat: num('action-repeat', 3),
+  maxGameTime: num('max-time', 0), ...(args.has('max-idle') ? { maxIdleGameTime: num('max-idle', 0) } : {}), ...(args.has('max-ko-gap') ? { maxKoGapGameTime: num('max-ko-gap', 0) } : {}), ...(args.has('ko-gap-grace') ? { koGapGraceGameTime: num('ko-gap-grace', 0) } : {}), ...(args.has('archive') ? { archive: String(args.get('archive')) } : {}), hz: num('hz', 60), actionRepeat: num('action-repeat', 3),
   recycleAfter: num('recycle-after', DEFAULT_BATCH.recycleAfter), recycleRssMB: num('recycle-rss', DEFAULT_BATCH.recycleRssMB), episodeTimeoutSec: num('episode-timeout', DEFAULT_BATCH.episodeTimeoutSec),
   label: args.get('label') ?? null,
   ...(args.has('policy-options') ? { policyOptions: JSON.parse(args.get('policy-options')!) as Record<string, unknown> } : {}),

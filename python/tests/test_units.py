@@ -415,6 +415,13 @@ def test_configuration_files_load_and_unknown_keys_are_errors(tmp_path):
     assert cfg.env_options({"env": {k: v for k, v in training["env"].items() if k != "max_ko_gap_game_time"}})["maxKoGapGameTime"] == 0
     evaluation = cfg.load(REPO / "configs" / "evaluation.yaml", cfg.EVALUATION_DEFAULTS, ["workers.envs=2", "seeds=4-6"])
     assert cfg.env_options(evaluation)["maxKoGapGameTime"] == 30
+    # The opening's grace for that rule: none in these two files and in a stored configuration without the key; 90 s
+    # for the manager, in training and in evaluation alike.
+    assert cfg.env_options(training)["koGapGraceGameTime"] == 0 == cfg.env_options(evaluation)["koGapGraceGameTime"]
+    assert cfg.env_options({"env": {k: v for k, v in training["env"].items() if k != "ko_gap_grace_game_time"}})["koGapGraceGameTime"] == 0
+    for name, defaults in (("manager.yaml", cfg.TRAINING_DEFAULTS), ("manager-evaluation.yaml", cfg.EVALUATION_DEFAULTS)):
+        options = cfg.env_options(cfg.load(REPO / "configs" / name, defaults))
+        assert (options["maxKoGapGameTime"], options["koGapGraceGameTime"]) == (30, 90)
     assert evaluation["workers"]["envs"] == 2 and cfg.parse_seeds(evaluation["seeds"]) == [4, 5, 6]
     assert evaluation["scenario"]["species"] == 150 and evaluation["reward"]["version"] == "v6" and len(cfg.parse_seeds(evaluation["promotion"]["seeds"])) == 50
     # The files spell out every default: a default changed in code without the file (or the reverse) shows here.

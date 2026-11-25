@@ -11,8 +11,8 @@ there.
 played from its file through the whole chain, is the heuristic: on seeds 1–30 it plays 29 of the heuristic's 30
 episodes to the KO, and the 30th the same way once the no-KO rule is off. Two things were found on the way. An episode
 played in a reused game process is not the episode its seed names; every episode now gets a fresh process (§6). And
-the heuristic's own opening breaks the owner's no-KO rule in about one run in 25, which needs a decision before PPO
-(§6, §7). Rifts, dojo trials and the Max form are not skills yet.
+the heuristic's own opening breaks the owner's no-KO rule in about one run in 25; the owner chose a grace for the
+opening, and with it the copy equals the heuristic on 30 of 30 seeds under the rules (§6). Rifts, dojo trials and the Max form are not skills yet.
 
 ## 1. What was implemented
 
@@ -147,7 +147,19 @@ reports a blocked request. Nothing was written under `mirror/`. No browser, no e
   KO in a zone). Every batch of the second heuristic was played by the runner, where the rule is off by default.
 - **What it means.** Nothing for the heuristic's stored scores: they are what it scores in the game. For a manager it
   means that taking every proposal loses about one episode in 25 at its start. Nothing was changed: the rule is the
-  owner's and the heuristic's opening earns items. The options are in §7.
+  owner's and the heuristic's opening earns items. The options were put to the owner (§7).
+- **Decided and done (the owner, 2026-11-25): a grace for the opening.** The no-KO rule does not run during the
+  first 90 game seconds of a run; its stretch without a KO starts when the grace is over. A new setting, off by
+  default (`koGapGraceGameTime`, `env.ko_gap_grace_game_time`, `--ko-gap-grace`), 90 in `configs/manager.yaml` and
+  `manager-evaluation.yaml`. The rule against standing still is unchanged. Tested in the environment's test (an
+  episode that ended at 2 s ends at 3.5 s with a grace of 1.5 s) and in the configuration's.
+- **Measured with the grace**, both rules on:
+  - the copy on seeds 1–30 (`copy-seeds1-30-grace:manager-copy-01`, batch 37): **30 of 30 episodes equal the
+    heuristic's** in KOs, bonus, level and game time. Median 2,127,158, mean 2,438,325, p90 5,241,253, best
+    7,069,176; 24 of 1M or more, 4 of 5M or more, none of 20M; 30 of 30 cashed Overtime;
+  - the heuristic on seed 1000007, which the rule had ended at 30 s: a full run, 210,856 KOs and a bonus of 593,757.
+- **Not redone:** the copy data keeps its one episode cut at 30 s (38 of 60,685 decisions). To be collected again
+  with the grace when the value network is trained from it.
 
 ### Found: an episode in a reused process is not the episode its seed names
 
@@ -210,9 +222,10 @@ reports a blocked request. Nothing was written under `mirror/`. No browser, no e
 
 ## 7. Recommended next stage
 
-Phase 3 as written, with four things settled first:
+Phase 3 as written, with these settled first:
 
-0. **The no-KO rule and the heuristic's opening** (the owner's call, §6). The options I see:
+0. **The no-KO rule and the heuristic's opening** (§6). Settled on 2026-11-25: the first option, done. The options
+   were:
    - *A grace for the opening* (my recommendation): the no-KO clock starts at the run's first KO, or after the
      first 90 s. The rule keeps catching what it was made for (pacing, hiding in a rift) and the heuristic's opening
      stays as it is. It is a change of the environment's rule, so it gets a new setting, off by default.

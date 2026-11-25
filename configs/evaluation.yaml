@@ -15,6 +15,9 @@ env:
   # still and nothing comes unless a wave is called): no KO for this many game seconds ends the episode as invalid,
   # whether the Pokémon moved or not. The time a guardian or the legendary is alive does not count. 0 = no such rule.
   max_ko_gap_game_time: 30
+  # The opening's grace for the rule above (2026-11-25): it does not run during the first this many game seconds of
+  # a run. 0 = none, as every run and evaluation of this configuration so far.
+  ko_gap_grace_game_time: 0
   ranked: true
   archive: null         # null = the archive the model was trained with (a model is not played on another account preset)
 
