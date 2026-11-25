@@ -1,0 +1,47 @@
+# Evaluation of a manager (python -m pokebonk_rl.evaluate --config configs/manager-evaluation.yaml --model <run>).
+# Tier 2, Mewtwo, forest, under the rules the phase 1 heuristic's batches were played with, so that a model and the
+# heuristic are compared episode by episode. The manager's own options and its item archive come from the model.
+
+game:
+  build: mwsewi0r
+
+env:
+  hz: 60
+  action_repeat: 3
+  max_game_time: 7200   # as the heuristic's batches
+  max_idle_game_time: 30      # the owner's rule against standing still: an episode it ends scores 0
+  max_ko_gap_game_time: 30
+  ranked: true
+  archive: null         # the model's own
+
+scenario:
+  species: 150
+  map: forest
+  tier: 2
+
+seeds: "900001-900050"  # held out. While developing:  --seeds 1-30 --reference <a batch of the heuristic on seeds 1-30>
+
+workers:
+  envs: 10
+  recycle_after: 1      # one episode per game process: an episode depends on how long the process's clock has run (docs/environment.md §3, cause 5)
+  recycle_rss_mb: 1500
+  step_timeout: 300
+  reset_timeout: 600
+
+deterministic: true
+device: cpu
+reward_file: reward-v6.yaml
+
+# The reference is the phase 1 heuristic (plan-3) on the held-out seeds, one episode per game process (batch 35,
+# played by the runner with the standing-still and no-KO rules off). The metric is a first setting: phase 3
+# proposes the promotion metric (p90 with a floor on the median) before any model is promoted.
+promotion:
+  metric: score_median
+  min_ratio: 1.0
+  first_reference: heldout-tier2-mewtwo-h2p3-balanced-fresh
+  seeds: "900001-900050"
+
+paths:
+  database: data/pokebonk.sqlite
+  models: models
+  logs: logs/evaluation

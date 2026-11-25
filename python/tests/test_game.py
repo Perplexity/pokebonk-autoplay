@@ -331,3 +331,64 @@ def test_evaluation_plays_the_requested_model_reproducibly_and_promotion_follows
     (foreign / "state.json").write_text(json.dumps(state), "utf-8")
     refused = run("evaluate", "--model", str(foreign), "--reference", "none", *sets)
     assert refused.returncode == 2 and "other observation or action layouts" in refused.stderr
+
+
+# ---------------------------------------------------------------- the manager (phase 2): copy the heuristic, then PPO
+
+def test_manager_copy_of_the_heuristic_plays_the_heuristics_episode_and_a_ppo_run_starts_from_it(tmp_path):
+    """collect → fit → evaluate → train, each through its command line, on episodes capped at 60 game seconds."""
+    manager_yaml = str(REPO / "configs" / "manager.yaml")
+    paths = [f"paths.database={(tmp_path / 'db.sqlite').as_posix()}", f"paths.models={(tmp_path / 'models').as_posix()}", f"paths.logs={(tmp_path / 'logs').as_posix()}"]
+    sets = [x for s in paths for x in ("--set", s)]
+    data = tmp_path / "bc"
+    collected = run("bc", "collect", "--config", manager_yaml, "--seeds", "1000000-1000001", "--out", str(data), "--set", "env.max_game_time=60", "--set", "workers.envs=2", *sets)
+    assert collected.returncode == 0, collected.stderr[-3000:]
+    assert run("bc", "collect", "--config", manager_yaml, "--seeds", "900001", "--out", str(data), *sets).returncode == 2, "nothing is trained on the held-out seeds"
+    meta = json.loads((data / "meta.json").read_text("utf-8"))
+    assert meta["profile_preset"] == "unlocked-v4:balanced" and meta["plan_version"] == "plan-3" and meta["manager"]["fuseNeeds"] == "tm-case"
+    stored = {}
+    for seed in (1000000, 1000001):
+        with np.load(data / f"seed-{seed}.npz") as z:
+            n = len(z["action"])
+            assert n > 30 and len(z["dt"]) == n and len(z["mask"]) == n and len(z["f_ptr"]) == n + 1 and len(z["kills"]) == n
+            assert float(z["dt"].sum()) == pytest.approx(60, abs=1.5) and (z["dt"] >= 0).all() and (z["dt"] == 0).any(), "dialog answers take no game time, skills about a second"
+            assert np.all(np.diff(z["kills"]) >= 0)
+            stored[seed] = json.loads(bytes(z["episode"]).decode("utf-8"))
+
+    fitted = run("bc", "fit", "--config", manager_yaml, "--data", str(data), "--name", "copy", "--epochs", "1", *sets)
+    assert fitted.returncode == 0, fitted.stderr[-3000:]
+    ckpt = tmp_path / "models" / "runs" / "copy" / "checkpoints" / "ckpt_000000000000"
+    state = json.loads((ckpt / "state.json").read_text("utf-8"))
+    assert state["kind"] == "bc" and state["profile_preset"] == "unlocked-v4:balanced" and state["archive"] == "balanced"
+    assert state["bc"]["before"]["agreement"] == 1.0 and state["bc"]["after"]["agreement"] == 1.0 and state["bc"]["after"]["proposal_probability"] > 0.98
+    assert state["manager"]["options"] == meta["manager"] and state["manager"]["layouts"]["compat"] == meta["layouts"]["compat"]
+
+    # The copy, played from its file through the pipes, is the heuristic's own episode on both seeds.
+    evaluation = ["--config", str(REPO / "configs" / "manager-evaluation.yaml"), "--set", "env.max_game_time=60", "--set", "workers.envs=2",
+                  "--set", f"paths.database={(tmp_path / 'db.sqlite').as_posix()}", "--set", f"paths.models={(tmp_path / 'models').as_posix()}", "--set", f"paths.logs={(tmp_path / 'evlogs').as_posix()}"]
+    played = run("evaluate", "--model", "copy", "--seeds", "1000000-1000001", "--reference", "none", *evaluation)
+    assert played.returncode == 0, played.stderr[-3000:]
+    con = sqlite3.connect(tmp_path / "db.sqlite")
+    con.row_factory = sqlite3.Row
+    batch = con.execute("SELECT * FROM batches WHERE policy_name = 'manager'").fetchone()
+    assert batch["profile_preset"] == "unlocked-v4:balanced" and batch["error_count"] == 0
+    rows = {r["seed"]: r for r in con.execute("SELECT * FROM episodes WHERE batch_id = ?", (batch["id"],))}
+    for seed, e in stored.items():
+        assert (rows[seed]["kills"], rows[seed]["level"], rows[seed]["game_time"]) == (e["kills"], e["level"], e["gameTime"]), f"seed {seed}: the copy and the heuristic differ"
+    # A model is not played on another account preset.
+    refused = run("evaluate", "--model", "copy", "--seeds", "1000000", "--reference", "none", *evaluation, "--set", "env.archive=empty")
+    assert refused.returncode == 2 and "another account preset" in refused.stderr
+
+    # PPO from the copy: the penalty for straying fades, steps are discounted by game time, the run resumes.
+    ppo = ["workers.envs=2", "workers.spares=1", "ppo.n_steps=64", "ppo.batch_size=64", "ppo.n_epochs=1", "env.max_game_time=20", "checkpoint_every_timesteps=128",
+           "manager.init_from=copy", "manager.stray_penalty=0.01", "manager.stray_fade_timesteps=200", f"paths.tensorboard={(tmp_path / 'tb').as_posix()}", *paths]
+    trained = run("train", "--config", manager_yaml, "--name", "ppo", "--timesteps", "256", *[x for s in ppo for x in ("--set", s)])
+    assert trained.returncode == 0, trained.stderr[-3000:]
+    assert "policy taken from" in trained.stdout
+    last = tmp_path / "models" / "runs" / "ppo" / "checkpoints" / "ckpt_000000000256"
+    pstate = json.loads((last / "state.json").read_text("utf-8"))
+    assert pstate["manager"]["layouts"]["compat"] == state["manager"]["layouts"]["compat"] and pstate["profile_preset"] == "unlocked-v4:balanced" and pstate["manager"]["horizon_seconds"] == 1000.0
+    assert con.execute("SELECT algorithm FROM training_runs WHERE name = 'ppo'").fetchone()["algorithm"] == "MaskablePPO (manager)"
+    resumed = run("train", "--resume", "ppo", "--models", str(tmp_path / "models"), "--timesteps", "320")
+    assert resumed.returncode == 0 and "256 of 320 timesteps done" in resumed.stdout, resumed.stderr[-3000:]
+    con.close()

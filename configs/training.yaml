@@ -19,6 +19,7 @@ env:
   # whether the Pokémon moved or not. The time a guardian or the legendary is alive does not count. 0 = no such rule.
   max_ko_gap_game_time: 30
   ranked: true
+  archive: null         # null = account preset unlocked-v3; empty | loose | balanced | narrow = unlocked-v4 with that item archive
 
 # Each episode draws one of each, uniformly, decided by the episode's number.
 scenarios:
@@ -33,7 +34,7 @@ episode_seeds:
 workers:
   envs: 5               # game processes stepped together
   spares: 2             # extra processes kept reset, so that an ending episode does not stall the others
-  recycle_after: 8      # episodes per game process before it is replaced (its memory grows)
+  recycle_after: 1      # one episode per game process: an episode depends on how long the process's clock has run (docs/environment.md §3, cause 5)
   recycle_rss_mb: 1500
   max_errors: 20        # environment errors per session before training stops
   step_timeout: 300
@@ -61,6 +62,20 @@ network:
   vf: [256]
 
 normalize_reward: true  # divide rewards by a running estimate of the return's spread (saved with every checkpoint)
+
+# The manager (phase 2; configs/manager.yaml is the configuration that uses it). Off here: this file trains the
+# low-level policy, which presses keys 20 times a game second.
+manager:
+  enabled: false
+  plan: {}
+  slice_seconds: 1.0
+  end_on_proposal_change: true
+  fuse_needs: tm-case
+  horizon_seconds: 1000.0
+  proposal_logit: 8.0
+  stray_penalty: 0.0
+  stray_fade_timesteps: 0
+  init_from: null
 
 total_timesteps: 2000000
 checkpoint_every_timesteps: 100000

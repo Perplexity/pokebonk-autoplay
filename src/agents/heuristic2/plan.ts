@@ -134,6 +134,16 @@ export interface Plan {
    * two, where the totem was never the nearest errand within `lootRange` before the wake (once passed at 19 m).
    */
   roarsFirst: boolean; roarTimeout: number;
+  // ---- added with plan-4 ----
+  /**
+   * Bill's machine (fuse two moves into one, or link them) is used only while this item is held, and only on two moves
+   * that are both at the level cap ('' = the machine is left alone). The owner: moves go to level 10 with a TM Case,
+   * "and we should realistically never fuse or join until we have this item, as this maximises our damage even more".
+   * Read in the game: the machine takes any two moves at level 8, a fusion inherits the upgrades its parents had, and
+   * the TM Case raises the cap of a move from 8 to 10 and of a fusion from ★5 to ★6. With the item set, `bill` is also
+   * an errand: the machine is walked to once the item is held and two moves are at the cap.
+   */
+  fuseNeeds: string;
 }
 
 export const PLAN_V1: Plan = {
@@ -159,6 +169,7 @@ export const PLAN_V1: Plan = {
   leash: 10,
   cashLoss: 2, cashWindow: 5,
   roarsFirst: false, roarTimeout: 120,
+  fuseNeeds: '',
 };
 
 /**
@@ -189,11 +200,17 @@ export const PLAN_V2: Plan = {
  */
 export const PLAN_V3: Plan = { ...PLAN_V2, version: 'plan-3', roarsFirst: true };
 
-export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3 };
+/**
+ * plan-4 (a candidate, NOT the default: not measured yet): plan-3, and Bill's machine fuses two moves at level 10 once
+ * a TM Case is held.
+ */
+export const PLAN_V4: Plan = { ...PLAN_V3, version: 'plan-4', fuseNeeds: 'tm-case', errands: [...PLAN_V3.errands, 'bill'] };
+
+export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4 };
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). The key `base` names the plan to start from
- * ('plan-1', 'plan-2', 'plan-3'; default: the newest). Unknown keys are an error: a typo must not play silently.
+ * ('plan-1' … 'plan-4'; default: plan-3, the newest that was measured). Unknown keys are an error: a typo must not play silently.
  */
 export function planWith(over: Record<string, unknown> | undefined, from?: Plan): Plan {
   const name = over?.base;

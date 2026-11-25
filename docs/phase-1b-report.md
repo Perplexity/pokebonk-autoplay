@@ -244,13 +244,17 @@ Measured, tier 2, Mewtwo, forest, balanced archive, policy `heuristic2 2+564e04e
 
 - The two zones that had no roar now have three (seed 4 at zone time 386–388 s, seed 7 at 382–383 s; the guardian
   woke 6 and 4 s later).
-- Seeds 1–30: 17 runs are identical to plan-2 to the KO (their totems were already used up), 9 score higher, 4 lower.
-  Held-out: 23 identical, 14 higher, 13 lower. Every Overtime reached was cashed; 0 errors; no run reaches 20 million.
-- The differences between the plans are within what one changed decision does to a run (§6): this measures that the
-  rule does no harm, not that it is worth 4 %.
+- Every Overtime reached was cashed; 0 errors; no run reaches 20 million.
+- **Correction (2026-11-25, later the same day).** This addendum first said that 17 of the 30 runs were identical to
+  plan-2's "because their totems were already used up" and counted the rest as the rule's effect. That reading was
+  wrong. An episode that is not the first of its game process is not reproduced by its seed (docs/environment.md §3,
+  cause 5), and these batches were played with 8, 9 and 10 workers, eight episodes per process. Two batches of the SAME
+  plan-3 code differ on 16 of 30 seeds for that reason alone. What is established about the rule itself: seeds 4 and 7
+  were traced in fresh processes and their zone 2 has three roars with it and none without. The table's figures are
+  what was measured; the difference between the plans is within what the order of episodes in a process does.
 - Held-out seed 900029, which stalled against a sanctuary wall under plan-2, did not stall under plan-3 (3,285,080).
   The stall itself is not fixed: the run simply took another path.
-- plan-2 replayed with the new code: seed 7 → 236,872, as in its gate batch.
+- plan-2 replayed with the new code: seed 7 → 236,872, as in its gate batch (both as the first episode of a process).
 - Tests: 187 TypeScript pass (one new: the totem before the wake, pressed until used, given up after the time-out,
   per zone, not when hurt, plan-2 unchanged).
 

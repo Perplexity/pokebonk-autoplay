@@ -60,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     from .bridge import WorkerError
     from .checkpoints import latest_checkpoint, read_checkpoint, save_checkpoint
     from .layout import load_layouts
+    from .manager import build_manager_model, gamma_per_second, load_manager_layouts
     from .evaluate import score
     from .reward import RewardConfig, ended_idle
     from .storage import Store
@@ -90,7 +91,10 @@ def main(argv: list[str] | None = None) -> int:
         config["total_timesteps"] = int(args.timesteps)
     offline.check_config(config)
 
-    layouts = load_layouts(config["game"]["build"])
+    # Manager mode (phase 2): the learner decides a skill or a dialog answer about once a game second, on the
+    # manager's own layouts. A run is one or the other for good: its stored configuration says which.
+    manager = cfg.manager_options(config)
+    layouts = load_manager_layouts(config["game"]["build"]) if manager is not None else load_layouts(config["game"]["build"])
     reward = RewardConfig.from_dict(config["reward"])
     store = Store(cfg.resolve(config["paths"]["database"]))
     ckpt_dir = run_dir / "checkpoints"
@@ -121,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         run_dir.mkdir(parents=True)
         (run_dir / "config.json").write_text(json.dumps(config, indent=1), "utf-8")
-        run_id = store.create_training_run(name=name, algorithm="MaskablePPO", config=config, reward=reward.to_dict(), observation_layout_hash=layouts.observation_hash,
+        run_id = store.create_training_run(name=name, algorithm="MaskablePPO (manager)" if manager is not None else "MaskablePPO", config=config, reward=reward.to_dict(), observation_layout_hash=layouts.observation_hash,
                                            action_layout_hash=layouts.action_hash, game_build=layouts.build, directory=str(run_dir))
     (run_dir / "config.json").write_text(json.dumps(config, indent=1), "utf-8")
     # A STOP file is a request to the session that was running when it was written. One left behind (that session
@@ -138,6 +142,15 @@ def main(argv: list[str] | None = None) -> int:
     recent: deque[dict[str, Any]] = deque(maxlen=100)
     counters = {"timesteps": start_timesteps}
 
+    seen = {"profile_preset": state.get("profile_preset")}
+
+    def on_metadata(m: dict[str, Any]) -> None:
+        store.set_batch_metadata(batch_id, m)
+        # A model belongs to the account preset it was trained on (unlocked-v4 with its item archive, …).
+        if seen["profile_preset"] not in (None, m.get("profilePreset")):
+            raise RuntimeError(f"the run {name!r} was trained on account preset {seen['profile_preset']!r}; the environment now runs {m.get('profilePreset')!r}")
+        seen["profile_preset"] = m.get("profilePreset")
+
     def on_episode(info: dict[str, Any]) -> None:
         store.insert_episode(batch_id, info["episode"], worker_id=info["worker_id"], reward=info["reward"], timesteps=counters["timesteps"])
         recent.append(info)
@@ -151,7 +164,13 @@ def main(argv: list[str] | None = None) -> int:
         n_envs=int(w["envs"]), n_spares=int(w["spares"]), layouts=layouts, env_options=cfg.env_options(config), reward=reward, scenarios=scenarios,
         first_seed=int(config["episode_seeds"]["first"]), first_episode=int(state["episodes_started"]), recycle_after=int(w["recycle_after"]), recycle_rss_mb=int(w["recycle_rss_mb"]),
         record_decisions=bool(config["store_decisions"]), log_dir=session_log, step_timeout=float(w["step_timeout"]), reset_timeout=float(w["reset_timeout"]),
-        max_errors=int(w["max_errors"]), on_episode=on_episode, on_error=on_error, on_metadata=lambda m: store.set_batch_metadata(batch_id, m))
+        max_errors=int(w["max_errors"]), on_episode=on_episode, on_error=on_error, on_metadata=on_metadata, manager=manager)
+    mcfg = config.get("manager") or {}
+    stray0, stray_fade = (float(mcfg.get("stray_penalty", 0.0)), int(mcfg.get("stray_fade_timesteps", 0))) if manager is not None else (0.0, 0)
+
+    def stray_penalty(timesteps: int) -> float:
+        """The reward taken away for a decision that is not the heuristic's proposal: from `stray_penalty` to zero, linearly."""
+        return stray0 * max(0.0, 1.0 - timesteps / stray_fade) if stray_fade > 0 else 0.0
 
     status, model, env = "failed", None, venv
     t_start = time.time()
@@ -175,8 +194,25 @@ def main(argv: list[str] | None = None) -> int:
                 raise RuntimeError(f"{resumed_from}: model.zip is at {model.num_timesteps} timesteps, state.json says {start_timesteps}")
         else:
             if config["normalize_reward"]:
-                env = VecNormalize(venv, norm_obs=False, norm_reward=True, clip_reward=10.0, gamma=float(config["ppo"]["gamma"]))
-            model = build_model(config, env, layouts.extractor_spec(), cfg.resolve(config["paths"]["tensorboard"]), device)
+                env = VecNormalize(venv, norm_obs=False, norm_reward=True, clip_reward=10.0,
+                                   gamma=gamma_per_second(float(mcfg["horizon_seconds"])) if manager is not None else float(config["ppo"]["gamma"]))
+            if manager is not None:
+                model = build_manager_model(config, env, layouts, cfg.resolve(config["paths"]["tensorboard"]), device)
+                if mcfg.get("init_from"):
+                    # The warm start: the policy (and value network) of a stored model, usually the copy of the heuristic.
+                    from .evaluate import resolve_model
+                    src_dir, src_state = resolve_model(str(mcfg["init_from"]), cfg.resolve(config["paths"]["models"]), store)
+                    why = layouts.accepts((src_state.get("manager") or {}).get("layouts") or {})
+                    if why:
+                        raise RuntimeError(f"manager.init_from {src_dir} cannot start this run: " + "; ".join(why))
+                    model.policy.load_state_dict(MaskablePPO.load(str(src_dir / "model.zip"), device=device).policy.state_dict())
+                    print(f"train: policy taken from {src_dir} (model {src_state['model_sha256'][:12]})")
+            else:
+                model = build_model(config, env, layouts.extractor_spec(), cfg.resolve(config["paths"]["tensorboard"]), device)
+        if manager is not None:
+            # The buffer discounts by game time and reads how long each step lasted from the environment.
+            model.rollout_buffer.dt_source = venv
+            venv.stray_penalty = stray_penalty(model.num_timesteps)
         vecnorm = env if isinstance(env, VecNormalize) else None
         total = int(config["total_timesteps"])
         every = int(config["checkpoint_every_timesteps"])
@@ -187,7 +223,9 @@ def main(argv: list[str] | None = None) -> int:
             path, sha = save_checkpoint(ckpt_dir, model=model, vecnormalize=vecnorm, timesteps=model.num_timesteps, state={
                 "run": name, "kind": kind, "session_id": session_id, "episodes_started": venv.episodes_started,
                 "episodes_finished": int(state["episodes_finished"]) + venv.episodes_finished, "observation_layout_hash": layouts.observation_hash,
-                "action_layout_hash": layouts.action_hash, "reward_version": reward.version, "game_build": layouts.build})
+                "action_layout_hash": layouts.action_hash, "reward_version": reward.version, "game_build": layouts.build,
+                "profile_preset": seen["profile_preset"], "archive": config["env"].get("archive"),
+                **({"manager": {"options": manager, "plan": mcfg.get("plan") or {}, "horizon_seconds": float(mcfg["horizon_seconds"]), "layouts": layouts.identity()}} if manager is not None else {})})
             store.insert_checkpoint(run_id=run_id, session_id=session_id, kind=kind, timesteps=model.num_timesteps,
                                     episodes=int(state["episodes_finished"]) + venv.episodes_finished, path=str(path), sha256=sha)
             print(f"train: checkpoint {path.name} ({kind})")
@@ -202,6 +240,8 @@ def main(argv: list[str] | None = None) -> int:
 
             def _on_step(self) -> bool:
                 counters["timesteps"] = self.model.num_timesteps
+                if manager is not None:
+                    venv.stray_penalty = stray_penalty(self.model.num_timesteps)
                 if not stop["requested"] and (run_dir / "STOP").exists():
                     stop.update(requested=True, why=f"stop file {run_dir / 'STOP'}")
                 return not stop["requested"]
@@ -231,6 +271,10 @@ def main(argv: list[str] | None = None) -> int:
                     for k in recent[0]["reward"]["components"]:
                         self.logger.record(f"reward/{k}_mean", mean([r["reward"]["components"][k] for r in recent]))
                     self.logger.record("reward/total_mean", mean([r["reward"]["total"] for r in recent]))
+                    if manager is not None:
+                        self.logger.record("manager/decisions_mean", mean([r["manager"]["decisions"] for r in recent]))
+                        self.logger.record("manager/strayed_share", sum(r["manager"]["strayed"] for r in recent) / max(1, sum(r["manager"]["decisions"] for r in recent)))
+                        self.logger.record("manager/stray_penalty", venv.stray_penalty)
                 if self.model.num_timesteps - self.last_checkpoint >= every:
                     checkpoint("periodic")
                     self.last_checkpoint = self.model.num_timesteps

@@ -224,6 +224,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     // Registries of the running bundle → the unlocked preset → the game's own devUnlock call adopts it.
     const reg = this.registries = await readRegistries(sim.loader.loaded);
     this.instrumentation.push('read-only: module exports of the loaded chunks are inspected to find the game\'s registries (League, Lab, shop items, maps, forms, tiers, season, friendship perks and level function, shiny perks, species rules and reference data)');
+    this.instrumentation.push('read-only: survivalFigures() reads player.overheal, player.leechBudget, overtime.refHp, the three factors of the spawn multiplier and run.roars');
     this.instrumentation.push('read-only: planRoute(x, z) runs the snapshot extractor\'s route planner (A* over the game\'s height map and prop colliders) for scripted policies; it reads terrain and writes nothing');
     sim.api.season = localRankedSeason(reg.season.season, reg.season.name, reg.season.biomes, sim.clock.epoch);
     await this.settle(app.backend.status(), 'the game to re-read the service status');
@@ -683,6 +684,19 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (!Number.isFinite(x) || !Number.isFinite(z)) throw new Error(`planRoute needs a finite world point, got (${x}, ${z})`);
     const nav = (extractSnapshot.call(this.run, x, z) as Snapshot | null)?.nav;
     return nav ? deepFreeze(structuredClone(nav)) : null;
+  }
+
+  /**
+   * Read-only figures of the moment that the snapshot and the state do not carry (the manager's observation,
+   * src/hybrid): the overheal held, what is left of the lifesteal budget, the reference HP the Overtime tide is a
+   * share of, the spawn multiplier as the game computes it (difficulty × enemy amount × the tier's amount, clamped to
+   * 1–3), and the roars Rhydon has made in this zone. Fields are read; nothing is called or written.
+   */
+  survivalFigures(): { overheal: number; leechBudget: number; referenceHp: number; spawnMultiplier: number; roars: number } {
+    if (!this.sim || !this.run || this.episode.index === 0) throw new Error('call reset() before survivalFigures()');
+    const run = this.run, p = run.player ?? {}, st = p.stats ?? {}, num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+    const raw = num(st.difficulty) * num(st.enemyAmount) * num(run.diff?.enemyAmount);
+    return { overheal: num(p.overheal), leechBudget: num(p.leechBudget), referenceHp: num(run.overtime?.refHp), spawnMultiplier: raw > 0 ? Math.max(1, Math.min(3, raw)) : 0, roars: num(run.roars) };
   }
 
   private blocked(): string[] {

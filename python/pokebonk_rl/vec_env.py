@@ -57,6 +57,10 @@ class _Slot:
         self.seed = -1
         self.scenario: dict[str, Any] = {}
         self.episode_index = -1
+        # Manager mode: decisions of the episode, how many were not the heuristic's proposal, and what that cost.
+        self.decisions = 0
+        self.strayed = 0
+        self.stray_cost = 0.0
 
 
 class NodeVecEnv(VecEnv):
@@ -64,13 +68,22 @@ class NodeVecEnv(VecEnv):
                  first_episode: int = 0, n_spares: int = 1, recycle_after: int = 8, recycle_rss_mb: int = 1500, record_decisions: bool = False,
                  log_dir: Path | None = None, step_timeout: float = 300.0, reset_timeout: float = 600.0, max_errors: int = 20,
                  on_episode: Callable[[dict[str, Any]], None] | None = None, on_error: Callable[[WorkerError, dict[str, Any]], None] | None = None,
-                 on_metadata: Callable[[dict[str, Any]], None] | None = None):
+                 on_metadata: Callable[[dict[str, Any]], None] | None = None, manager: dict[str, Any] | None = None):
+        # Manager mode (python/pokebonk_rl/manager.py): `layouts` are the manager's, an action is one id, and every
+        # step reports the heuristic's proposal and the game seconds it lasted.
+        self.manager = None if manager is None else dict(manager)
         self.layouts = layouts
         observation_space = spaces.Dict({
             "float": spaces.Box(-np.inf, np.inf, (layouts.float_size,), np.float32),
             "int": spaces.Box(0, max(layouts.vocab_sizes.values()), (layouts.int_size,), np.int32),
         })
-        super().__init__(n_envs, observation_space, spaces.MultiDiscrete(layouts.nvec))
+        super().__init__(n_envs, observation_space, layouts.action_space() if self.manager is not None else spaces.MultiDiscrete(layouts.nvec))
+        # Per slot: the heuristic's proposal for the observation the learner is deciding on, and the game seconds the
+        # step just taken lasted (0 outside manager mode: the time-discounting buffer reads it).
+        self.proposals = np.full(n_envs, -1, dtype=np.int64)
+        self.last_dt = np.zeros(n_envs, dtype=np.float32)
+        # Reward taken away for a decision that is not the proposal (the trainer fades it to zero).
+        self.stray_penalty = 0.0
         self.env_options, self.reward_config, self.scenarios = dict(env_options), reward, scenarios
         self.first_seed = int(first_seed)
         self.episodes_started = int(first_episode)     # episodes handed out so far in this training run (all sessions)
@@ -100,7 +113,7 @@ class NodeVecEnv(VecEnv):
         log = self.log_dir / f"worker-{wid:04d}.log" if self.log_dir else None
         if log:
             log.parent.mkdir(parents=True, exist_ok=True)
-        slot = _Slot(NodeWorker(self.env_options, record_decisions=self.record_decisions, log_path=log, worker_id=wid), self.reward_config)
+        slot = _Slot(NodeWorker(self.env_options, record_decisions=self.record_decisions, log_path=log, worker_id=wid, manager=self.manager), self.reward_config)
         self._request_reset(slot)
         return slot
 
@@ -134,11 +147,16 @@ class NodeVecEnv(VecEnv):
                 self._spares.append(self._launch())
                 continue
             if not self._metadata_seen and pick.worker.metadata is not None:
-                check_against_metadata(self.layouts, pick.worker.metadata)
+                if self.manager is not None:
+                    self.layouts.check_metadata(pick.worker)
+                else:
+                    check_against_metadata(self.layouts, pick.worker.metadata)
                 self._metadata_seen = True
                 if self.on_metadata:
                     self.on_metadata(pick.worker.metadata)
             pick.tracker.reset(frame.header["c"])
+            pick.decisions = pick.strayed = 0
+            pick.stray_cost = 0.0
             return pick, frame
 
     def _recv(self, slot: _Slot, timeout: float) -> Frame:
@@ -160,6 +178,7 @@ class NodeVecEnv(VecEnv):
     def _place(self, i: int, slot: _Slot, frame: Frame) -> None:
         self._slots[i] = slot
         self._obs["float"][i], self._obs["int"][i], self._masks[i] = frame.float, frame.int, frame.mask.astype(bool)
+        self.proposals[i] = int(frame.header.get("p", -1))
 
     # ---------------------------------------------------------------- VecEnv
 
@@ -205,13 +224,22 @@ class NodeVecEnv(VecEnv):
                 self._failed(slot, failed[i], during="step")
                 dones[i] = True
                 infos[i] = {"terminal_observation": {"float": self._obs["float"][i].copy(), "int": self._obs["int"][i].copy()}, "TimeLimit.truncated": True, "worker_error": str(failed[i])}
+                self.last_dt[i] = 0.0
                 new, first = self._take_spare_after(slot, broken=True)
                 self._place(i, new, first)
                 continue
             episode = frame.header.get("episode")
             rewards[i] = slot.tracker.step(frame.header["c"], episode, frame.header.get("ot"), bool(frame.header.get("sw")), bool(frame.header.get("rf")))
+            self.last_dt[i] = float(frame.header.get("dt", 0.0))
+            if self.manager is not None:
+                slot.decisions += 1
+                if int(actions[i]) != int(self.proposals[i]):
+                    slot.strayed += 1
+                    slot.stray_cost += self.stray_penalty
+                    rewards[i] -= self.stray_penalty
             if episode is None:
                 self._obs["float"][i], self._obs["int"][i], self._masks[i] = frame.float, frame.int, frame.mask.astype(bool)
+                self.proposals[i] = int(frame.header.get("p", -1))
                 continue
             dones[i] = True
             summary = slot.tracker.summary()
@@ -224,6 +252,9 @@ class NodeVecEnv(VecEnv):
                 "episode": {"r": summary["total"], "l": summary["steps"], "t": episode["wallSeconds"]},
                 "pokebonk": {"episode": episode, "reward": summary, "scenario": slot.scenario, "episode_index": slot.episode_index, "worker_id": slot.worker.worker_id},
             }
+            if self.manager is not None:
+                # Kept apart from the stored reward: the penalty for straying is a training aid, not part of the reward version.
+                infos[i]["pokebonk"]["manager"] = {"decisions": slot.decisions, "strayed": slot.strayed, "stray_cost": slot.stray_cost}
             if self.on_episode:
                 self.on_episode(infos[i]["pokebonk"])
             new, first = self._take_spare_after(slot)

@@ -19,6 +19,13 @@
  *   {cmd: 'step', a: [move, jump, dash, ultimate, interact, form, incense, fuse, choice]}                                → obs
  *   {cmd: 'close'}                                                                                  → (exit 0)
  *
+ * Manager mode (`init` with `manager: {plan?, sliceSeconds?, endOnProposalChange?, fuseNeeds?}`; src/hybrid): the
+ * environment is the manager's. A step is `{cmd: 'step', m: <action id>}`: a dialog answer, or a skill that the
+ * heuristic's brain carries out for about a second of game time. The payload is the manager's observation
+ * (data/encoding/<build>/manager-observation-layout.json) and its mask over the manager's action table; the reply also
+ * carries `p` (the heuristic's proposal: an action id), `dt` (game seconds the step took), `k` (low-level decisions it
+ * made) and `end` (why the step ended). The low-level `step` with `a` is refused in this mode, and `m` outside it.
+ *
  * Replies:
  *   {t: 'hello', pid, protocol}     (the game is loaded by the first reset, not here)
  *   {t: 'obs', phase, step, term, trunc, n: [floatSize, intSize, maskSize], c: <counters>, ot: <overtime or null>,
@@ -37,9 +44,14 @@
  */
 import { writeSync } from 'node:fs';
 import { decodeAction } from '../actions/codec.ts';
+import { choiceOfId } from '../hybrid/actions.ts';
 import { createEnvironment } from '../environment/index.ts';
 import type { HeadlessGameEnvironment } from '../environment/GameEnvironment.ts';
 import type { ChoiceMask, Observation, StepResult } from '../environment/types.ts';
+import { managerActionLayout } from '../hybrid/actions.ts';
+import { ManagerEnvironment } from '../hybrid/manager.ts';
+import type { ManagerObservation, ManagerOptions, ManagerStep } from '../hybrid/manager.ts';
+import { ManagerEncoder } from '../hybrid/observe.ts';
 import { batchMetadata, chosenId, defeated, finalBuild } from '../runner/episode.ts';
 import { real } from '../sim/clock.ts';
 import type { DecisionRecord, EpisodeRecord } from '../storage/records.ts';
@@ -63,10 +75,12 @@ process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => (process.stderr.
 
 // ---------------------------------------------------------------- state
 
-interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; archive?: string; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean }
-type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a: number[] } | { cmd: 'close' };
+interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; archive?: string; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean; manager?: ManagerOptions }
+type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a?: number[]; m?: number } | { cmd: 'close' };
 
 let env: HeadlessGameEnvironment | null = null;
+let manager: ManagerEnvironment | null = null;
+let mobs: ManagerObservation | null = null;
 let recordDecisions = false;
 let withView = false;
 let obs: Observation | null = null;
@@ -75,18 +89,19 @@ let sentMetadata = false;
 let ep: { seed: number; ranked: boolean; startedAt: string; t0: number; resetSeconds: number; firstSpecies: number; decisions: DecisionRecord[]; decisionCount: number; overtimeStarted: boolean } | null = null;
 
 function payloadOf(o: Observation): Uint8Array {
-  const e = o.encoded;
+  const e = manager ? (mobs?.obs === o && mobs.encoded ? { ...mobs.encoded, mask: mobs.mask } : null) : o.encoded;
   if (!e) throw new Error('ipc: the environment returned an observation without its encoding');
   return Buffer.concat([Buffer.from(e.float.buffer, e.float.byteOffset, e.float.byteLength), Buffer.from(e.int.buffer, e.int.byteOffset, e.int.byteLength), Buffer.from(e.mask.buffer, e.mask.byteOffset, e.mask.byteLength)]);
 }
 
 function reply(o: Observation, res: StepResult | null, extra: Record<string, unknown>): void {
-  const p = o.snapshot.player;
+  const p = o.snapshot.player, payload = payloadOf(o);
+  const n = manager ? [mobs!.encoded!.float.length, mobs!.encoded!.int.length, mobs!.mask.length] : [o.encoded!.float.length, o.encoded!.int.length, o.encoded!.mask.length];
   out({
-    t: 'obs', phase: o.phase, step: o.step, n: [o.encoded!.float.length, o.encoded!.int.length, o.encoded!.mask.length], term: res?.terminated ?? false, trunc: res?.truncated ?? false,
+    t: 'obs', phase: o.phase, step: o.step, n, term: res?.terminated ?? false, trunc: res?.truncated ?? false,
     c: res ? res.info.counters : o.state.counters, ot: res?.info.overtime ?? null, sw: o.state.zone.finalSwarm ? 1 : 0, rf: o.snapshot.rift?.inside ? 1 : 0, hp: p.hp, maxHp: p.maxHp,
     rss: Math.round(process.memoryUsage().rss / 1048576), ...(withView ? { v: viewOf(o) } : {}), ...extra,
-  }, payloadOf(o));
+  }, payload);
 }
 
 /**
@@ -128,12 +143,22 @@ function episodeRecord(o: Observation, res: StepResult): EpisodeRecord {
   };
 }
 
+/** What a trainer must match: the manager's two layouts, its options and the plan it advises with. */
+function managerMetadata(): Record<string, unknown> {
+  const m = manager!, L = m.encoder!.layout, A = managerActionLayout();
+  return {
+    observation: { version: L.version, hash: L.hash, compat: L.compat, floatSize: L.floatSize, intSize: L.intSize }, action: { version: A.version, hash: A.hash, size: A.size },
+    options: m.options, plan: m.advisor.plan.version, capacities: L.capacities,
+  };
+}
+
 async function handle(req: Request): Promise<void> {
   if (req.cmd === 'init') {
     if (env) throw new Error('ipc: init was sent twice');
     recordDecisions = !!req.recordDecisions;
     withView = !!req.view;
-    env = createEnvironment({ ...req.env, encode: true });
+    env = createEnvironment({ ...req.env, encode: !req.manager });
+    if (req.manager) manager = new ManagerEnvironment(env, req.manager);
     out({ t: 'hello', protocol: IPC_PROTOCOL, pid: process.pid });
     return;
   }
@@ -145,18 +170,21 @@ async function handle(req: Request): Promise<void> {
   if (req.cmd === 'reset') {
     const startedAt = new real.Date().toISOString(), t0 = real.performanceNow();
     const { cmd: _cmd, ...setup } = req;
-    obs = await env.reset(setup);
+    if (manager) { mobs = await manager.reset(setup); obs = mobs.obs; } else obs = await env.reset(setup);
     episodes++;
     const md = env.getMetadata();
+    // The manager's encoder needs the running build, which is known once the game is loaded.
+    if (manager && !manager.encoder) { manager.encoder = new ManagerEncoder(md.game.build); mobs = { ...mobs!, encoded: manager.encoder.encode(mobs!, manager) }; }
     ep = { seed: req.seed, ranked: md.mode.ranked, startedAt, t0: real.performanceNow(), resetSeconds: (real.performanceNow() - t0) / 1000, firstSpecies: obs.snapshot.player.species, decisions: [], decisionCount: 0, overtimeStarted: false };
-    reply(obs, null, sentMetadata ? {} : { metadata: batchMetadata(md) });
+    reply(obs, null, { ...(manager ? { p: mobs!.proposal, dt: 0, k: 0 } : {}), ...(sentMetadata ? {} : { metadata: batchMetadata(md), ...(manager ? { manager: managerMetadata() } : {}) }) });
     sentMetadata = true;
     return;
   }
   if (req.cmd === 'step') {
     if (!obs || !ep) throw new Error('ipc: step was sent before reset');
-    const action = decodeAction(req.a, obs);
-    if (obs.phase === 'choice' && action.type === 'choice') {
+    if (manager ? req.m === undefined : !req.a) throw new Error(manager ? 'ipc: manager mode takes {cmd: "step", m: <action id>}' : 'ipc: a step needs the action vector `a` (the manager\'s `m` needs init with `manager`)');
+    const action = manager ? (obs.phase === 'choice' ? choiceOfId(req.m!) : null) : decodeAction(req.a!, obs);
+    if (obs.phase === 'choice' && action?.type === 'choice') {
       ep.decisionCount++;
       if (recordDecisions) {
         const d = obs.decision!, s = obs.snapshot;
@@ -166,12 +194,13 @@ async function handle(req: Request): Promise<void> {
         });
       }
     }
-    const res = await env.step(action);
+    let res: StepResult, ms: ManagerStep | null = null;
+    if (manager) { ms = await manager.step(req.m!); mobs = ms.observation; res = { observation: mobs.obs, terminated: ms.terminated, truncated: ms.truncated, info: ms.info } as StepResult; } else res = await env.step(action!);
     obs = res.observation;
     if (res.info.overtime?.live) ep.overtimeStarted = true;
     const over = res.terminated || res.truncated;
-    reply(obs, res, over ? { episode: { ...episodeRecord(obs, res), decisionCount: ep.decisionCount } } : {});
-    if (over) { obs = null; ep = null; }
+    reply(obs, res, { ...(ms ? { p: mobs!.proposal, dt: ms.dt, k: ms.ticks, end: ms.ended } : {}), ...(over ? { episode: { ...episodeRecord(obs, res), decisionCount: ep.decisionCount } } : {}) });
+    if (over) { obs = null; ep = null; mobs = null; }
     return;
   }
   throw new Error(`ipc: unknown command ${JSON.stringify((req as { cmd?: unknown }).cmd)}`);

@@ -139,6 +139,26 @@ export function choose2(obs: Observation, ctx: Chooser2Context): Choice {
       for (const key of ctx.plan.offerings) { const c = option(d.options.findIndex((o) => o.id === key), `offering "${key}"`); if (c) return c; }
       return extra('decline', 'none of the wanted offerings is offered') ?? fallback('declining the offering');
     }
+    case 'fusion': {
+      const pick = fusionPick(d, s, ctx.plan);
+      if (pick >= 0) { const c = option(pick, `${d.options[pick].id}: the ${ctx.plan.fuseNeeds} is held and both moves are at level ${moveCap(s, ctx.plan)}`); if (c) return c; }
+      return extra('leave', ctx.plan.fuseNeeds ? `no two moves at level ${moveCap(s, ctx.plan)} with the ${ctx.plan.fuseNeeds} held` : "Bill's machine is not used") ?? fallback("leaving Bill's machine");
+    }
     default: return chooseV1(obs, ctx);
   }
+}
+
+/** The level a move can reach: 8, and 10 while the plan's `fuseNeeds` item (the TM Case) is held. */
+export function moveCap(s: Snapshot, plan: Plan): number {
+  return 8 + (plan.fuseNeeds && (s.player.items[plan.fuseNeeds] ?? 0) > 0 ? 2 : 0);
+}
+
+/**
+ * The option of Bill's machine the plan takes, or −1: a fusion (not a link) of two moves that are both at the cap,
+ * with the plan's item held. The game lists the pairs best recipe first (signature, reaction, type, glitch).
+ */
+export function fusionPick(d: Decision, s: Snapshot, plan: Plan): number {
+  if (!plan.fuseNeeds || !((s.player.items[plan.fuseNeeds] ?? 0) > 0)) return -1;
+  const cap = moveCap(s, plan), level = (key: unknown): number => s.player.moves.find((m) => m.key === key)?.level ?? 0;
+  return d.options.findIndex((o) => o.data.how === 'fuse' && level(o.data.moveA) >= cap && level(o.data.moveB) >= cap);
 }

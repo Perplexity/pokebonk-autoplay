@@ -181,9 +181,27 @@ the enemy arrays, then the fields of the run object):
    cause, not one site: it covers every lazily created three.js object. Code of the game itself that draws from
    `Math.random` only the first time something is built in a process would still show; none is known.
 
-Still depending on process history, without a known effect on play: the virtual wall clock keeps running from one
-episode to the next (the game's date-dependent features outside a run would see a later time of day), `run.bornAt` and
-the profiler's timestamps follow it, and which music track is picked.
+5. **The virtual wall clock** (found 2026-11-25, when the second heuristic made runs last past minute 10 of a zone;
+   NOT fixed inside a process). The clock the game reads as `performance.now()` keeps running from one episode to the
+   next, and its absolute value changes play. Traced on tier 2, Mewtwo, seed 21, capped at 640 game seconds: a fresh
+   process and a process that had only been reset once (clock 150 ms) both make 26,659 KOs; the same process with the
+   clock advanced by 662,583 ms before the episode makes 26,845, to the KO what a process that had played one
+   episode before makes. The first difference is at zone time 598.75 s, in one strike that defeats an enemy in one
+   process and not in the other, with the random stream, every enemy, pickup and projectile array and the account
+   identical until then; only `run.bornAt`, `resumedAt`, `fanfareAt`, `profAt` and the phase of the game's frame-rate
+   window differ. At full length the same seed twice in one process: 1,487,778 KOs, then 1,498,866. Which code of
+   the game reads the clock in a way that reaches play is **not identified**.
+   - *What is done about it*: every episode is played in a fresh process (`recycleAfter` / `recycle_after` = 1, the
+     default of the runner, the trainer, the evaluator and `bc collect` since that day). A fresh process loads the
+     game in about a second more than a reset takes; an episode of the second heuristic takes eight minutes.
+   - *What it means for stored results*: batches played before with `recycleAfter` 8 hold real episodes, but an
+     episode that was not the first of its process is not reproduced by its seed. On tier 2 with the second heuristic,
+     16 of 30 seeds differed between two batches of the same code that only differed in the number of workers
+     (docs/phase-2-report.md). The tier-0 baselines never showed it: their episodes are short and repeat exactly.
+   - *Not done*: setting the clock back at reset. Timestamps the game keeps outside the run would then lie in the
+     future, which is a dependence on process history of its own.
+
+Still depending on process history, without a known effect on play: which music track is picked.
 
 The unit test `test/env/environment.test.ts` repeats the check inside one process (seed 5 first, then again after six
 other resets). Not covered: maps other than forest and coast; zones 2–4 on anything but the one probe run; evolution, capture

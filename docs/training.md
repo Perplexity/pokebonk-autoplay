@@ -56,8 +56,9 @@ an episode carries its `EpisodeRecord`, the same record the Stage 1 runner store
 - **Spares.** `spares` further processes hold an episode that has already been reset. When a slot's episode ends, a
   ready spare takes the slot and the old process resets in the background. A reset costs 2.6 to 4.1 s; without
   spares each one would stall every slot.
-- **Recycling.** A process is closed and replaced after `recycle_after` episodes (default 8) or above
-  `recycle_rss_mb` (1,500).
+- **Recycling.** A process is closed and replaced after `recycle_after` episodes or above `recycle_rss_mb` (1,500).
+  The default is 1 since 2026-11-25 (it was 8): an episode in a reused process is not the episode its seed names
+  (docs/environment.md §3, cause 5). With spares, a fresh process per episode costs no waiting.
 - **Seeds and scenarios.** The run's k-th episode is played on seed `episode_seeds.first + k` and on the Pokémon, map
   and tier that `scenarios` gives for k (uniform over the configured lists, a function of k and the run's seed alone).
   A resumed run continues at the k its checkpoint recorded, so no seed is played twice.
@@ -289,6 +290,11 @@ v6 has every weight of v5, and `rift` = 150: a rift cleared and left pays 150 ×
     pays the `idle` penalty. Early in training that is most rift visits, so the learner will probably stop opening
     rifts until it can clear one. Rifts are a use of the map (a relic each); if they disappear for good, that is
     this rule's price.
+  - *Not true of the second heuristic on tier 2 (2026-11-25, docs/phase-2-report.md §6).* The check above was the
+    first heuristic on tier 0. `heuristic2` opens a run by walking to the free chests with a level-1 Mewtwo, and on
+    tier 2 that walk is longer than 30 s without a KO in about one run in 25: seed 19 (2 KOs by 23.7 s, the next at
+    64.2 s) and seed 1000007 (the first KO at 33 s) of 50 episodes played under the rule. Its batches were played
+    with the rule off. Open: a grace for the opening, the rule as it is, or another opening (the owner's call).
   - `mewtwo-v5-01` was stopped at about 1.1 million decisions; `mewtwo-v5-02` had the same reward and this rule.
     Since v6 the rule does not run inside a rift ("Rifts" above), which is where it had been made for.
 - **Standing still (v3, and `env.max_idle_game_time`).** What was found: the first model (`mewtwo-v2-01`, 2 million

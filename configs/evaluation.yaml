@@ -16,6 +16,7 @@ env:
   # whether the Pokémon moved or not. The time a guardian or the legendary is alive does not count. 0 = no such rule.
   max_ko_gap_game_time: 30
   ranked: true
+  archive: null         # null = the archive the model was trained with (a model is not played on another account preset)
 
 # One scenario per evaluation: results of different Pokémon, maps or tiers are not pooled.
 scenario:
@@ -30,7 +31,7 @@ seeds: "900001-900050"
 
 workers:
   envs: 5
-  recycle_after: 8
+  recycle_after: 1      # one episode per game process: an episode depends on how long the process's clock has run (docs/environment.md §3, cause 5)
   recycle_rss_mb: 1500
   step_timeout: 300
   reset_timeout: 600

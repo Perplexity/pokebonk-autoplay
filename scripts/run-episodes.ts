@@ -17,7 +17,8 @@
  *   --archive=empty|loose|balanced|narrow   account preset unlocked-v4 with that item archive (default: unlocked-v3)
  *   --max-ko-gap=<game seconds>        end an episode as invalid after this long without a KO (boss fights do not count)
  *                                      (default: no such rule; training and evaluation use 30)
- *   --recycle-after=8                  episodes per worker process before it is replaced by a fresh one (memory growth).
+ *   --recycle-after=1                  episodes per worker process before a fresh one replaces it. 1 (the default): an episode
+ *                                      is named by its seed; more: it also depends on what the process played before.
  *                                      1 = every episode in a fresh process (loads the game once per episode)
  *   --recycle-rss=1500                 … or as soon as it reports more resident memory than this (MB)
  *   --episode-timeout=1800             wall seconds for one episode before its worker is killed and the seed recorded as an error

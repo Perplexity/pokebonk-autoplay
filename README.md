@@ -37,6 +37,11 @@ py -3.13 -m venv .venv                                 # once: Python side (trai
 .venv\Scripts\python -m pip install -e .[test]
 
 .venv\Scripts\python -m pokebonk_rl.train --config configs/training.yaml --name my-run
+
+# The hybrid (heuristic + learned manager, docs/hybrid.md):
+.venv\Scripts\python -m pokebonk_rl.bc collect --config configs/manager.yaml --seeds 1000000-1000019 --out data/bc/plan3
+.venv\Scripts\python -m pokebonk_rl.bc fit --config configs/manager.yaml --data data/bc/plan3 --name manager-copy-01
+.venv\Scripts\python -m pokebonk_rl.evaluate --config configs/manager-evaluation.yaml --model manager-copy-01
 .venv\Scripts\python -m pokebonk_rl.train --resume my-run
 .venv\Scripts\python -m pokebonk_rl.evaluate --model my-run
 .venv\Scripts\python -m pokebonk_rl.registry list

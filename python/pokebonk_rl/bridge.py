@@ -61,8 +61,11 @@ class NodeWorker:
     """
 
     def __init__(self, env: dict[str, Any], *, record_decisions: bool = False, log_path: Path | None = None,
-                 node: str = "node", repo: Path = REPO, worker_id: int = 0, view: bool = False):
+                 node: str = "node", repo: Path = REPO, worker_id: int = 0, view: bool = False, manager: dict[str, Any] | None = None):
         self.worker_id = worker_id
+        # Manager mode (src/hybrid): a step is one action id; the reply's payload is the manager's observation and mask.
+        self.manager = None if manager is None else dict(manager)
+        self.manager_metadata: dict[str, Any] | None = None
         self.env_options = dict(env)
         self.log_path = log_path
         self._log = open(log_path, "ab") if log_path else subprocess.DEVNULL
@@ -81,6 +84,8 @@ class NodeWorker:
         init: dict[str, Any] = {"cmd": "init", "env": self.env_options, "recordDecisions": record_decisions}
         if view:
             init["view"] = True   # every observation reply then carries `v`, a top-down picture (watch.py)
+        if self.manager is not None:
+            init["manager"] = self.manager
         self.send(init)
 
     # ---------------------------------------------------------------- pipes
@@ -157,6 +162,8 @@ class NodeWorker:
         self.rss_mb = int(header.get("rss", 0))
         if "metadata" in header:
             self.metadata = header["metadata"]
+        if "manager" in header:
+            self.manager_metadata = header["manager"]
         return Frame(header, f, i, m)
 
     # ---------------------------------------------------------------- requests
@@ -173,7 +180,10 @@ class NodeWorker:
         self.send(req)
 
     def request_step(self, action) -> None:
-        self.send({"cmd": "step", "a": [int(x) for x in action]})
+        if self.manager is not None:
+            self.send({"cmd": "step", "m": int(action)})
+        else:
+            self.send({"cmd": "step", "a": [int(x) for x in action]})
 
     def reset(self, seed: int, timeout: float | None = 600, **scenario) -> Frame:
         self.request_reset(seed, **scenario)

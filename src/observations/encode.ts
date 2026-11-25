@@ -127,7 +127,7 @@ export interface LayoutSegment {
 export interface ObservationLayout {
   version: number;
   knowledge: { build: string; gameVersion: string | null; vocabVersion: number; vocabSha256: string };
-  sizes: typeof SIZES;
+  sizes: { [K in keyof typeof SIZES]: number };
   conventions: Record<string, string>;
   floatSize: number;
   intSize: number;
@@ -147,9 +147,17 @@ export class ObservationEncoder {
   private readonly ints: { seg: IntSegment<any>; offset: number }[] = [];
   private floatSize = 0;
   private intSize = 0;
+  private readonly sizes: { [K in keyof typeof SIZES]: number };
 
-  constructor(knowledge: EncoderKnowledge) {
+  /**
+   * `sizes.optionSlots`: rows of the dialog-option segments. The default is the version-2 layout (64, the action
+   * codec's); the manager's observation (src/hybrid) uses more, because a strong run holds more than 64 distinct items
+   * and Ditto lists every one. Another size is another layout, with another hash.
+   */
+  constructor(knowledge: EncoderKnowledge, sizes: { optionSlots?: number } = {}) {
     this.k = knowledge;
+    this.sizes = { ...SIZES, optionSlots: sizes.optionSlots ?? SIZES.optionSlots };
+    const SZ = this.sizes;
     const k = knowledge;
     const T = k.tables;
     for (const name of ['species', 'type', 'role', 'rank', 'passive', 'archetype', 'stat', 'vitamin', 'item', 'relic', 'seal', 'overtimeOffering', 'decisionKind', 'enemyFlag', 'map', 'weather', 'interactable', 'entity'])
@@ -420,7 +428,7 @@ export class ObservationEncoder {
       name: 'choice', rows: 1, entities: self, note: 'the open dialog: its kind, how many options it has, and which untargeted extra actions it has and allows. All zero in the play phase',
       features: [
         ...oneHot<Ctx>('kind', decisionKeys, (c) => (c.decision ? T.decisionKind[c.decision.kind] - 1 : -1)),
-        f('options', unit(SIZES.optionSlots), (c) => c.decision?.options.length ?? 0),
+        f('options', unit(SZ.optionSlots), (c) => c.decision?.options.length ?? 0),
         f('shop_restock_cost', log(100000), (c) => (c.decision?.kind === 'shop' ? Number(c.decision.context.rerollCost) || 0 : 0)),
         f('slot_spins_until_insured', unit(6), (c) => (c.decision?.kind === 'slots' ? Number(c.decision.context.spinsUntilInsured) || 0 : 0)),
         f('hypno_lesson_ready', BOOL, (c) => c.decision?.kind === 'forget' && c.decision.context.lessonReady === true),
@@ -430,7 +438,7 @@ export class ObservationEncoder {
       ],
     });
     this.addFloat<OptionE>({
-      name: 'options', rows: SIZES.optionSlots, entities: (c) => c.options, note: 'one row per option of the open dialog (row = option index = choice index − 1); what the option is is in the int segments option_entity / option_secondary',
+      name: 'options', rows: SZ.optionSlots, entities: (c) => c.options, note: 'one row per option of the open dialog (row = option index = choice index − 1); what the option is is in the int segments option_entity / option_secondary',
       features: [
         f('present', BOOL, () => true), f('allowed', BOOL, (e) => e.allowed),
         ...oneHot<OptionE>('offer', OFFER_KINDS, (e) => e.offerKind),
@@ -476,7 +484,7 @@ export class ObservationEncoder {
     });
     this.addInt<Enemy>({ name: 'enemy_species', rows: SIZES.enemies, entities: (c) => c.s.enemies.list, note: 'species of each row of the float segment "enemies"', features: [{ name: 'species', vocab: 'species', raw: (e) => species(e[11]) }] });
     this.addInt<OptionE>({
-      name: 'option_entity', rows: SIZES.optionSlots, entities: (c) => c.options, note: 'what each option of the dialog is: the move, vitamin, item, relic, overtime offering, species (evolution, party) or stat (blessing). "secondary" is the League member a new move comes from, or the relic a new relic would replace',
+      name: 'option_entity', rows: SZ.optionSlots, entities: (c) => c.options, note: 'what each option of the dialog is: the move, vitamin, item, relic, overtime offering, species (evolution, party) or stat (blessing). "secondary" is the League member a new move comes from, or the relic a new relic would replace',
       features: [{ name: 'entity', vocab: 'entity', raw: (e) => e.entity }, { name: 'secondary', vocab: 'entity', raw: (e) => e.secondary }],
     });
 
@@ -488,7 +496,7 @@ export class ObservationEncoder {
     const body = {
       version: OBS_ENCODING_VERSION,
       knowledge: { build: k.build, gameVersion: k.gameVersion, vocabVersion: k.vocabVersion, vocabSha256: k.vocabSha256 },
-      sizes: SIZES,
+      sizes: SZ,
       conventions: {
         axes: 'positions are relative to the player and world-axis aligned: +x east, +z south (the action\'s move "n" is −z). Not rotated by the camera',
         directions: 'direction index d is the angle d·22.5° measured from +x towards +z',
@@ -528,7 +536,7 @@ export class ObservationEncoder {
   private options(c: Ctx): OptionE[] {
     const d = c.decision, mask = c.choiceMask;
     if (!d || !mask) return [];
-    if (d.options.length > SIZES.optionSlots) throw new EncodingError(`the "${d.kind}" dialog has ${d.options.length} options; the encoding has ${SIZES.optionSlots} option slots (nothing is truncated)`);
+    if (d.options.length > this.sizes.optionSlots) throw new EncodingError(`the "${d.kind}" dialog has ${d.options.length} options; the encoding has ${this.sizes.optionSlots} option slots (nothing is truncated)`);
     const banish = Array.isArray(mask.extras.banish) ? mask.extras.banish : [];
     const banishKit = Array.isArray(mask.extras.banishKit) ? mask.extras.banishKit : [];
     const st = c.st;

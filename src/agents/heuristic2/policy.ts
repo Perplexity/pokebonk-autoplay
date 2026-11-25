@@ -10,6 +10,7 @@ import type { Action, Observation, PlayMask } from '../../environment/types.ts';
 import type { RunState } from '../../observations/state.ts';
 import { toPlayAction } from '../heuristic/adapter.ts';
 import { choose2 } from './chooser.ts';
+import type { Chooser2Context } from './chooser.ts';
 import { EF, E_DMG, E_FLAGS } from '../../bot/snapshot.ts';
 import type { Point } from '../../bot/snapshot.ts';
 import { planWith } from './plan.ts';
@@ -101,7 +102,7 @@ export function hpLost(life: Lifecycle2, now: number, window: number): number {
 
 /** What the plan needs to know besides the snapshot: prices, what is held, and the estimated spawn multiplier. */
 export interface World { gold: number; ballPrice: number; cagePrice: number; slotPrice: number; items: number; spawn: number }
-const POINT_NAME: Record<string, string> = { freechest: 'Great Ball (free)', chest: 'Poké Ball', berry: 'berries', slots: 'slot machine', meowth: 'shop', ditto: 'Ditto', cage: 'cage', snorlax: 'Snorlax', magnet: 'Magnemite', rhydon: "Rhydon's roar", cursedchest: 'cursed Poké Ball', cursed: 'cursed altar', greed: "Gengar's altar" };
+const POINT_NAME: Record<string, string> = { bill: "Bill's machine", freechest: 'Great Ball (free)', chest: 'Poké Ball', berry: 'berries', slots: 'slot machine', meowth: 'shop', ditto: 'Ditto', cage: 'cage', snorlax: 'Snorlax', magnet: 'Magnemite', rhydon: "Rhydon's roar", cursedchest: 'cursed Poké Ball', cursed: 'cursed altar', greed: "Gengar's altar" };
 export const pointKey = (q: Pick<Point, 'kind' | 'x' | 'z'>): string => `${q.kind}:${Math.round(q.x)}:${Math.round(q.z)}`;
 
 /**
@@ -138,6 +139,8 @@ export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, lif
       case 'cage': return w.cagePrice > 0 && w.gold >= w.cagePrice;
       case 'snorlax': case 'magnet': return true;
       case 'rhydon': return !s.bossSpawned && !s.stageCleared;
+      // Bill's machine: with the plan's item held and two moves at the cap (chooser.ts, `fusionPick`).
+      case 'bill': return !!plan.fuseNeeds && (s.player.items[plan.fuseNeeds] ?? 0) > 0 && s.player.moves.filter((m) => m.level >= 10).length >= 2;
       case 'cursedchest': case 'cursed': case 'greed': return hp >= plan.riskHp && w.spawn < plan.spawnTarget;
       default: return false;
     }
@@ -155,7 +158,7 @@ export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, lif
 }
 
 /** The directive for the brain. Exported for tests. */
-const wakeAfter = (plan: Plan, stage: number): number => plan.wakeAfterSec[Math.min(plan.wakeAfterSec.length - 1, Math.max(0, stage - 1))];
+export const wakeAfter = (plan: Plan, stage: number): number => plan.wakeAfterSec[Math.min(plan.wakeAfterSec.length - 1, Math.max(0, stage - 1))];
 
 /** Where the plan sends the brain to loot, or null. A berry is only fetched when hurt. */
 export function lootGoal(s: Snapshot, hp: number, swarm: boolean, skip: string[], plan: Plan): NonNullable<Directive['goto']> | null {
@@ -243,7 +246,39 @@ export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live'
 
 let cached: Knowledge | null = null;
 
-export function heuristic2Policy(options: Heuristic2Options = {}): Policy & { readonly state: { intent: string; note: string; plan: string } } {
+/** What the heuristic would do in one play tick: the snapshot the brain sees (with the planned route), its tuning and the plan's order. */
+export interface Advice { snap: Snapshot; tuning: Tuning; directive: Directive }
+
+/**
+ * The heuristic taken apart, for a layer that can overrule it (src/hybrid): the plan's order for a play tick
+ * (`advise`), the brain's answer to an order WITHOUT committing it (`peek`), committing one (`commit`), and the
+ * answer to a dialog (`choose`) with the bookkeeping the plan does on whatever was answered (`noteChoice`).
+ * `heuristic2Policy` below is these five in the heuristic's own order, and plays as it always did.
+ */
+export interface Heuristic2Advisor {
+  readonly plan: Plan;
+  readonly knowledge: Knowledge;
+  /** The brain's tuning without the zone's wake time (the manager's own skills start from it). */
+  readonly baseTuning: Tuning;
+  readonly state: { intent: string; note: string; plan: string };
+  readonly life: Lifecycle2;
+  /** Map points the brain has given up on in this zone ("kind:x:z"). */
+  readonly skip: readonly string[];
+  kit(species: number): Kit;
+  context(species: number): Chooser2Context;
+  reset(): void;
+  /** Once per play observation: logs HP, tracks revives, and returns the plan's order. Advances the plan's own state. */
+  advise(obs: Observation): Advice;
+  /** The brain's decision for an order, not committed. Pure. */
+  peek(advice: Advice): ReturnType<typeof decide>;
+  /** Make a peeked decision the one that is played: the brain's memory moves on, and the action is fitted to the mask. */
+  commit(obs: Observation, out: ReturnType<typeof decide>): Action;
+  choose(obs: Observation): { action: Action; reason: string };
+  /** After a dialog was answered (by anyone): what the plan remembers of it. */
+  noteChoice(obs: Observation, action: Action, reason: string): void;
+}
+
+export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Advisor {
   const plan = planWith(options.plan);
   const base: Tuning = { ...DEFAULT_TUNING, ...plan.tuning, wakeLevel: [...plan.wakeLevel], wakeAfterSec: plan.wakeAfterSec[0], visitKinds: [...(plan.tuning.visitKinds ?? DEFAULT_TUNING.visitKinds)] };
   const knowledge = (cached ??= loadValuationKnowledge(BUILD));
@@ -251,25 +286,27 @@ export function heuristic2Policy(options: Heuristic2Options = {}): Policy & { re
   let life: Lifecycle2 = newLife();
   let nav: Nav | null = null, navAt = -Infinity, navGoal: { x: number; z: number } | null = null, intent = '', note = '';
   const emit = (t: number, what: string, detail: string) => options.onEvent?.({ t, what, detail });
+  const ctxOf = (species: number): Chooser2Context => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge, kit: (kit ??= kitOf(knowledge, species)) });
   return {
-    name: 'heuristic2',
+    plan, knowledge, baseTuning: base,
     get state() { return { intent, note, plan: plan.version }; },
+    get life() { return life; },
+    get skip() { return mem.skip; },
+    kit: (species) => (kit ??= kitOf(knowledge, species)),
+    context: ctxOf,
     reset() { mem = newMemory(); build = null; kit = null; nav = null; navAt = -Infinity; navGoal = null; intent = ''; note = ''; life = newLife(); },
-    act(obs: Observation): Action {
+    choose(obs) { return choose2(obs, ctxOf(obs.snapshot.player.species)); },
+    noteChoice(obs, action, reason) {
+      const d = obs.decision!, s = obs.snapshot;
+      if (SERVICE_DIALOGS.has(d.kind)) mem = markVisited(mem);
+      // What the plan remembers of the answers: what was left on leaving the shop, and Gengar's curses at the slot machine.
+      if (d.kind === 'shop' && 'extra' in action && action.extra === 'leave') life.shopLeft = s.gold;
+      if (d.kind === 'slots' && (d.context.last as { prize?: string } | null)?.prize === 'gengar') life.gengar++;
+      emit(s.t, `choice:${d.kind}`, reason);
+    },
+    advise(obs) {
       const s = obs.snapshot;
-      build ??= buildFor(s.player.species);
-      kit ??= kitOf(knowledge, s.player.species);
-      if (obs.phase === 'choice') {
-        const c = choose2(obs, { build, tuning: base, plan, knowledge, kit });
-        const d = obs.decision!;
-        if (SERVICE_DIALOGS.has(d.kind)) mem = markVisited(mem);
-        // What the plan remembers of its own answers: what was left on leaving the shop, and Gengar's curses at the slot machine.
-        if (d.kind === 'shop' && 'extra' in c.action && c.action.extra === 'leave') life.shopLeft = s.gold;
-        if (d.kind === 'slots' && (d.context.last as { prize?: string } | null)?.prize === 'gengar') life.gengar++;
-        emit(s.t, `choice:${obs.decision!.kind}`, c.reason);
-        return c.action;
-      }
-      if (obs.phase !== 'play') throw new Error('heuristic2 policy: the episode is over');
+      ctxOf(s.player.species);
       let snap: Snapshot = s;
       if (options.planRoute && navGoal && (s.t - navAt >= 0.45 || s.t < navAt)) { nav = options.planRoute(navGoal.x, navGoal.z); navAt = s.t; }
       if (nav && s.t - navAt < 1.5 && s.t >= navAt) snap = { ...s, nav };
@@ -281,12 +318,34 @@ export function heuristic2Policy(options: Heuristic2Options = {}): Policy & { re
       life.revives = st.build.revives;
       while (life.hpLog.length && (life.hpLog[0].t < s.t - 30 || life.hpLog[0].t > s.t)) life.hpLog.shift();
       const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, knowledge, life.gengar) };
-      const out = decide(snap, mem, tuning, directiveFor2(s, st.overtime, life, plan, st.zone.finalSwarm, mem.skip, world));
+      return { snap, tuning, directive: directiveFor2(s, st.overtime, life, plan, st.zone.finalSwarm, mem.skip, world) };
+    },
+    peek(advice) { return decide(advice.snap, mem, advice.tuning, advice.directive); },
+    commit(obs, out) {
+      const s = obs.snapshot;
       mem = out.mem;
       navGoal = out.goal?.far ? { x: out.goal.x, z: out.goal.z } : null;
       if (out.action.intent !== intent) emit(s.t, `intent:${out.action.intent}`, out.action.note);
       intent = out.action.intent; note = out.action.note;
       return toPlayAction(out.action, obs.mask as PlayMask).action;
+    },
+  };
+}
+
+export function heuristic2Policy(options: Heuristic2Options = {}): Policy & { readonly state: { intent: string; note: string; plan: string } } {
+  const adv = heuristic2Advisor(options);
+  return {
+    name: 'heuristic2',
+    get state() { return adv.state; },
+    reset() { adv.reset(); },
+    act(obs: Observation): Action {
+      if (obs.phase === 'choice') {
+        const c = adv.choose(obs);
+        adv.noteChoice(obs, c.action, c.reason);
+        return c.action;
+      }
+      if (obs.phase !== 'play') throw new Error('heuristic2 policy: the episode is over');
+      return adv.commit(obs, adv.peek(adv.advise(obs)));
     },
   };
 }

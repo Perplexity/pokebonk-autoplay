@@ -26,7 +26,8 @@ node scripts/heuristic-trace.ts --seed=3 --quiet                                
   `src/storage/database.ts`). Options are listed in the script's header.
 - **An episode is a function of its batch settings and its seed**: which worker plays it, in which order, as which
   episode of its process, and how many workers there are does not change it (§4).
-- **Recycling.** A worker is replaced by a fresh process after `--recycle-after` episodes (default 8) or as soon as it
+- **Recycling.** (Since 2026-11-25 the default is `--recycle-after=1`, every episode in a fresh process: see the note
+  under "Recycling default" in §4.) A worker is replaced by a fresh process after `--recycle-after` episodes (then: default 8) or as soon as it
   reports more than `--recycle-rss` MB (default 1500) after an episode: the environment's memory grows by about 25 MB per
   episode, and long episodes with large hordes grow the heap by themselves. `--recycle-after=1` plays every episode in
   a fresh process (§4 says when that is worth its cost).
@@ -201,7 +202,10 @@ past a guardian, which is why the environment's own reproducibility checks had p
 (three.js UUIDs come from a private stream; docs/environment.md §3, cause 4); all results recorded before it were
 discarded. With the fix the comparisons above are identical.
 
-**Recycling default.** `--recycle-after=8`: process reuse is reproducible on the evidence above, a reused process
+**Recycling default: 1 since 2026-11-25.** The evidence below was gathered on episodes of 345–832 s and holds for
+them. Episodes of the second heuristic on tier 2 (2,200–3,400 s) are NOT reproduced by a reused process: the game's
+virtual wall clock keeps running between episodes and its value changes play (docs/environment.md §3, cause 5). So
+every episode is now played in a fresh process. What was written then: `--recycle-after=8`: process reuse is reproducible on the evidence above, a reused process
 saves loading the game (the first reset of a process takes 4.1 s on average against 2.6–2.8 s for later ones, §5),
 and 8 episodes bound the memory growth (§5). `--recycle-after=1` (every episode in a fresh process) stays available
 for when a result must not be able to depend on process history at all; the table above includes one such batch.

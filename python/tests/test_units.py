@@ -797,3 +797,164 @@ def test_feature_extractor_reads_every_segment_and_ignores_rows_that_are_not_pre
             assert not torch.allclose(net(changed), base), f"category ids of {s['name']} have no influence"
     with pytest.raises(ValueError, match="sizes of the layout"):
         SetsExtractor(spaces.Dict({"float": spaces.Box(-1, 1, (10,), np.float32), "int": space["int"]}), spec)
+
+
+# ---------------------------------------------------------------- the manager (phase 2)
+
+def manager_layouts():
+    from pokebonk_rl.manager import load_manager_layouts
+    return load_manager_layouts(BUILD)
+
+
+def test_manager_layouts_accept_what_only_grew_at_the_end_and_refuse_everything_else():
+    import copy
+    L = manager_layouts()
+    assert L.n_actions == L.mask_size == len(L.action["names"]) and L.float_size > 0 and L.int_size > 0
+    assert L.observation["action"]["hash"] == L.action_hash
+    # An embedding has a row for every id the registry can ever give, so appended keys need no new rows.
+    assert L.vocab_sizes["item"] == L.registry["tables"]["item"]["capacity"] + 1 > len(L.registry["tables"]["item"]["keys"]) + 1
+    trained = L.identity()
+    assert L.accepts(trained) == []
+    # A later game build appended an item to the registry (within its capacity): the model is still valid.
+    grown = copy.deepcopy(L.registry)
+    grown["tables"]["item"]["keys"].append("brand-new-item")
+    later = type(L)(build=L.build, observation=L.observation, action=L.action, registry=grown)
+    assert later.accepts(trained) == []
+    # …but not when an id changed its meaning, a capacity changed, the shape changed, or the action table is another.
+    moved = copy.deepcopy(L.registry)
+    moved["tables"]["item"]["keys"][0], moved["tables"]["item"]["keys"][1] = moved["tables"]["item"]["keys"][1], moved["tables"]["item"]["keys"][0]
+    assert any("item" in w for w in type(L)(build=L.build, observation=L.observation, action=L.action, registry=moved).accepts(trained))
+    wider = copy.deepcopy(L.registry)
+    wider["tables"]["item"]["capacity"] += 8
+    assert any("item" in w for w in type(L)(build=L.build, observation=L.observation, action=L.action, registry=wider).accepts(trained))
+    assert any("shape" in w for w in type(L)(build=L.build, observation={**L.observation, "compat": "0" * 64}, action=L.action, registry=L.registry).accepts(trained))
+    renamed = {**L.action, "names": ["other"] + list(L.action["names"][1:])}
+    assert any("action table" in w for w in type(L)(build=L.build, observation=L.observation, action=renamed, registry=L.registry).accepts(trained))
+    longer = {**L.action, "names": list(L.action["names"]) + ["use:new-kind"], "size": L.n_actions + 1}
+    assert any("action table" in w for w in type(L)(build=L.build, observation=L.observation, action=longer, registry=L.registry).accepts(trained)), "a longer table needs a model of that size"
+    assert L.accepts({}) != []
+
+
+def test_manager_configuration_names_the_mode_the_plan_and_the_archive():
+    config = cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS)
+    assert cfg.manager_options(config) == {"sliceSeconds": 1.0, "endOnProposalChange": True, "fuseNeeds": "tm-case"}
+    assert cfg.env_options(config, species=150, map="forest", tier=2)["archive"] == "balanced"
+    assert config["network"] == {"architecture": "manager-v1", "features_dim": 512, "pi": [], "vf": [256]}
+    # The low-level configuration stays what it was: no manager, no archive.
+    low = cfg.load(REPO / "configs" / "training.yaml", cfg.TRAINING_DEFAULTS)
+    assert cfg.manager_options(low) is None and "archive" not in cfg.env_options(low)
+    with_plan = cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS, ['manager.plan={"base": "plan-2"}'])
+    assert cfg.manager_options(with_plan)["plan"] == {"base": "plan-2"}
+    with pytest.raises(KeyError):
+        cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS, ["manager.slice=2"])
+
+
+def test_discount_by_game_time_matches_the_formula_and_ordinary_gae_when_every_step_lasts_a_second():
+    import torch
+    from gymnasium import spaces
+    from pokebonk_rl.manager import gamma_per_second
+    from pokebonk_rl.manager_net import TimeDiscountBuffer
+
+    assert gamma_per_second(1000) == pytest.approx(0.9990005, abs=1e-7) and gamma_per_second(1000) ** 1000 == pytest.approx(1 / 2.718281828, rel=1e-6)
+    with pytest.raises(ValueError):
+        gamma_per_second(0)
+    space = spaces.Dict({"float": spaces.Box(-1, 1, (3,), np.float32), "int": spaces.Box(0, 5, (2,), np.int32)})
+
+    class Source:
+        last_dt = np.zeros(1, np.float32)
+
+    def run(dts, rewards, values, last_value, gamma=0.9, lam=0.8, starts=None):
+        buf = TimeDiscountBuffer(len(dts), space, spaces.Discrete(4), device="cpu", gamma=gamma, gae_lambda=lam, n_envs=1)
+        buf.dt_source = Source()
+        obs = {"float": np.zeros((1, 3), np.float32), "int": np.zeros((1, 2), np.int32)}
+        for k, (dt, r, v) in enumerate(zip(dts, rewards, values)):
+            Source.last_dt = np.array([dt], np.float32)
+            buf.add(obs, np.array([[0]]), np.array([r], np.float32), np.array([float(starts[k]) if starts else 0.0]), torch.tensor([v]), torch.tensor([0.0]), action_masks=np.ones((1, 4), bool))
+        buf.compute_returns_and_advantage(torch.tensor([last_value]), np.array([False]))
+        return buf.advantages[:, 0].copy(), buf.returns[:, 0].copy()
+
+    # By hand: a dialog answer (no time), a skill of 2 s, a skill of 0.5 s.
+    g, lam = 0.9, 0.8
+    dts, rewards, values, last = [0.0, 2.0, 0.5], [1.0, 2.0, 3.0], [0.5, 0.25, 0.75], 1.5
+    gs = [g ** d for d in dts]
+    d2 = rewards[2] + gs[2] * last - values[2]
+    d1 = rewards[1] + gs[1] * values[2] - values[1]
+    d0 = rewards[0] + gs[0] * values[1] - values[0]
+    a2 = d2
+    a1 = d1 + gs[1] * lam * a2
+    a0 = d0 + gs[0] * lam * a1
+    adv, ret = run(dts, rewards, values, last)
+    assert adv == pytest.approx([a0, a1, a2], rel=1e-5) and ret == pytest.approx([a0 + 0.5, a1 + 0.25, a2 + 0.75], rel=1e-5)
+    assert gs[0] == 1.0, "a step that takes no game time is not discounted"
+    # Every step one second: the library's own estimate with that γ.
+    from sb3_contrib.common.maskable.buffers import MaskableDictRolloutBuffer
+    plain = MaskableDictRolloutBuffer(3, space, spaces.Discrete(4), device="cpu", gamma=g, gae_lambda=lam, n_envs=1)
+    obs = {"float": np.zeros((1, 3), np.float32), "int": np.zeros((1, 2), np.int32)}
+    for r, v in zip(rewards, values):
+        plain.add(obs, np.array([[0]]), np.array([r], np.float32), np.array([0.0]), torch.tensor([v]), torch.tensor([0.0]), action_masks=np.ones((1, 4), bool))
+    plain.compute_returns_and_advantage(torch.tensor([last]), np.array([False]))
+    adv1, _ = run([1.0, 1.0, 1.0], rewards, values, last)
+    assert adv1 == pytest.approx(plain.advantages[:, 0], rel=1e-5)
+    # An episode that begins inside the buffer cuts the estimate there.
+    cut, _ = run(dts, rewards, values, last, starts=[False, False, True])
+    assert cut[1] == pytest.approx(rewards[1] - values[1], rel=1e-5)
+    # Without a source of step lengths the buffer refuses to guess.
+    bare = TimeDiscountBuffer(1, space, spaces.Discrete(4), device="cpu", gamma=g, gae_lambda=lam, n_envs=1)
+    with pytest.raises(RuntimeError, match="dt_source"):
+        bare.add(obs, np.array([[0]]), np.array([0.0], np.float32), np.array([0.0]), torch.tensor([0.0]), torch.tensor([0.0]), action_masks=np.ones((1, 4), bool))
+
+
+def test_an_untrained_manager_takes_the_heuristics_proposal_and_a_trained_one_can_leave_it():
+    import torch
+    from pokebonk_rl.manager import build_manager_model, spaces_only_env
+
+    L = manager_layouts()
+    config = cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS)
+    model = build_manager_model(config, spaces_only_env(L), L, None, "cpu")
+    seg = L.segment("proposal")
+    assert seg["shape"] == [1, L.n_actions]
+    rng = np.random.default_rng(0)
+    n = 64
+    obs = {"float": rng.uniform(-1, 1, (n, L.float_size)).astype(np.float32), "int": np.zeros((n, L.int_size), np.int32)}
+    obs["float"][:, seg["offset"]: seg["offset"] + L.n_actions] = 0
+    masks = rng.random((n, L.n_actions)) < 0.2
+    proposals = np.array([rng.integers(L.n_actions) for _ in range(n)])
+    for k, p in enumerate(proposals):
+        obs["float"][k, seg["offset"] + p] = 1
+        masks[k, p] = True
+    actions, _ = model.predict(obs, action_masks=masks, deterministic=True)
+    assert np.array_equal(actions, proposals), "the most probable action of an untrained manager is the proposal, whatever else it sees"
+    with torch.no_grad():
+        t = {k: torch.as_tensor(v) for k, v in obs.items()}
+        dist = model.policy.get_distribution(t, action_masks=torch.as_tensor(masks))
+        p = dist.log_prob(torch.as_tensor(proposals)).exp().numpy()
+    assert p.min() > 0.9, "…and sampled play takes it nearly always"
+    # The mask still rules: a proposal that is not allowed is not taken.
+    masks2 = masks.copy()
+    masks2[np.arange(n), proposals] = False
+    masks2[:, 0] = True
+    actions2, _ = model.predict(obs, action_masks=masks2, deterministic=True)
+    assert not np.any(actions2 == proposals) and all(masks2[k, a] for k, a in enumerate(actions2))
+    # The path is a weight like any other: training can move away from the proposal where that pays.
+    head = model.policy.action_net
+    assert head.in_features == int(config["network"]["features_dim"]) + L.n_actions and head.weight.requires_grad
+    assert torch.allclose(head.weight[:, -L.n_actions:], torch.eye(L.n_actions) * float(config["manager"]["proposal_logit"]))
+    # A policy head with hidden layers would have no such path: refused.
+    bad = cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS, ["network.pi=[64]"])
+    with pytest.raises(ValueError, match="one linear layer"):
+        build_manager_model(bad, spaces_only_env(L), L, None, "cpu")
+
+
+def test_stored_decisions_come_back_as_they_were(tmp_path):
+    from pokebonk_rl.bc import _Sparse, dense
+    rng = np.random.default_rng(1)
+    rows = (rng.random((7, 300)) < 0.05) * rng.uniform(-1, 1, (7, 300))
+    rows = rows.astype(np.float32)
+    rows[3] = 0
+    s = _Sparse(np.float32)
+    for r in rows:
+        s.add(r)
+    a = s.arrays("f")
+    assert a["f_ptr"].tolist()[0] == 0 and len(a["f_idx"]) == int((rows != 0).sum())
+    assert np.array_equal(dense(a["f_idx"], a["f_val"], a["f_ptr"], np.arange(7), 300, np.float32), rows)
+    assert np.array_equal(dense(a["f_idx"], a["f_val"], a["f_ptr"], np.array([5, 3, 0]), 300, np.float32), rows[[5, 3, 0]])

@@ -13,15 +13,14 @@ import type { FromWorker, ToWorker, WorkerInit } from './protocol.ts';
  * The unattended runner: a parent process that plays a list of seeds on K worker processes.
  *
  *   - one environment per worker process; the parent never loads the game and is the only writer of the database;
- *   - seeds are handed out one at a time; an episode is a function of its seed and the batch settings: which worker
- *     plays it, in which order, as which episode of its process, and how many workers there are does not change its
- *     result (checked with full episodes: docs/baseline.md §4);
- *   - a worker is replaced by a fresh process after `recycleAfter` episodes (default 8) or as soon as it reports more
- *     than `recycleRssMB`: the environment's memory grows by about 25 MB per episode (docs/environment.md §7).
- *     `recycleAfter: 1` plays every episode in a fresh process, at the price of loading the game once per episode: the
- *     setting to use when a result must not be able to depend on what the process played before, whatever the state
- *     of the environment's in-process reset (one such dependence was found with this runner and fixed:
- *     docs/baseline.md §4);
+ *   - seeds are handed out one at a time; with the default `recycleAfter: 1` an episode is a function of its seed and
+ *     the batch settings: which worker plays it, in which order and how many workers there are does not change it;
+ *   - `recycleAfter` is how many episodes a worker process plays before a fresh one replaces it. The default is 1:
+ *     EVERY EPISODE IN A FRESH PROCESS, about a second more per episode. A reused process does not replay an episode:
+ *     the game's virtual wall clock keeps running from one episode to the next and its value changes play (the fifth
+ *     dependence on process history found, 2026-11-25, on runs strong enough to last ten minutes in a zone:
+ *     docs/environment.md §3). With a larger value an episode is still a real one, but its seed no longer names it;
+ *   - a worker is also replaced as soon as it reports more than `recycleRssMB`;
  *   - an episode that throws is recorded in `errors` and its worker is replaced; a worker that delivers nothing for
  *     `episodeTimeoutSec` of wall time is killed and recorded; a worker that dies is recorded. The batch goes on.
  *     Nothing is retried: a failed seed stays failed and the batch ends with status `failed`.
@@ -64,7 +63,7 @@ export interface BatchConfig {
 
 export const DEFAULT_BATCH: BatchConfig = {
   policy: 'random', episodes: 1, seed: 1, workers: 1, species: 155, map: 'forest', tier: 0, ranked: true, maxGameTime: 0, hz: 60, actionRepeat: 3,
-  recycleAfter: 8, recycleRssMB: 1500, episodeTimeoutSec: 1800, label: null,
+  recycleAfter: 1, recycleRssMB: 1500, episodeTimeoutSec: 1800, label: null,
 };
 
 export interface BatchHooks {

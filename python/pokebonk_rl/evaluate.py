@@ -88,8 +88,13 @@ def compare(mine: list[dict[str, Any]], theirs: list[dict[str, Any]], metric: st
 
 
 def play_seeds(model, *, layouts, env_options: dict[str, Any], scenario: dict[str, Any], seeds: list[int], reward, workers: int, deterministic: bool,
-               recycle_after: int, recycle_rss_mb: int, log_dir: Path | None, step_timeout: float, reset_timeout: float, on_episode, on_error, on_metadata) -> int:
-    """Play every seed once with `model`. Returns the number of seeds lost to errors."""
+               recycle_after: int, recycle_rss_mb: int, log_dir: Path | None, step_timeout: float, reset_timeout: float, on_episode, on_error, on_metadata,
+               manager: dict[str, Any] | None = None) -> int:
+    """Play every seed once with `model`. Returns the number of seeds lost to errors.
+
+    With `manager` (the options of manager mode) the model is a manager: `layouts` are the manager's and an action is
+    one id. `model` may also be the string "proposal": every decision is then the heuristic's own proposal (the
+    reference a copy of the heuristic is checked against, played through the same pipes)."""
     import numpy as np
     from .bridge import NodeWorker, WorkerError
     from .layout import check_against_metadata
@@ -113,7 +118,7 @@ def play_seeds(model, *, layouts, env_options: dict[str, Any], scenario: dict[st
         if log_dir:
             log_dir.mkdir(parents=True, exist_ok=True)
             log = log_dir / f"worker-{wid:04d}.log"
-        return NodeWorker(env_options, record_decisions=True, log_path=log, worker_id=wid)
+        return NodeWorker(env_options, record_decisions=True, log_path=log, worker_id=wid, manager=manager)
 
     def begin(seat) -> bool:
         """Start the next pending seed on this seat (False when none is left). A seed whose reset fails is lost, the next one is tried."""
@@ -127,7 +132,10 @@ def play_seeds(model, *, layouts, env_options: dict[str, Any], scenario: dict[st
                     seat.worker = new_worker()
                 seat.frame = seat.worker.reset(seat.seed, timeout=reset_timeout, **scenario)
                 if not started["metadata"] and seat.worker.metadata is not None:
-                    check_against_metadata(layouts, seat.worker.metadata)
+                    if manager is not None:
+                        layouts.check_metadata(seat.worker)
+                    else:
+                        check_against_metadata(layouts, seat.worker.metadata)
                     started["metadata"] = True
                     on_metadata(seat.worker.metadata)
                 seat.tracker.reset(seat.frame.header["c"])
@@ -146,7 +154,10 @@ def play_seeds(model, *, layouts, env_options: dict[str, Any], scenario: dict[st
         while active:
             obs = {"float": np.stack([s.frame.float for s in active]), "int": np.stack([s.frame.int for s in active])}
             masks = np.stack([s.frame.mask for s in active]).astype(bool)
-            actions, _ = model.predict(obs, action_masks=masks, deterministic=deterministic)
+            if isinstance(model, str):
+                actions = [int(s.frame.header["p"]) for s in active]
+            else:
+                actions, _ = model.predict(obs, action_masks=masks, deterministic=deterministic)
             failed = {}
             for s, a in zip(active, actions):
                 try:
@@ -231,7 +242,6 @@ def main(argv: list[str] | None = None) -> int:
     seeds = cfg.parse_seeds(args.seeds or config["seeds"])
     deterministic = bool(config["deterministic"]) and not args.stochastic
     scenario = {"species": int(config["scenario"]["species"]), "map": str(config["scenario"]["map"]), "tier": int(config["scenario"]["tier"])}
-    layouts = load_layouts(config["game"]["build"])
     reward = RewardConfig.from_dict(config["reward"])
     store = Store(cfg.resolve(config["paths"]["database"]))
     models_root = cfg.resolve(config["paths"]["models"])
@@ -241,8 +251,28 @@ def main(argv: list[str] | None = None) -> int:
         except (LookupError, FileNotFoundError, ValueError) as e:
             print(f"evaluate: {e}", file=sys.stderr)
             return 2
-        if state.get("observation_layout_hash") != layouts.observation_hash or state.get("action_layout_hash") != layouts.action_hash:
-            print(f"evaluate: {ckpt} was trained on other observation or action layouts than data/encoding/{layouts.build}/ holds; it cannot play this build", file=sys.stderr)
+        mstate = state.get("manager")
+        manager = dict(mstate["options"]) if mstate else None
+        if mstate:
+            # A manager stays valid on layouts that only grew at the end (new keys in the id registry, new actions of a
+            # larger model): everything else is refused.
+            from .manager import load_manager_layouts
+            layouts = load_manager_layouts(config["game"]["build"])
+            why = layouts.accepts(mstate.get("layouts") or {})
+            if why:
+                print(f"evaluate: {ckpt} cannot play on the manager layouts of data/encoding/{layouts.build}/: " + "; ".join(why), file=sys.stderr)
+                return 2
+        else:
+            layouts = load_layouts(config["game"]["build"])
+            if state.get("observation_layout_hash") != layouts.observation_hash or state.get("action_layout_hash") != layouts.action_hash:
+                print(f"evaluate: {ckpt} was trained on other observation or action layouts than data/encoding/{layouts.build}/ holds; it cannot play this build", file=sys.stderr)
+                return 2
+        # A model belongs to the account preset it was trained on: its item archive is part of the model's world.
+        trained_archive = state.get("archive")
+        if config["env"].get("archive") is None:
+            config["env"]["archive"] = trained_archive
+        elif trained_archive is not None and config["env"]["archive"] != trained_archive:
+            print(f"evaluate: {ckpt} was trained with the item archive {trained_archive!r}; the configuration asks for {config['env']['archive']!r}. A model is not played on another account preset.", file=sys.stderr)
             return 2
         sha = state["model_sha256"]
         import torch
@@ -293,8 +323,8 @@ def main(argv: list[str] | None = None) -> int:
         w = config["workers"]
         # species / map / tier / maxGameTime are repeated flat, under the names the Node runner uses, so that its reports describe the batch.
         batch_config = {**config, "scenario": scenario, **scenario, "maxGameTime": float(config["env"]["max_game_time"]), "seeds": seeds, "model": str(ckpt), "model_sha256": sha,
-                        "deterministic": deterministic}
-        batch_id = store.create_batch(label=args.label or f"eval:{sha[:12]}", policy_name="ppo", policy_version=sha[:12], config=batch_config, hz=int(config["env"]["hz"]),
+                        "deterministic": deterministic, **({"manager": {"options": manager, "plan": mstate.get("plan")}} if mstate else {})}
+        batch_id = store.create_batch(label=args.label or f"eval:{sha[:12]}", policy_name="manager" if mstate else "ppo", policy_version=sha[:12], config=batch_config, hz=int(config["env"]["hz"]),
                                       action_repeat=int(config["env"]["action_repeat"]), reward_version=reward.version, episodes_planned=len(seeds))
         t0 = time.time()
         status = "failed"
@@ -309,11 +339,17 @@ def main(argv: list[str] | None = None) -> int:
             store.insert_error(batch_id, kind=error.kind, message=str(error), details={**error.details, **context}, seed=context.get("seed"), worker_id=context.get("workerId"))
             print(f"  seed {context.get('seed')}: LOST ({context.get('during')}): {error}", file=sys.stderr)
 
+        def on_metadata(m):
+            store.set_batch_metadata(batch_id, m)
+            trained = state.get("profile_preset")
+            if trained is not None and m.get("profilePreset") != trained:
+                raise RuntimeError(f"{ckpt} was trained on account preset {trained!r}; this environment runs {m.get('profilePreset')!r}. A model is not played on another preset.")
+
         try:
             lost = play_seeds(model, layouts=layouts, env_options=cfg.env_options(config, **scenario), scenario=scenario, seeds=seeds, reward=reward, workers=int(w["envs"]),
                               deterministic=deterministic, recycle_after=int(w["recycle_after"]), recycle_rss_mb=int(w["recycle_rss_mb"]),
                               log_dir=cfg.resolve(config["paths"]["logs"]) / f"batch-{batch_id:05d}", step_timeout=float(w["step_timeout"]), reset_timeout=float(w["reset_timeout"]),
-                              on_episode=on_episode, on_error=on_error, on_metadata=lambda m: store.set_batch_metadata(batch_id, m))
+                              on_episode=on_episode, on_error=on_error, on_metadata=on_metadata, manager=manager)
             status = "completed" if lost == 0 else "failed"
         finally:
             store.finish_batch(batch_id, status, time.time() - t0)

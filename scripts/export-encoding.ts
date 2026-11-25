@@ -1,7 +1,8 @@
 /**
  * The encoding contracts as files, and the cost of encoding (docs/observation.md).
  *
- *   node scripts/export-encoding.ts                 write data/encoding/<build>/observation-layout.json and action-layout.json
+ *   node scripts/export-encoding.ts                 write data/encoding/<build>/observation-layout.json and action-layout.json,
+ *                                                   the manager's two layouts next to them, and data/encoding/manager-ids.json
  *   node scripts/export-encoding.ts --check         compare with the files on disk (exit 2 if any differs)
  *   node scripts/export-encoding.ts --measure       boot the game and time state extraction and encoding at about 0, 150 and 800
  *                                                   live enemies (one long zone-1 run kept alive by a labelled cheat)
@@ -17,6 +18,10 @@ import { createEnvironment, validChoices } from '../src/environment/index.ts';
 import type { ChoiceMask, Observation, PlayAction } from '../src/environment/index.ts';
 import { loadKnowledge } from '../src/knowledge/load.ts';
 import { ObservationEncoder } from '../src/observations/encode.ts';
+import { managerActionLayout } from '../src/hybrid/actions.ts';
+import { REGISTRY_PATH, extendRegistry, registryTables } from '../src/hybrid/ids.ts';
+import type { IdRegistry } from '../src/hybrid/ids.ts';
+import { ManagerEncoder } from '../src/hybrid/observe.ts';
 import { extractState } from '../src/observations/state.ts';
 import { real } from '../src/sim/clock.ts';
 
@@ -87,7 +92,15 @@ try {
   const b = build();
   const k = loadKnowledge(b);
   const encoder = new ObservationEncoder(k);
-  const files = { 'observation-layout.json': text(encoder.layout), 'action-layout.json': text(actionLayout()) };
+  // The manager's layouts (src/hybrid): its id registry is one file for all builds and only ever grows.
+  const before = existsSync(REGISTRY_PATH) ? (JSON.parse(readFileSync(REGISTRY_PATH, 'utf8')) as IdRegistry) : null;
+  const registry = extendRegistry(before, b, registryTables(k));
+  const manager = new ManagerEncoder(b, registry);
+  const files: Record<string, string> = {
+    'observation-layout.json': text(encoder.layout), 'action-layout.json': text(actionLayout()),
+    'manager-observation-layout.json': text(manager.layout), 'manager-action-layout.json': text(managerActionLayout()), '../manager-ids.json': text(registry),
+  };
+  say(`manager: observation layout v${manager.layout.version} hash ${manager.layout.hash.slice(0, 16)}… compat ${manager.layout.compat.slice(0, 16)}…, ${manager.layout.floatSize} floats + ${manager.layout.intSize} ints in ${manager.layout.segments.length} segments; ${managerActionLayout().size} actions (hash ${managerActionLayout().hash.slice(0, 16)}…); id registry: ${Object.keys(registry.tables).length} tables, builds ${registry.builds.join(', ')}`);
   const dir = join(REPO, 'data', 'encoding', b);
   const L = encoder.layout;
   say(`build ${b}: observation layout v${L.version} hash ${L.hash.slice(0, 16)}…, ${L.floatSize} floats + ${L.intSize} ints in ${L.segments.length} segments; action layout v${actionLayout().version} hash ${actionLayout().hash.slice(0, 16)}…, nvec [${actionLayout().nvec.join(', ')}], mask ${actionLayout().maskSize}`);
