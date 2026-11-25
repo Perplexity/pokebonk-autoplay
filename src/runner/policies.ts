@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HEURISTIC_VERSION, heuristicPolicy } from '../agents/heuristic/index.ts';
+import { HEURISTIC2_VERSION, heuristic2Policy } from '../agents/heuristic2/policy.ts';
 import type { HeuristicOptions } from '../agents/heuristic/index.ts';
 import type { HeadlessGameEnvironment } from '../environment/GameEnvironment.ts';
 import { idlePolicy, randomPolicy } from '../environment/policies.ts';
@@ -26,6 +27,7 @@ interface PolicySpec {
 const SPECS: Record<string, PolicySpec> = {
   random: { version: '1', sources: ['environment/policies.ts'], make: () => randomPolicy() },
   idle: { version: '1', sources: ['environment/policies.ts'], make: () => idlePolicy() },
+  heuristic2: { version: HEURISTIC2_VERSION, sources: ['agents/heuristic2', 'agents/heuristic', 'bot/brain'], make: (env, o) => heuristic2Policy({ planRoute: (x, z) => env.planRoute(x, z), plan: o.plan as Record<string, unknown> | undefined }) },
   heuristic: { version: HEURISTIC_VERSION, sources: ['agents/heuristic', 'bot/brain'], make: (env, o) => heuristicPolicy({ planRoute: (x, z) => env.planRoute(x, z), tuning: o.tuning as HeuristicOptions['tuning'], heuristic: o.heuristic as HeuristicOptions['heuristic'] }) },
 };
 
@@ -42,7 +44,7 @@ export function makePolicy(name: string, env: HeadlessGameEnvironment, options: 
 /** Refuse settings the policy does not have (checked by the parent before any worker starts, and again by the worker). */
 export function validatePolicyOptions(name: string, options: Record<string, unknown>): void {
   if (!SPECS[name]) throw new Error(`unknown policy "${name}": use one of ${POLICY_NAMES.join(', ')}`);
-  const known = name === 'heuristic' ? ['tuning', 'heuristic'] : [];
+  const known = name === 'heuristic' ? ['tuning', 'heuristic'] : name === 'heuristic2' ? ['plan'] : [];
   for (const k of Object.keys(options)) {
     if (!known.includes(k)) throw new Error(`policy "${name}" has no option "${k}"${known.length ? ` (it has: ${known.join(', ')})` : ''}`);
     const v = options[k];

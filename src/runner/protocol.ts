@@ -9,7 +9,7 @@ export interface WorkerInit {
   policy: string;
   /** The policy's own settings (src/runner/policies.ts). */
   policyOptions: Record<string, unknown>;
-  env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; species: number; map: string; tier: number; ranked: boolean };
+  env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; archive?: string; species: number; map: string; tier: number; ranked: boolean };
   /** TEST ONLY: seeds on which the worker throws, or blocks its event loop for good, instead of playing. */
   faults?: { throwSeeds?: number[]; hangSeeds?: number[] };
 }

@@ -17,6 +17,7 @@ import { DialogCapture, HANDLED_METHODS, HANDLER_WRITES, REFUSED_METHODS, resolv
 import type { BuildNames } from './dialogs.ts';
 import { resolveGameFns } from './gamefns.ts';
 import type { GameFns } from './gamefns.ts';
+import { ARCHIVES, itemArchive, kitOf, loadValuationKnowledge } from '../agents/heuristic2/values.ts';
 import { UNLOCKED_PRESET, playableMaps, readRegistries, unlockedProfile, verifyUnlocked } from './profile.ts';
 import type { Registries, UnlockCheck } from './profile.ts';
 import { ACTION_SCHEMA, DECISION_SCHEMA, InvalidActionError, MOVES, MOVE_VECTORS, OBSERVATION_SCHEMA, PLAY_BUTTONS, UnknownSituationError } from './types.ts';
@@ -137,7 +138,7 @@ export function findHuntSpecies(loaded: string[]): number[] {
 /** `maxKoGapGameTime` in the sanctuary outside Overtime: this many times the allowance (see koGapTooLong). */
 const SANCTUARY_KO_GAP_FACTOR = 4;
 
-type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; dataDir?: string; apiTarget?: string; encode: boolean };
+type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; dataDir?: string; archive?: string; apiTarget?: string; encode: boolean };
 
 export class HeadlessGameEnvironment implements GameEnvironment {
   readonly options: Resolved;
@@ -169,6 +170,10 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   /** The last sign of activity, for `maxIdleGameTime`: the run clock, the KOs and the place at that moment. */
   private activity = { time: 0, kills: 0, x: 0, z: 0 };
   /** The last KO (or the last moment a boss was alive), for `maxKoGapGameTime`: the run clock and the KOs then. */
+  /** Dialogs the game raised while the Pokémon was fainting, in this episode: dropped, not asked (see `check`). */
+  private droppedDialogs: string[] = [];
+  /** Preset unlocked-v4: the items archived (empty for unlocked-v3 and for the archive version `empty`). */
+  private archived: string[] = [];
   private lastKo = { time: 0, kills: 0, overtime: false };
   private koGapAllowance = 0;
   /** Wall-clock cost of the last boot and reset, for measurements. */
@@ -178,11 +183,12 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     this.options = {
       hz: options.hz ?? 60, actionRepeat: options.actionRepeat ?? 3, invalidAction: options.invalidAction ?? 'throw',
       maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, maxKoGapGameTime: options.maxKoGapGameTime ?? 0, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
-      ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
+      ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', archive: options.archive, verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
       encode: !!options.encode,
     };
     if (!Number.isInteger(this.options.actionRepeat) || this.options.actionRepeat < 1) throw new Error('actionRepeat must be a positive integer');
     if (!(this.options.maxIdleGameTime >= 0) || !(this.options.idleRadius > 0)) throw new Error('maxIdleGameTime must be 0 (no rule) or a positive number of game seconds, and idleRadius a positive number of metres');
+    if (this.options.archive != null && !(this.options.archive in ARCHIVES)) throw new Error(`unknown archive "${this.options.archive}": use one of ${Object.keys(ARCHIVES).join(', ')}`);
     if (!(this.options.maxKoGapGameTime >= 0)) throw new Error('maxKoGapGameTime must be 0 (no rule) or a positive number of game seconds');
     if (this.options.invalidAction !== 'throw' && this.options.invalidAction !== 'penalty') throw new Error('invalidAction must be "throw" or "penalty"');
   }
@@ -225,9 +231,22 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (!(season?.live && season?.ranked && Array.isArray(season?.maps) && season.maps.length)) throw new Error(`[environment] the game does not see a live ranked season: ${JSON.stringify(season)}`);
 
     if (this.options.profile === 'unlocked') {
-      sim.api.unlockPreset = (p) => unlockedProfile(p, reg, (s) => app.meta.family(s));
+      sim.api.unlockPreset = (p) => {
+        const profile = unlockedProfile(p, reg, (s) => app.meta.family(s));
+        if (this.options.archive == null) return profile;
+        // unlocked-v4: the same account with an item archive. The game applies its slot limit only when an item is
+        // toggled in the menu, not when a run starts, so the preset keeps to it itself.
+        const count = ARCHIVES[this.options.archive];
+        if (count == null) throw new Error(`[environment] unknown archive "${this.options.archive}": use one of ${Object.keys(ARCHIVES).join(', ')}`);
+        const slots = 5 * (Number(profile.lab?.archive) || 0) + (profile.itemsOwned?.length ?? 0);
+        const knowledge = loadValuationKnowledge(this.buildId());
+        this.archived = itemArchive(knowledge, kitOf(knowledge, this.options.species), { count, slots });
+        if (this.archived.length > slots) throw new Error(`[environment] the archive holds ${this.archived.length} items, the account has ${slots} slots`);
+        return { ...profile, itemsOff: [...this.archived] };
+      };
       await this.settle(app.meta.devUnlock(), 'meta.devUnlock()');
-      this.unlockCheck = verifyUnlocked(app.meta, reg);
+      if (this.options.archive != null && JSON.stringify(app.meta.profile.itemsOff) !== JSON.stringify(this.archived)) throw new Error('[environment] the game did not adopt the item archive of the preset');
+      this.unlockCheck = verifyUnlocked(app.meta, reg, this.archived);
       if (!this.unlockCheck.ok) throw new Error(`[environment] the unlocked profile is not fully unlocked according to the game:\n  ${this.unlockCheck.problems.join('\n  ')}`);
     } else {
       // The starter-only fresh account: /dev/unlock hands back the profile as it was when the game booted.
@@ -389,6 +408,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     this.previousPlay = null;
     this.activity = { time: 0, kills: 0, x: Number(run.player?.pos?.x) || 0, z: Number(run.player?.pos?.z) || 0 };
     this.lastKo = { time: 0, kills: 0, overtime: false };
+    this.droppedDialogs = [];
     this.pointsUsed = {};
     this.pointsSeen = new WeakSet();
     this.pointsCounted = new WeakSet();
@@ -575,6 +595,13 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     }
     if (run.state === 'modal' && !d.pending) throw new UnknownSituationError(`[environment] the run is waiting on a dialog that was not captured (during ${during})`, this.where({}));
     if (run.state === 'paused') throw new UnknownSituationError(`[environment] the game paused itself (during ${during})`, this.where({}));
+    if (d.pending && (run.state === 'dead' || run.state === 'over')) {
+      // A dialog raised in the very step in which the Pokémon fainted (seen: the item dialog of a Poké Ball opened as the
+      // last hit landed). The game draws it over a run that is already ending and does not wait for an answer: fainting
+      // set the state to "dead" and the run finishes 0.6 s later whatever is on screen. It is not a decision.
+      this.droppedDialogs.push(`${d.pending.decision.method} at ${Number(run.time).toFixed(1)} s`);
+      d.pending = null;
+    }
     if (run.state !== 'modal' && d.pending) {
       // The shop and the leave-only dialogs put the run in "modal" themselves before calling the HUD; a decision
       // without the modal state means the capture and the run disagree.
@@ -750,7 +777,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       instrumentation: [...sim.instrumentation, ...this.instrumentation],
       shimHash: sh.digest('hex'),
       shims: [...shims.map((f) => `src/sim/${f}`), dom],
-      profile: { preset: this.options.profile === 'unlocked' ? UNLOCKED_PRESET : this.options.profile, registered: !sim.session?.guest, summary: this.unlockCheck?.summary ?? { note: 'starter-only fresh account' } },
+      profile: { preset: this.options.profile === 'unlocked' ? (this.options.archive != null ? `unlocked-v4:${this.options.archive}` : UNLOCKED_PRESET) : this.options.profile, registered: !sim.session?.guest, summary: this.unlockCheck?.summary ?? { note: 'starter-only fresh account' } },
       mode: { ranked: this.episode.ranked, season: JSON.parse(JSON.stringify(sim.api.season)) },
       offline: {
         guardInstalled: true, primitives: [...sim.guard.primitives],

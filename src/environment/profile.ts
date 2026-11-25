@@ -257,7 +257,11 @@ export function playableMaps(reg: Registries): GameMap[] { return reg.maps.filte
 export interface UnlockCheck { ok: boolean; problems: string[]; summary: Record<string, unknown> }
 
 /** Ask the game's own profile object (`app.meta`) whether everything in the registries is unlocked. */
-export function verifyUnlocked(meta: any, reg: Registries): UnlockCheck {
+/**
+ * `archived` (preset unlocked-v4): item keys the preset took out of the pool on purpose. An owned shop item among
+ * them must be OUT of the pool by the game's own test, every other one in it.
+ */
+export function verifyUnlocked(meta: any, reg: Registries, archived: readonly string[] = []): UnlockCheck {
   const problems: string[] = [];
   const bad = <T>(what: string, list: T[], ok: (x: T) => boolean, name: (x: T) => string) => {
     const missing = list.filter((x) => { try { return !ok(x); } catch { return true; } });
@@ -266,7 +270,7 @@ export function verifyUnlocked(meta: any, reg: Registries): UnlockCheck {
   };
   const league = bad('League (meta.inLeague)', reg.league, (m) => meta.inLeague(m.id) === true, (m) => String(m.id));
   const lab = bad('Lab (meta.lab)', reg.lab, (u) => meta.lab(u.id) === u.max, (u) => u.id);
-  const items = bad('Items (meta.itemInPool)', reg.shopItems, (i) => meta.itemInPool(i.key) === true, (i) => i.key);
+  const items = bad('Items (meta.itemInPool)', reg.shopItems, (i) => meta.itemInPool(i.key) === !archived.includes(i.key), (i) => i.key);
   const playable = playableMaps(reg);
   const maps = bad('Maps (meta.biomeTier)', playable, (m) => meta.biomeTier(m.id) === reg.tiers - 1, (m) => m.id);
   const forms = bad('Forms (meta.hasForm)', reg.forms, (f) => meta.hasForm(f.form) === true, (f) => String(f.form));

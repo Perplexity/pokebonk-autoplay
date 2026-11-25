@@ -65,6 +65,14 @@ await env.close();
   sanctuary outside Overtime the allowance is four times as long (`idle: no KO for 120 s …`). Inside a rift neither
   this rule nor the one against standing still runs (the owner: "We should allow rifts infinite time"). Read-only: the run
   clock, the KO count, `boss.alive`, `sanctuary`, `overtime.live`.
+- **Account preset unlocked-v4** (`createEnvironment({ archive: 'empty' | 'loose' | 'balanced' | 'narrow' })`, default:
+  unlocked-v3). The unlocked account with an item archive (`profile.itemsOff`), generated from the game's item effects
+  for the kit of `species` (src/agents/heuristic2/values.ts) and kept within the account's archive slots (105: the
+  game checks the limit only in its menu). The game takes archived items out of every Poké Ball and shop of the run.
+  `getMetadata().profile.preset` reads `unlocked-v4:<version>`. docs/phase-1-report.md.
+- **A dialog raised while the Pokémon faints is dropped.** Seen: the item dialog of a Poké Ball opened as the last hit
+  landed. The game sets the run to `dead` and finishes it 0.6 s later without waiting for an answer; the environment
+  does the same instead of stopping with an error.
 - **Unknown situations stop the episode with an `UnknownSituationError`** carrying seed, species, map, tier, step, simulation
   step, run state and time, the HUD method and a summary of its arguments: a dialog of another mode, a window opened by a
   HUD method nobody replaced, the run in `modal` without a captured dialog, the game pausing itself, a non-interactive state
