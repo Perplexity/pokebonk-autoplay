@@ -292,3 +292,89 @@ runs moved in unrelated directions: there is no sign yet that what moved was lea
 
 The heuristic's reference on the 100 development seeds (2000001–2000100) is being played (label
 `dev100-tier2-mewtwo-h2p3-balanced-fresh`).
+
+
+---
+
+# Part 3: what ends Overtime for the heuristic
+
+2026-11-26. No training. Stored run records of the heuristic's reference batches (30 runs on seeds 1–30, 50 on the
+held-out seeds, all cashed), and two whole runs traced round by round (seeds 1 and 23; both reproduce their stored
+run to the KO). **This corrects part 2**, which named "rounds survived" as the lever.
+
+**In one paragraph.** Hits do not end Overtime: the traced runs take none while they still kill. The kill rate
+falls first, because enemy HP outgrows the build's damage; then the tide, which nothing dodges, outgrows the
+healing and the heuristic cashes. Neither a dodging policy (phase 4) nor a later cash-out can reach 20 million with
+these builds: with both the kill rate and the survival made perfect on paper, the best of the 80 runs is 17.7
+million. The gap to a 20 million run is the build that arrives at Overtime.
+
+## Measured
+
+**KOs a round fall long before the run cashes** (80 stored runs; the game's bonus formula reproduces every stored
+bonus exactly):
+
+- The best round is round 8 (median); the runs play 13 rounds (median). The last whole round has a third of the
+  best round's KOs (median); under a quarter in 32 of 80.
+- Against the spawn ceiling of phase 0 (94,500 a round from round 10), the median run kills 53 to 64 % in rounds 7
+  to 9 on seeds 1–30 (about 30 % on the held-out seeds), then 13 % in round 12 and 8 % in round 14.
+
+**Two traced runs:**
+
+| | Seed 1 (score 2.03 million) | Seed 23 (score 7.07 million, the best of seeds 1–30) |
+|---|---|---|
+| KOs by round | 54,719 in round 8, then 10,880, 9,415, 5,140, 3,086 | 92,698 in round 10 (98 % of the ceiling), then 87,605, 67,398, 52,074, 31,289 |
+| Enemies alive | 237 in round 8, 332 to 347 after | 109 in round 9, rising to 298 in round 14 |
+| Hits taken in Overtime | none in rounds 1 to 8, 79 in rounds 9 to 13 | 1 |
+| HP bar | 89 % or more until the last round | 90 % or more until the last round |
+| Tide, in HP bars a round | 0.55 in round 8, 2.2 in round 12 | 0.75 in round 8, 5.9 in round 14 (×1.41 a round) |
+| Healed, in HP bars a round | equal to what was taken until the last round | the same |
+| Cashed | round 13, HP 73 %, tide 10 % of max HP a second | round 15, half the bar lost in 4 s, tide 26 % a second |
+
+**What two changes would be worth, on paper** (same runs, the game's formula; not played):
+
+| | Seeds 1–30: median / best | Held-out: median / best | Runs of 20 million |
+|---|---|---|---|
+| as played | 2.13 M / 7.07 M | 1.53 M / 9.05 M | 0 |
+| A: KOs a round never fall below the run's best round, same cash time | 3.32 M / 9.80 M | 2.27 M / 11.0 M | 0 |
+| B: as played, then on to the end of round 20 at the last round's rate | 4.09 M / 11.5 M | 3.31 M / 14.3 M | 0 |
+| A and B together | 9.35 M / 17.7 M | 5.12 M / 17.6 M | 0 |
+
+**The build that arrives** (final builds of the 80 runs against the leaderboard Mewtwo of phase 0 §6.7):
+
+| | The heuristic, median (highest) | Leaderboard run |
+|---|---|---|
+| Run length | 49 min (58) | 96 min |
+| Level | 794 (1,551) | 6,293 |
+| Items held | 128 (171) | 313 |
+| KOs before the bonus | 0.92 M (2.13 M) | 6.5 M |
+| Damage × | 9.5 (19.1) | 152 |
+| Special × | 7.5 (13.0) | 50.5 |
+| Attack speed × | 4.7 (14.8) | 15.6 |
+| Area × | 2.7 (8.7) | 76 |
+| Max HP | 678 (1,176) | 19,650 |
+| Healing × | 1.55 (2.6) | 15.7 |
+
+Over the 80 runs the score follows the run's length (rank correlation +0.81), items held (+0.65) and level (+0.62).
+
+## What it means
+
+- **Phase 4 is not needed and would not help.** Its condition is "if Overtime deaths are the limit". No run of the
+  heuristic dies in Overtime, and the HP it loses there is the tide's, which positioning cannot avoid.
+- **A better cash rule or more rounds alone is worth about a factor of two** (row B), and less in play: the tide
+  grows by 41 % a round while healing, which comes from kills, falls with the kill rate.
+- **20 million needs a build several times stronger at the start of Overtime**: one that still kills at the
+  ceiling in rounds 18 to 22 and heals through that tide. The leaderboard run gets it from 96 minutes, 6,300
+  levels and 313 items; the heuristic arrives after 43 minutes with 800 levels and 128 items.
+- **PPO near the heuristic cannot close that gap** by small deviations. It is a different plan for the 45 minutes
+  before Overtime (how long to stay in each zone, experience gain as a stat, an economy that can be spent), which
+  phase 0 §6.7 listed for the owner to decide and phase 1b only began (its plans leave a zone's final swarm after
+  about 1,060 s because enemy damage there doubles every 45 s).
+- Not measured here: why the kill rate falls so abruptly in seed 1 (one round) and gradually in seed 23; how the
+  leaderboard builds survive long final swarms; whether any of it can be done within the heuristic's survival.
+
+## Recommended next stage
+
+A measured study of the long run before any more training, in the manner of phase 0's probes: with a handed-out
+build, how long each zone's final swarm can be held and what a minute of it yields in levels, items and
+Pokédollars; then a plan-4 of the heuristic that stays for it, tuned on seeds 1–30. The manager and reward v7 stay
+as they are for the day the default plan is strong enough for deviations from it to matter.
