@@ -127,7 +127,11 @@ The heuristic (plan-3), one episode per process, on three sets of seeds:
 - **20 million.** With every score of the heuristic doubled, no run of 20 million in 50; tripled, at least one in
   67 % of trials.
 
-### Measured: sampled play costs about half
+### Measured: sampled play costs about half (corrected in part 2: it costs far less)
+
+**Correction, 2026-11-26.** The ten seeds below were too few. The 305 sampled episodes of the two short runs
+(part 2) score a median 23 % and a mean 12 % under the heuristic's on untuned seeds, with the same p90. "About
+half" was wrong.
 
 PPO learns from sampled play. The start model's most probable action is the heuristic's (agreement 1.0000 on 13,209
 held-back decisions); sampled, on seeds 1–10 (the heuristic there: median 1,244,430, mean 1,733,565):
@@ -192,3 +196,99 @@ held-back decisions); sampled, on seeds 1–10 (the heuristic there: median 1,24
 3. **Budget**: the two short runs first (sqrt against log, 500,000 decisions each, then seeds 1–30 for both), then a
    report. The long run is decided after it, not before.
 4. The taking back of what `score` paid when a rule against standing still ends a run stays in v7.
+
+
+---
+
+# Part 2: the two short runs (sqrt against log)
+
+2026-11-26. Two PPO runs of 501,760 decisions each (98 updates of 5,120), 10 game processes + 2 spares, the same
+priming (logit 6, `portal` and `wake` rare), the same episode seeds from 1000000 on, the penalty for straying 0.0005
+a decision fading to zero over the first 250,000. `manager-v7-sqrt-01` under v7, `manager-v7-log-01` under v7log
+(its value network fitted on v7log's returns). Then both on seeds 1–30, most probable action.
+
+**In one paragraph.** Neither run changed a single choice of the heuristic: both models play seeds 1–30 exactly as
+the heuristic does, 30 of 30. The comparison of sqrt against log is therefore a tie, and v7 (sqrt) stays, as the
+brief's choice. The policies did move, but not far enough to change the most probable action anywhere, and the two
+runs moved in unrelated directions: there is no sign yet that what moved was learned and not noise.
+
+## Measured
+
+**Seeds 1–30, most probable action** (batches 52 and 53, against batch 32):
+
+| | Median | Mean | p90 | Best | Episodes equal to the heuristic's |
+|---|---|---|---|---|---|
+| the heuristic | 2,127,158 | 2,438,325 | 5,241,253 | 7,069,176 | |
+| after 500k decisions, sqrt | 2,127,158 | 2,438,325 | 5,241,253 | 7,069,176 | 30 of 30 |
+| after 500k decisions, log | 2,127,158 | 2,438,325 | 5,241,253 | 7,069,176 | 30 of 30 |
+
+**The training episodes themselves** (sampled play, seeds 1000000 on; a run ended by an idle rule scores 0):
+
+| | n | Median | Mean | p90 | Best | Overtime rounds |
+|---|---|---|---|---|---|---|
+| sqrt, all | 155 | 1,009,577 | 1,633,770 | 3,646,257 | 9,865,443 | 10.3 |
+| sqrt, first half / second half | 77 / 78 | 1,031,189 / 907,614 | 1,772,775 / 1,496,548 | | | 10.5 / 10.0 |
+| log, all | 150 | 1,021,961 | 1,629,589 | 3,702,641 | 7,247,611 | 10.3 |
+| log, first half / second half | 75 / 75 | 935,568 / 1,152,574 | 1,556,289 / 1,702,890 | | | 10.0 / 10.6 |
+| the heuristic, 90 episodes on untuned seeds | 90 | 1,319,398 | 1,845,313 | 3,740,033 | 9,052,797 | |
+| the heuristic, seeds 1000000–39 | 40 | 1,174,675 | 1,508,616 | 3,036,749 | 6,823,205 | |
+| sqrt / log on those 40 seeds | 40 | 1,008,918 / 862,440 | 1,542,143 / 1,410,796 | 2,946,356 / 3,111,439 | | |
+
+- No trend within either run that the noise would not give (halves differ by 12 to 23 % in opposite directions).
+- Of the 305 episodes: 291 cashed Overtime, 6 lost it by fainting, 4 fainted before it, 2 left without it, 2 were
+  ended by the no-KO rule.
+- 500,000 decisions are about 150 episodes (3,300 decisions an episode), 3.5 hours a run.
+
+**How far the policies moved**, read on 30,000 stored decisions of the heuristic:
+
+| | Most probable action = the proposal | Probability of the proposal | Lead of the proposal over the next action, in logits: median (smallest) |
+|---|---|---|---|
+| start | 1.0000 | 0.962 | 6.0 (6.0) |
+| after sqrt | 1.0000 | 0.949 | 4.9 (1.6) |
+| after log | 1.0000 | 0.931 | 4.5 (2.4) |
+
+- The share of sampled decisions that are not the proposal rose from 3.7 % to 4.4 % (sqrt) and from 4.2 % to 5.3 %
+  (log).
+- **The two runs do not agree on what to prefer.** Over the 42 actions offered 300 times or more, the change of
+  an action's logit against the proposal correlates −0.13 between the runs. Both raised `use:altar` (+1.3, +1.0)
+  and `use:challenge`, both lowered `skill:retreat`, `use:berry` and `skill:farm`; the rest go in opposite
+  directions (`use:rhydon` +2.6 and +0.1, `use:nest` −0.6 and +1.6, `use:cursedchest` −1.5 and +0.2).
+
+## What it means
+
+- **The gate.** At this budget the manager does not beat the heuristic on median and p90: it equals it. By the
+  brief that is a stop, with the reason:
+  1. *The start is 6 logits from any change of play, and the learner moves about 1 to 1.5 logits in 150 episodes.*
+     That is my setting (priming at logit 6, learning rate 1e-4, clip 0.1), chosen so that sampled play stays close
+     to the heuristic. It makes the most probable action change late or never.
+  2. *What did move shows no common direction.* With one run under each reward I cannot separate "the two rewards
+     teach different things" from "both are noise". Nothing measured here says the movement is learning.
+- **sqrt against log**: no difference that can be measured. v7 stays.
+- **Not tested**: the trained models sampled on fixed seeds; a second run under the same reward (which would tell
+  noise from signal); a higher learning rate.
+
+## Where a score three times as high would come from (from earlier measurements, not new ones)
+
+- The Overtime multiplier rises by 1 a round from round 7 (docs/game-mechanics.md). At the same KOs a round, the
+  bonus after 20 rounds is about three times the bonus after 12 (3.3 times without seals, 3.0 with ten kept).
+- The heuristic's best runs already kill at the spawn ceiling from round 8 and cash in rounds 12 to 16 when the HP
+  bar falls (phase 1b). Its mean is 11.4 rounds on seeds 1–30.
+- So the lever is rounds survived in Overtime, and behind it the build's HP and healing against the tide and the
+  horde. Phase 0 measured 16.5 million from Overtime alone with a leaderboard build's stats over 20 rounds.
+- The manager can reach that lever only through hundreds of dialog answers whose worth shows in the final score,
+  the signal PPO has least of (about 1,000 episodes a day, each ±75 %).
+- **Not measured:** what takes the HP in the rounds before the heuristic cashes: the tide (no dodging helps, only
+  HP and healing) or hits (positioning helps: phase 4's subject).
+
+## Recommended next stage
+
+1. **Do not start the 5 million decision run as configured.** I expect it to flip some choices, with no evidence
+   yet that the flips would be the right ones, and no path to three times the score.
+2. **Measure what ends Overtime for the heuristic** (about an hour: the heuristic on seeds 1–30 with HP lost per
+   round split into tide and hits, and HP, healing and the round it cashes). It decides between phase 4 (a dodging
+   and positioning policy) and build work.
+3. If PPO over the manager is to be continued, first a second sqrt run from the same start (3.5 hours) to see
+   whether two runs under one reward agree. If they do not, more decisions of the same will not help.
+
+The heuristic's reference on the 100 development seeds (2000001–2000100) is being played (label
+`dev100-tier2-mewtwo-h2p3-balanced-fresh`).
