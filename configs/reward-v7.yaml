@@ -1,0 +1,34 @@
+# Reward v7 (python/pokebonk_rl/reward.py), phase 3 of the heuristic + RL refactor. Unit: the learner's own (scale 1).
+# Changing anything here means a new version name: the version is recorded with every training run, batch and
+# episode, and a run refuses to resume under another reward.
+#
+# The owner's brief: "pay the change in sqrt(KOs + current Overtime bonus), scaled so a 20M run returns about 5. If
+# Overtime is lost by fainting, take the bonus part back. No reward for healing itself: it would reward taking damage
+# to heal it back. Surviving already pays. Other terms stay in decision 8's order and together under 5% of a 1M-KO
+# run's return."
+#
+# What a whole run is paid by `score`: 5 x sqrt(score / 20,000,000), the score being the evaluation's (KOs + the
+# Overtime bonus if cashed; 0 for a run ended by a rule against standing still).
+#   100,000: 0.35     1,000,000: 1.12     2,000,000: 1.58     5,000,000: 2.50     20,000,000: 5.00
+version: v7
+scale: 1.0
+score:
+  transform: sqrt
+# The smaller terms. Each pays share x 1.118 (the return of a 1-million run) at most, half of that after `half` of
+# its events (cap x (1 - 2^(-count / half))). `half` is about what the phase 1 heuristic does in a run on tier 2
+# (seeds 1-30: 113 points, 187 uses, 128 items, 515,000 spent, 1,660,000 earned). The shares sum to 4.5 %; the three
+# groups keep the owner's order: using the map and spending (2.7 %), earning (1.1 %), the rest (0.7 %).
+terms:
+  point_use: { share: 0.0090, half: 110 }       # map points used, each once
+  map_use:   { share: 0.0045, half: 190 }       # every use of the map: points, shop purchases, spins, lessons, rifts, Max forms
+  item:      { share: 0.0070, half: 130 }       # items by which the collection grows beyond the largest it has been
+  spend:     { share: 0.0065, half: 400000 }    # Pokédollars spent
+  earn:      { share: 0.0110, half: 1200000 }   # Pokédollars earned
+  guardian:  { share: 0.0020, half: 1.5 }       # zone guardians beaten
+  zone:      { share: 0.0020, half: 1.5 }       # zones entered through a portal
+  legendary: { share: 0.0010, half: 1 }         # the sanctuary's legendary beaten
+  rift:      { share: 0.0020, half: 2 }         # rifts completed, each counted by how quickly (60 / (60 + seconds inside))
+# Penalties, as shares of a 1-million run's return.
+weights:
+  death: -0.005        # fainting before the map is cleared, once (what it loses in KOs is the real cost)
+  shop_sale: -0.0005   # per owned item sold in the shop, without a cap: more than any one item pays

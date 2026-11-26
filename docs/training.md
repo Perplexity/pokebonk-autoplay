@@ -69,13 +69,48 @@ an episode carries its `EpisodeRecord`, the same record the Stage 1 runner store
   episode ends as truncated with reward 0 for that step, and the error goes to the `errors` table. After
   `max_errors` (default 20) in one session the trainer stops with the last error.
 
-## 3. Reward (`python/pokebonk_rl/reward.py`, `configs/reward-v2.yaml`)
+## 3. Reward (`python/pokebonk_rl/reward.py`, `configs/reward-v*.yaml`)
 
 Computed in the trainer from the differences of the run's counters. Unit: one KO; the sum is multiplied by
 `scale` = 0.01. **Current version: v6** (Stage 3): v5 (the owner's order of importance, decision 8) plus a payment
 for a completed rift by how quickly it was done (decision 9, "Rifts" below). Kept: v5, v4 (v3 plus a real payment for
 a map point and an item), v3 (v2 plus a penalty for standing still), v2 (v1 plus a payment for using the map and a
 penalty for selling in the shop), v1 and the Stage 2 version v0 (`configs/reward-v5.yaml` … `configs/reward-v0.yaml`).
+
+**The manager's reward: v7 (phase 3 of the heuristic + RL refactor, 2026-11-26; `configs/reward-v7.yaml`).** The
+tier-0 runs above keep v6. The manager (docs/hybrid.md) is trained under v7, after the owner's brief: "pay the change
+in sqrt(KOs + current Overtime bonus), scaled so a 20M run returns about 5. If Overtime is lost by fainting, take the
+bonus part back. No reward for healing itself: it would reward taking damage to heal it back. Surviving already pays.
+Other terms stay in decision 8's order and together under 5% of a 1M-KO run's return."
+
+- **`score`**: every step is paid the change of `5 × sqrt(score / 20,000,000)`, the score being KOs + the Overtime
+  bonus as it stands. At the end of an episode the score is the evaluation's own: KOs + the bonus if it was cashed,
+  KOs alone if it was not. So fainting in Overtime ends with a negative payment (the bonus part), and the component
+  sums to the root of the final score whatever happened in between. A whole run is paid 0.35 for 100,000, 1.12 for
+  1 million, 1.58 for 2 million, 2.50 for 5 million, 5.00 for 20 million. Unit: the learner's own (`scale` 1, no
+  running normalisation: `normalize_reward: false` in `configs/manager.yaml`).
+- **`idle`**: a run ended by a rule against standing still is invalid and scores 0 in an evaluation. Under v7
+  everything `score` paid is taken back at that moment (v3 to v6 took a fixed 100 KOs). This is the one place where
+  v7 is harsher than the brief's words; it makes the reward of a run equal to what the evaluation counts.
+- **The smaller terms** (`terms`): map points used, uses of the map, items, Pokédollars spent; Pokédollars earned;
+  guardians, zones, the legendary, rifts by how quickly (as v6). Each is paid as the change of
+  `cap × (1 − 2^(−count / half))`: half its cap after `half` events, never more than the cap. The caps are shares of
+  a 1-million run's return (1.118) and sum to 4.5 %; a configuration whose shares reach 5 %, or whose three groups
+  leave the owner's order (map and spending 2.7 %, earning 1.1 %, the rest 0.7 %), is refused when it is loaded.
+- **Penalties**: fainting before the map is cleared, once (0.5 % of a 1-million run's return; what it loses in KOs
+  is the real cost); each owned item sold in the shop (0.05 %, without a cap, more than any one item pays).
+- **Nothing** for healing, HP, time survived, damage or levels.
+- **Tested** (`python/tests/test_units.py`, four tests; `test_game.py` on real episodes): the payments add up to the
+  root of the final score in one step or in many; cashing beats fainting at the same bonus, and one more round then
+  fainting is worth less than cashing now; the bonus part is taken back; an invalid run sums to 0; the smaller terms
+  stay under 5 % at a hundred times the heuristic's counts and keep the order; selling costs every time.
+- **Measured on the stored heuristic episodes** (final counters through the tracker): return under v7 mean 1.65 on
+  seeds 1–30 (median 1.65, best 3.01) and 1.56 on the held-out seeds (best 3.40); the smaller terms pay 2.2 % of a
+  1-million run's return on average, 3.3 % at most.
+- **`v7log`** (`configs/reward-v7log.yaml`): the same reward with `log(1 + score / 10,000)` in place of the root,
+  scaled to 5 at 20 million too (1.58, 3.04, 3.49, 4.09, 5.00 for the scores above), for the comparison of the two
+  before long training. The knee of 10,000 is a choice of mine. The smaller terms keep their shares of a 1-million
+  run's return.
 
 **The owner's decisions behind v1 and v2** (2026-11-24):
 1. KOs matter more than finishing the run, because the ranking counts KOs.

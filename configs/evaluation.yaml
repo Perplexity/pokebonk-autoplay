@@ -50,6 +50,7 @@ reward_file: reward-v6.yaml
 promotion:
   metric: score_median  # score = KOs + cashed overtime bonus
   min_ratio: 1.0
+  floors: {}            # further metrics that must each reach their own ratio, e.g. {score_median: 0.9}
   first_reference: heldout-mewtwo-random
   seeds: "900001-900050"
 

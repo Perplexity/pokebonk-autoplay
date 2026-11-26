@@ -158,12 +158,17 @@ def gamma_per_second(horizon_seconds: float) -> float:
     return math.exp(-1.0 / float(horizon_seconds))
 
 
-def prime_proposal(model, logit: float) -> None:
+def prime_proposal(model, logit: float, rare: dict[int, float] | None = None) -> None:
     """Set the direct path from the proposal to the action: logit(a) = `logit` where the heuristic proposes a.
 
     The rest of the policy head starts as the library initialises it (close to zero), so an untrained manager's most
     probable action is the proposal, and sampled actions are the proposal with probability about
     e^logit / (e^logit + allowed − 1).
+
+    `rare` (action id → how much): actions that start that much less likely than any other when the heuristic does
+    NOT propose them, and exactly as likely as any other proposal when it does (bias −b, own path `logit` + b).
+    For what cannot be taken back in the next second: a sampled "take the portal" in Overtime cashes the bonus.
+    Start values like the rest: training moves them.
     """
     import torch
     net = model.policy.action_net
@@ -173,6 +178,22 @@ def prime_proposal(model, logit: float) -> None:
         raise ValueError("the policy head is narrower than the action table: was the model built with pi = []?")
     with torch.no_grad():
         net.weight[:, mix:] = torch.eye(n, device=net.weight.device) * float(logit)
+        for a, b in (rare or {}).items():
+            if not 0 <= int(a) < n or not float(b) >= 0:
+                raise ValueError(f"rare action {a}: outside the action table, or a negative amount")
+            net.bias[int(a)] = -float(b)
+            net.weight[int(a), mix + int(a)] = float(logit) + float(b)
+
+
+def rare_actions(config_manager: dict[str, Any], layouts: "ManagerLayouts") -> dict[int, float]:
+    """`manager.rare_actions` (action name → amount) as action ids."""
+    names = list(layouts.action["names"])
+    out = {}
+    for name, b in (config_manager.get("rare_actions") or {}).items():
+        if name not in names:
+            raise ValueError(f"manager.rare_actions: the action table has no action {name!r}")
+        out[names.index(name)] = float(b)
+    return out
 
 
 def build_manager_model(config: dict[str, Any], venv, layouts: ManagerLayouts, tensorboard: Path | None, device: str):
@@ -191,7 +212,7 @@ def build_manager_model(config: dict[str, Any], venv, layouts: ManagerLayouts, t
         policy_kwargs={"features_extractor_class": extractor, "features_extractor_kwargs": {"spec": layouts.extractor_spec(), "mix_dim": int(net["features_dim"])},
                        "net_arch": {"pi": [], "vf": list(net["vf"])}},
         tensorboard_log=str(tensorboard) if tensorboard else None, seed=int(config["seed"]), device=device, verbose=1)
-    prime_proposal(model, float(m["proposal_logit"]))
+    prime_proposal(model, float(m["proposal_logit"]), rare_actions(m, layouts))
     return model
 
 

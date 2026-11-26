@@ -154,6 +154,9 @@ refused at export: that needs a new observation version.
   most probable action is always the proposal, and a sampled action is the proposal with probability about 0.99.
   It is a weight like any other: training can lower it where leaving the proposal pays.
 - The value network has one hidden layer of 256.
+- `manager.rare_actions` (phase 3): skills that cannot be taken back in the next second (`skill:portal`,
+  `skill:wake`) start 4 logits less likely than any other skill when the heuristic does not propose them (bias −4)
+  and exactly as likely as any proposal when it does (own path: the logit + 4). Start values, trained like the rest.
 
 ## 5. Warm start (`python/pokebonk_rl/bc.py`)
 
@@ -170,8 +173,14 @@ python -m pokebonk_rl.evaluate   --config configs/manager-evaluation.yaml --mode
   with one checkpoint at 0 timesteps.
 - **What this copy is.** Because of the direct path the copy is exact before any training: `fit` reports agreement
   1.0 before its first step. The check that the copy plays like the heuristic is therefore a check of the whole chain
-  (network, masks, pipes, manager environment, skills), not of how well something was learned. The value network is
-  not trained here: it needs the reward, which phase 3 defines.
+  (network, masks, pipes, manager environment, skills), not of how well something was learned.
+- **The value network** (phase 3). `collect` also stores, for every frame, the run's counters and the Overtime, swarm
+  and rift flags: everything a reward is computed from. `fit` runs the configuration's reward over them with the
+  trainer's own tracker (`rewards_of`), discounts by game time (`returns_of`) and trains the value network on those
+  returns (`--value-weight`, default 1). The last tenth of the episodes is held back whole and the value network's
+  explained variance on them is printed and stored with the model. `--policy-weight 0` leaves the policy as it is
+  primed (`manager.proposal_logit`) and trains only the value network: the start of a PPO run, which is to explore
+  more than a sharpened copy would (at logit 8 a sampled decision is the proposal 997 times in 1000).
 
 ## 6. PPO (`python/pokebonk_rl/train.py`)
 
@@ -194,7 +203,14 @@ python -m pokebonk_rl.evaluate   --config configs/manager-evaluation.yaml --mode
   2026-11-25 the manager's configurations give the opening a grace: the no-KO rule does not run during the first
   90 game seconds of a run (`env.ko_gap_grace_game_time`).
 
-Reward, budget, the promotion metric and the comparison of sqrt against log are phase 3.
+- **Reward**: v7, the change of the root of the score, 5 for a run of 20 million (docs/training.md §3), in the
+  learner's own unit: no running normalisation of rewards (`normalize_reward: false`).
+- **Evaluation** prints median, mean, p90 and best, and the promotion rule can hold a floor under further metrics
+  (`promotion.floors`).
+- **The manager's promotion metric** (agreed 2026-11-26, `configs/manager-evaluation.yaml`): on the 50 held-out
+  seeds, p90 of the score at least the phase 1 heuristic's and median at least 90 % of it.
+
+Budget, the promotion metric and the comparison of sqrt against log: docs/phase-3-report.md.
 
 ## 7. Tests
 

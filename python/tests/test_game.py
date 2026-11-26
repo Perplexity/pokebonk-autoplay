@@ -354,6 +354,22 @@ def test_manager_copy_of_the_heuristic_plays_the_heuristics_episode_and_a_ppo_ru
             assert float(z["dt"].sum()) == pytest.approx(60, abs=1.5) and (z["dt"] >= 0).all() and (z["dt"] == 0).any(), "dialog answers take no game time, skills about a second"
             assert np.all(np.diff(z["kills"]) >= 0)
             stored[seed] = json.loads(bytes(z["episode"]).decode("utf-8"))
+            # Phase 3: the figures a reward is computed from are stored for every frame, and the payments of v7 on
+            # this real episode add up to the root of its score (the cap ended it: KOs, no bonus).
+            e = {k: z[k] for k in z.files}
+            assert len(e["counters"]) == n + 1 and len(e["flags"]) == n + 1
+            for version in ("v7", "v7log"):
+                import yaml
+                from pokebonk_rl.bc import returns_of, rewards_of
+                from pokebonk_rl.reward import RewardConfig
+                reward = RewardConfig.from_dict(yaml.safe_load((REPO / "configs" / f"reward-{version}.yaml").read_text("utf-8")))
+                paid, summary = rewards_of(e, reward)
+                assert len(paid) == n and summary["components"]["score"] == pytest.approx(reward.score_return(stored[seed]["kills"])) and summary["raw"]["ko"] == stored[seed]["kills"]
+                assert float(paid.sum()) == pytest.approx(summary["total"]) == pytest.approx(sum(summary["components"].values()))
+                others = summary["total"] - summary["components"]["score"]
+                assert 0 < others < 0.05 * reward.reference_return
+                g = returns_of(paid, e["dt"], 0.999)
+                assert g[-1] == pytest.approx(paid[-1]) and g[0] <= paid.sum() + 1e-12 and g[0] > 0.9 * paid.sum(), "60 game seconds are discounted by little"
 
     fitted = run("bc", "fit", "--config", manager_yaml, "--data", str(data), "--name", "copy", "--epochs", "1", *sets)
     assert fitted.returncode == 0, fitted.stderr[-3000:]
@@ -361,6 +377,9 @@ def test_manager_copy_of_the_heuristic_plays_the_heuristics_episode_and_a_ppo_ru
     state = json.loads((ckpt / "state.json").read_text("utf-8"))
     assert state["kind"] == "bc" and state["profile_preset"] == "unlocked-v4:balanced" and state["archive"] == "balanced"
     assert state["bc"]["before"]["agreement"] == 1.0 and state["bc"]["after"]["agreement"] == 1.0 and state["bc"]["after"]["proposal_probability"] > 0.98
+    # The value network was trained on reward v7's returns of the heuristic; the second episode was held back.
+    assert state["reward_version"] == "v7" and state["bc"]["held_back_episodes"] == 1 and state["bc"]["value_weight"] == 1.0
+    assert state["bc"]["after"]["value_mean_abs_error"] < state["bc"]["before"]["value_mean_abs_error"] or state["bc"]["after"]["value_mean_abs_error"] < 0.01
     assert state["manager"]["options"] == meta["manager"] and state["manager"]["layouts"]["compat"] == meta["layouts"]["compat"]
 
     # The copy, played from its file through the pipes, is the heuristic's own episode on both seeds.

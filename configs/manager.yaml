@@ -37,7 +37,7 @@ workers:
   step_timeout: 300
   reset_timeout: 600
 
-reward_file: reward-v6.yaml   # phase 3 replaces it (sqrt of KOs + Overtime bonus)
+reward_file: reward-v7.yaml   # phase 3: the change of sqrt(KOs + Overtime bonus), 5 for a run of 20 million (reward-v7log.yaml: the logarithm)
 
 ppo:
   n_steps: 512          # manager decisions per game process per update (about 8 game minutes each)
@@ -58,7 +58,9 @@ network:
   pi: []                # one linear layer from there to the action: the proposal has a direct path
   vf: [256]
 
-normalize_reward: true
+# v7 is already in the learner's unit (a whole run returns 1 to 5), and the value network of the warm start is
+# trained on those returns as they are: no running normalisation in between.
+normalize_reward: false
 
 manager:
   enabled: true
@@ -68,6 +70,10 @@ manager:
   fuse_needs: tm-case           # Bill's machine: no fusion and no link without the TM Case (moves go to level 10 with it)
   horizon_seconds: 1000.0       # discount by elapsed game time: a reward 1000 game seconds away counts 1/e
   proposal_logit: 8.0           # an untrained manager takes the proposal (most probable action: always)
+  # Skills that cannot be taken back in the next second start this much less likely than any other when the heuristic
+  # does not propose them (and as likely as any proposal when it does). Measured without it (seeds 1-10, sampled):
+  # Overtime was cashed by a sampled "portal" after 6.5 to 8.5 rounds instead of 9.9. Training moves these like any weight.
+  rare_actions: { "skill:portal": 4.0, "skill:wake": 4.0 }
   stray_penalty: 0.0            # reward per decision that is not the proposal, at the start of a PPO run...
   stray_fade_timesteps: 0       # ...fading to zero over this many timesteps (set both for a PPO run)
   init_from: null               # the copy of the heuristic a PPO run starts from (a run name or checkpoint folder)

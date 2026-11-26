@@ -20,6 +20,7 @@ MANAGER_DEFAULTS: dict[str, Any] = {
     "fuse_needs": "tm-case",        # Bill's machine fuses or links only while this item is held ("" = no such rule)
     "horizon_seconds": 1000.0,      # discount by elapsed game time: a reward this far away counts 1/e
     "proposal_logit": 8.0,          # start of the direct path from the heuristic's proposal to the action
+    "rare_actions": {},             # action name -> how much less likely than any other it starts when it is not the proposal
     "stray_penalty": 0.0,           # reward taken away per decision that is not the proposal, at the start of the run...
     "stray_fade_timesteps": 0,      # ...fading linearly to zero over this many timesteps (0 = no penalty at all)
     "init_from": None,              # a checkpoint folder or run name whose policy the new run starts from (the copy of the heuristic)
@@ -59,7 +60,7 @@ EVALUATION_DEFAULTS: dict[str, Any] = {
     # with no episode lost to an error. The reference is the stable model's evaluation on the same seeds and scenario when
     # there is a stable model, else the batch labelled `first_reference`. Only an evaluation on exactly the seeds
     # `promotion.seeds` (the held-out list), compared with that reference, is a verdict; any other is information.
-    "promotion": {"metric": "score_median", "min_ratio": 1.0, "first_reference": "heldout-mewtwo-random", "seeds": "900001-900050"},
+    "promotion": {"metric": "score_median", "min_ratio": 1.0, "floors": {}, "first_reference": "heldout-mewtwo-random", "seeds": "900001-900050"},
     "paths": {"database": "data/pokebonk.sqlite", "models": "models", "logs": "logs/evaluation"},
 }
 

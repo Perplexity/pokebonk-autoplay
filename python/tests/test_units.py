@@ -297,6 +297,153 @@ def test_reward_v6_pays_a_completed_rift_by_how_quickly_it_was_done():
     assert old.step(counters(time=30.0, riftsCleared=1), None, None, False, False) == 0.0 and "rift" not in old.summary()["components"]
 
 
+# ---------------------------------------------------------------- reward v7 (phase 3: the root of the score)
+
+LIVE = {"live": True, "over": False}
+
+
+def run_v7(r: RewardConfig, steps):
+    """Plays (counters, episode, overtime) triples through a tracker; returns every payment and the summary."""
+    t = RewardTracker(r)
+    t.reset(counters())
+    paid = [t.step(c, e, ot) for c, e, ot in steps]
+    return paid, t.summary()
+
+
+def test_reward_v7_pays_the_change_of_the_root_of_the_score_and_the_payments_add_up():
+    import math
+    r = default_reward("v7")
+    unit = 5 / math.sqrt(20_000_000)
+    assert r.version == "v7" and r.scale == 1.0 and r.score_return(20_000_000) == pytest.approx(5.0)
+    assert [round(r.score_return(x), 2) for x in (100_000, 1_000_000, 5_000_000)] == [0.35, 1.12, 2.5]
+    paid, s = run_v7(r, [
+        (counters(kills=100), None, None),
+        (counters(kills=100, healed=5000, damageTaken=900.0, level=40), None, None),        # healing, HP, levels: nothing
+        (counters(kills=10_000), None, None),
+        (counters(kills=10_000), None, {**LIVE, "bonus": 0}),                               # Overtime goes live
+        (counters(kills=12_000), None, {**LIVE, "bonus": 4_000}),                           # its bonus builds up
+        (counters(kills=12_100), episode_end(victory=True, cashed=True, bonus=4_000, started=True), {"live": False, "over": True, "bonus": 4_000}),
+    ])
+    assert paid[0] == pytest.approx(unit * 10) and paid[1] == 0.0
+    assert paid[4] == pytest.approx(unit * (math.sqrt(16_000) - 100))                       # the KOs and the bonus, as one score
+    # The payments add up to the root of the final score, whatever the steps were.
+    assert sum(paid) == pytest.approx(unit * math.sqrt(16_100)) == pytest.approx(s["components"]["score"]) and s["total"] == pytest.approx(sum(paid))
+    assert s["total"] == pytest.approx(sum(s["components"].values()))
+    assert s["raw"]["ko"] == 12_100 and s["raw"]["overtime"] == 4_000 and s["raw"]["damage_taken"] == 900.0
+    # In one step or in many: the same sum.
+    once, _ = run_v7(r, [(counters(kills=12_100), episode_end(victory=True, cashed=True, bonus=4_000, started=True), None)])
+    assert sum(once) == pytest.approx(sum(paid))
+    # An early KO is worth more than a late one, and a run of 20 million more than four of 1 million.
+    assert r.score_return(1) - r.score_return(0) > 100 * (r.score_return(1_000_001) - r.score_return(1_000_000))
+    assert r.score_return(20_000_000) > 4 * r.score_return(1_000_000)
+    # KOs made before the reset are not owed.
+    t = RewardTracker(r)
+    t.reset(counters(kills=400))
+    assert t.step(counters(kills=400), None) == 0.0 and t.step(counters(kills=900), None) == pytest.approx(unit * 10)
+
+
+def test_reward_v7_cashing_beats_fainting_at_the_same_bonus_and_a_lost_bonus_is_taken_back():
+    import math
+    r = default_reward("v7")
+    unit = 5 / math.sqrt(20_000_000)
+    before = [(counters(kills=1_000_000), None, {**LIVE, "bonus": 0}), (counters(kills=1_000_000), None, {**LIVE, "bonus": 500_000})]
+    cashed, sc = run_v7(r, before + [(counters(kills=1_000_000), episode_end(victory=True, cashed=True, bonus=500_000, started=True), {"live": False, "over": True, "bonus": 500_000})])
+    fainted, sf = run_v7(r, before + [(counters(kills=1_000_000), episode_end(victory=True, cashed=False, bonus=500_000, started=True), {**LIVE, "bonus": 500_000})])
+    assert sum(cashed) == pytest.approx(unit * math.sqrt(1_500_000)) and sum(fainted) == pytest.approx(unit * 1000)
+    assert sum(cashed) > sum(fainted)
+    # The last payment of the lost Overtime is the bonus part, negative; the KOs stay paid (the evaluation's score keeps them).
+    assert fainted[-1] == pytest.approx(unit * (1000 - math.sqrt(1_500_000))) and fainted[-1] < 0 and cashed[-1] == 0.0
+    # One more round and then fainting is worth less than cashing now, however many KOs the round had...
+    greedy, _ = run_v7(r, before + [(counters(kills=1_400_000), episode_end(victory=True, cashed=False, bonus=900_000, started=True), {**LIVE, "bonus": 900_000})])
+    assert sum(cashed) > sum(greedy)
+    # ...and one more round and then cashing is worth more.
+    more, _ = run_v7(r, before + [(counters(kills=1_100_000), episode_end(victory=True, cashed=True, bonus=700_000, started=True), {"live": False, "over": True, "bonus": 700_000})])
+    assert sum(more) > sum(cashed)
+    # Fainting before the map is cleared: the KOs stay paid, and a small penalty on top.
+    dead, sd = run_v7(r, [(counters(kills=40_000), episode_end(terminated=True, victory=False), None)])
+    assert sd["components"]["death"] == pytest.approx(r.weights["death"] * r.reference_return) and sum(dead) == pytest.approx(unit * 200 + sd["components"]["death"])
+    assert sc["components"]["death"] == 0.0 and sf["components"]["death"] == 0.0
+    # A run ended by a rule against standing still is invalid and scores 0: everything the score paid is taken back.
+    invalid, si = run_v7(r, [(counters(kills=250_000), None, None), (counters(kills=250_000), {**episode_end(terminated=False), "endCause": "idle: no KO for 30 s of game time"}, None)])
+    assert sum(invalid) == pytest.approx(0.0, abs=1e-12) and si["components"]["idle"] == pytest.approx(-unit * 500) and si["raw"]["idle"] == 1
+    assert score({"kills": 250_000, "overtime": {"cashed": False, "bonus": 0}, "endCause": "idle: no KO for 30 s of game time"}) == 0.0
+
+
+def test_reward_v7_smaller_terms_keep_the_owners_order_and_stay_under_five_percent_of_a_million_run():
+    from pokebonk_rl.reward import V7_GROUPS, V7_TERMS
+    r = default_reward("v7")
+    ref = r.reference_return
+    assert ref == pytest.approx(r.score_return(1_000_000))
+    shares = {k: r.terms[k]["share"] for k in V7_TERMS}
+    groups = {g: sum(shares[k] for k in ks) for g, ks in V7_GROUPS.items()}
+    assert sum(shares.values()) < 0.05 and groups["map"] > groups["earn"] > groups["rest"] > 0
+    # A run that does a hundred times what the heuristic does on every count: still under 5 %.
+    huge = counters(kills=0, pointsUsed=11_300, mapUse=18_700, itemsPeak=12_800, goldSpent=51_500_000, goldEarned=166_000_000, guardiansDefeated=400, legendariesDefeated=100, zonesEntered=301)
+    paid, s = run_v7(r, [(huge, None, None)])
+    others = sum(v for k, v in s["components"].items() if k in V7_TERMS)
+    assert others == pytest.approx(sum(paid)) and 0.9 * sum(shares.values()) * ref < others < 0.05 * ref
+    # What the phase 1 heuristic does in a run on tier 2 (means of seeds 1-30): about half of each cap, in the order.
+    typical = counters(kills=0, pointsUsed=113, mapUse=187, itemsPeak=128, goldSpent=515_000, goldEarned=1_660_000, guardiansDefeated=4, legendariesDefeated=1, zonesEntered=4)
+    _, s = run_v7(r, [(typical, None, None)])
+    c = s["components"]
+    by_group = {g: sum(c[k] for k in ks) for g, ks in V7_GROUPS.items()}
+    assert by_group["map"] > by_group["earn"] > by_group["rest"] > 0 and 0.02 * ref < sum(by_group.values()) < 0.035 * ref
+    assert s["raw"]["guardian"] == 3 and s["raw"]["zone"] == 3 and s["raw"]["legendary"] == 1
+    # Each term is paid as it happens and less each time: the first map point more than the 200th, never nothing.
+    t = RewardTracker(r)
+    t.reset(counters())
+    first = t.step(counters(pointsUsed=1, mapUse=1), None)
+    t.step(counters(pointsUsed=199, mapUse=199), None)
+    late = t.step(counters(pointsUsed=200, mapUse=200), None)
+    assert first > late > 0
+    # A point (with its use) is worth more than a Pokédollar spent, which is worth more than a Pokédollar earned.
+    assert r.term_paid("point_use", 1) + r.term_paid("map_use", 1) > r.term_paid("spend", 1) > r.term_paid("earn", 1) > 0
+    # Selling in the shop costs reward, every time, and more than one item pays.
+    t = RewardTracker(r)
+    t.reset(counters(itemsPeak=5))
+    assert r.weights["shop_sale"] < 0 and t.step(counters(itemsPeak=5, shopSold=1), None) == pytest.approx(r.weights["shop_sale"] * ref)
+    assert t.step(counters(itemsPeak=5, shopSold=3), None) == pytest.approx(2 * r.weights["shop_sale"] * ref)
+    assert -r.weights["shop_sale"] * ref > r.term_paid("item", 1)
+    # A rift is counted by how quickly it was done, as in v6.
+    t = RewardTracker(r)
+    t.reset(counters(time=100.0))
+    t.step(counters(time=100.05), None, None, False, True)
+    quick = t.step(counters(time=130.0, riftsCleared=1, mapUse=1), None, None, False, False)
+    assert t.summary()["raw"]["rift"] == pytest.approx(60 / 90) and quick == pytest.approx(r.term_paid("rift", 60 / 90) + r.term_paid("map_use", 1))
+
+
+def test_reward_v7_refuses_what_would_break_its_rules_and_v7log_is_the_same_reward_with_the_logarithm():
+    import math
+    import yaml
+    d = yaml.safe_load((REPO / "configs" / "reward-v7.yaml").read_text("utf-8"))
+    r = RewardConfig.from_dict(d)
+    assert RewardConfig.from_dict(r.to_dict()) == r and r.to_dict()["score"] == {"transform": "sqrt"}
+    with pytest.raises(ValueError, match="under 0.05"):
+        RewardConfig.from_dict({**d, "terms": {**d["terms"], "earn": {"share": 0.02, "half": 1}}})
+    with pytest.raises(ValueError, match="order"):
+        RewardConfig.from_dict({**d, "terms": {**d["terms"], "earn": {"share": 0.004, "half": 1}, "guardian": {"share": 0.006, "half": 1}}})
+    with pytest.raises(ValueError, match="exactly the terms"):
+        RewardConfig.from_dict({**d, "terms": {**d["terms"], "heal": {"share": 0.001, "half": 100}}})
+    with pytest.raises(ValueError, match="neither positive"):
+        RewardConfig.from_dict({**d, "weights": {"death": -0.005, "shop_sale": 0.0005}})
+    with pytest.raises(ValueError, match="transform"):
+        RewardConfig.from_dict({**d, "score": {"transform": "log", "knee": 10000}})
+    with pytest.raises(ValueError, match="v7's"):
+        RewardConfig.from_dict({**yaml.safe_load((REPO / "configs" / "reward-v6.yaml").read_text("utf-8")), "score": {"transform": "sqrt"}})
+    log = default_reward("v7log")
+    assert log.version == "v7log" and log.terms == r.terms and log.weights == r.weights and log.score == {"transform": "log", "knee": 10000}
+    assert log.score_return(20_000_000) == pytest.approx(5.0) and log.score_return(0) == 0.0
+    assert log.score_return(1_000_000) == pytest.approx(5 * math.log1p(100) / math.log1p(2000))
+    paid, s = run_v7(log, [(counters(kills=30_000), None, None), (counters(kills=900_000), None, {**LIVE, "bonus": 100_000}),
+                           (counters(kills=900_000), episode_end(victory=True, cashed=True, bonus=100_000, started=True), None)])
+    assert sum(paid) == pytest.approx(log.score_return(1_000_000)) == pytest.approx(s["components"]["score"])
+    # The logarithm pays a doubling about the same anywhere; the root pays the top end far more.
+    assert log.score_return(2_000_000) - log.score_return(1_000_000) == pytest.approx(log.score_return(20_000_000) - log.score_return(10_000_000), rel=0.02)
+    assert r.score_return(20_000_000) - r.score_return(10_000_000) > 3 * (r.score_return(2_000_000) - r.score_return(1_000_000))
+    # The smaller terms are the same shares of a 1-million run in both.
+    assert log.term_paid("item", 130) / log.reference_return == pytest.approx(r.term_paid("item", 130) / r.reference_return) == pytest.approx(0.0035)
+
+
 def test_reward_v5_follows_the_owners_order_of_importance():
     """KOs first, then the KOs of staying (final swarms, Overtime), then spending Pokédollars and using the map,
     then earning Pokédollars, then everything else."""
@@ -420,8 +567,17 @@ def test_configuration_files_load_and_unknown_keys_are_errors(tmp_path):
     assert cfg.env_options(training)["koGapGraceGameTime"] == 0 == cfg.env_options(evaluation)["koGapGraceGameTime"]
     assert cfg.env_options({"env": {k: v for k, v in training["env"].items() if k != "ko_gap_grace_game_time"}})["koGapGraceGameTime"] == 0
     for name, defaults in (("manager.yaml", cfg.TRAINING_DEFAULTS), ("manager-evaluation.yaml", cfg.EVALUATION_DEFAULTS)):
-        options = cfg.env_options(cfg.load(REPO / "configs" / name, defaults))
+        loaded = cfg.load(REPO / "configs" / name, defaults)
+        options = cfg.env_options(loaded)
         assert (options["maxKoGapGameTime"], options["koGapGraceGameTime"]) == (30, 90)
+        # The manager is trained and evaluated under reward v7 (phase 3), in the learner's own unit.
+        assert loaded["reward"]["version"] == "v7" and RewardConfig.from_dict(loaded["reward"]).score_return(20_000_000) == pytest.approx(5.0)
+    assert cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS)["normalize_reward"] is False
+    # The promotion metric the owner agreed for the manager (2026-11-26): p90 at least the heuristic's, with a floor
+    # of 90 % under the median, on the 50 held-out seeds.
+    rule = cfg.load(REPO / "configs" / "manager-evaluation.yaml", cfg.EVALUATION_DEFAULTS)["promotion"]
+    assert (rule["metric"], rule["min_ratio"], rule["floors"]) == ("score_p90", 1.0, {"score_median": 0.9})
+    assert rule["first_reference"] == "heldout-tier2-mewtwo-h2p3-balanced-fresh" and len(cfg.parse_seeds(rule["seeds"])) == 50
     assert evaluation["workers"]["envs"] == 2 and cfg.parse_seeds(evaluation["seeds"]) == [4, 5, 6]
     assert evaluation["scenario"]["species"] == 150 and evaluation["reward"]["version"] == "v6" and len(cfg.parse_seeds(evaluation["promotion"]["seeds"])) == 50
     # The files spell out every default: a default changed in code without the file (or the reverse) shows here.
@@ -731,6 +887,16 @@ def test_comparison_is_seed_by_seed_and_the_rule_is_applied_as_configured():
     assert partial["passed"] is False and partial["seeds_missing_in_reference"] == [3]
     with pytest.raises(KeyError, match="unknown promotion metric"):
         compare(mine, ref, "style", 1.0)
+    # The top of the distribution with a floor under its middle (phase 3): both must hold.
+    from pokebonk_rl.evaluate import percentile
+    assert percentile([1, 2, 3, 4, 5], 0.9) == pytest.approx(4.6) and percentile([7], 0.9) == 7 and percentile(list(range(1, 31)), 0.9) == pytest.approx(27.1)
+    top = compare(mine, ref, "score_p90", 1.0, {"score_median": 0.9})
+    assert top["model"]["score_p90"] == pytest.approx(700) and top["reference"]["score_p90"] == pytest.approx(370) and top["model"]["score_max"] == 800
+    assert top["passed"] is True and top["floors"]["score_median"] == {"ratio": pytest.approx(1.2), "needed": 0.9, "held": True}
+    under = compare(mine, ref, "score_p90", 1.0, {"score_median": 1.3})
+    assert under["passed"] is False and under["ratio"] > 1 and under["floors"]["score_median"]["held"] is False
+    with pytest.raises(KeyError, match="unknown promotion metric"):
+        compare(mine, ref, "score_p90", 1.0, {"style": 1.0})
     s = summarize(mine)
     assert s["completed"] == 1 and s["died"] == 2 and s["zones"] == {"1": 2, "4": 1} and s["overtime_cashed"] == 1
 
@@ -945,7 +1111,26 @@ def test_an_untrained_manager_takes_the_heuristics_proposal_and_a_trained_one_ca
     # The path is a weight like any other: training can move away from the proposal where that pays.
     head = model.policy.action_net
     assert head.in_features == int(config["network"]["features_dim"]) + L.n_actions and head.weight.requires_grad
-    assert torch.allclose(head.weight[:, -L.n_actions:], torch.eye(L.n_actions) * float(config["manager"]["proposal_logit"]))
+    names = list(L.action["names"])
+    rare = {names.index(k): v for k, v in config["manager"]["rare_actions"].items()}
+    assert set(config["manager"]["rare_actions"]) == {"skill:portal", "skill:wake"}
+    want = torch.eye(L.n_actions) * float(config["manager"]["proposal_logit"])
+    for a, b in rare.items():
+        want[a, a] += b
+    assert torch.allclose(head.weight[:, -L.n_actions:], want)
+    # What cannot be taken back starts rare when the heuristic does not propose it, and is taken like any proposal when it does.
+    farm, portal, retreat = names.index("skill:farm"), names.index("skill:portal"), names.index("skill:retreat")
+    one = {"float": np.zeros((2, L.float_size), np.float32), "int": np.zeros((2, L.int_size), np.int32)}
+    one["float"][0, seg["offset"] + farm] = 1        # the heuristic proposes farming...
+    one["float"][1, seg["offset"] + portal] = 1      # ...and the portal
+    allowed = np.zeros((2, L.n_actions), bool)
+    allowed[:, [farm, portal, retreat]] = True
+    with torch.no_grad():
+        probs = model.policy.get_distribution({k: torch.as_tensor(v) for k, v in one.items()}, action_masks=torch.as_tensor(allowed)).distribution.probs.numpy()
+    assert probs[0, farm] > 0.99 and probs[0, portal] < 0.05 * probs[0, retreat], "an unproposed portal is far less likely than another stray skill"
+    assert probs[1, portal] == pytest.approx(probs[0, farm], abs=2e-3), "a proposed portal is taken as any proposal is"
+    with pytest.raises(ValueError, match="no action"):
+        build_manager_model({**config, "manager": {**config["manager"], "rare_actions": {"skill:fly": 1.0}}}, spaces_only_env(L), L, None, "cpu")
     # A policy head with hidden layers would have no such path: refused.
     bad = cfg.load(REPO / "configs" / "manager.yaml", cfg.TRAINING_DEFAULTS, ["network.pi=[64]"])
     with pytest.raises(ValueError, match="one linear layer"):

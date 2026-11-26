@@ -31,14 +31,17 @@ workers:
 
 deterministic: true
 device: cpu
-reward_file: reward-v6.yaml
+reward_file: reward-v7.yaml
 
 # The reference is the phase 1 heuristic (plan-3) on the held-out seeds, one episode per game process (batch 35,
-# played by the runner with the standing-still and no-KO rules off). The metric is a first setting: phase 3
-# proposes the promotion metric (p90 with a floor on the median) before any model is promoted.
+# played by the runner with the standing-still and no-KO rules off).
+# The promotion metric (agreed with the owner, 2026-11-26): the p90 of the score at least the reference's, and the
+# median at least 90 % of the reference's. Measured on the heuristic's own noise (docs/phase-3-report.md §6): a model
+# exactly as good passes in 8 % of trials, one 1.25 times as good in 86 %, one 1.5 times as good in 99 %.
 promotion:
-  metric: score_median
+  metric: score_p90
   min_ratio: 1.0
+  floors: { score_median: 0.9 }
   first_reference: heldout-tier2-mewtwo-h2p3-balanced-fresh
   seeds: "900001-900050"
 

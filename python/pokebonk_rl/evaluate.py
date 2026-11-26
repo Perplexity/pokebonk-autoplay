@@ -36,6 +36,15 @@ def score(e: dict[str, Any]) -> float:
     return float(e["kills"]) + (float(e["overtime_bonus"]) if e["overtime_cashed"] else 0.0)
 
 
+def percentile(values: list[float], p: float) -> float:
+    """The p-quantile (0 to 1) by linear interpolation between the two nearest ranks (the usual default)."""
+    a = sorted(values)
+    k = (len(a) - 1) * p
+    f = int(k)
+    c = min(f + 1, len(a) - 1)
+    return a[f] + (a[c] - a[f]) * (k - f)
+
+
 def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """The figures an evaluation is judged by, over stored episode rows (sqlite rows or dicts with the same keys)."""
     if not rows:
@@ -47,7 +56,7 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "episodes": len(rows),
         "kos_mean": statistics.fmean(kos), "kos_median": statistics.median(kos), "kos_min": min(kos), "kos_max": max(kos),
-        "score_mean": statistics.fmean(scores), "score_median": statistics.median(scores),
+        "score_mean": statistics.fmean(scores), "score_median": statistics.median(scores), "score_p90": percentile(scores, 0.9), "score_max": max(scores), "score_min": min(scores),
         "game_time_mean": statistics.fmean(float(r["game_time"]) for r in rows),
         "level_mean": statistics.fmean(float(r["level"]) for r in rows),
         "guardians_mean": statistics.fmean(float(r["guardians_defeated"]) for r in rows),
@@ -69,8 +78,10 @@ def incomparable(mine: Any, reference: Any) -> list[str]:
     return [c for c in COMPARABLE if mine[c] != reference[c]]
 
 
-def compare(mine: list[dict[str, Any]], theirs: list[dict[str, Any]], metric: str, min_ratio: float) -> dict[str, Any]:
-    """Model against reference on the seeds both played: the summaries, the per-seed record, and the promotion rule's verdict."""
+def compare(mine: list[dict[str, Any]], theirs: list[dict[str, Any]], metric: str, min_ratio: float, floors: dict[str, float] | None = None) -> dict[str, Any]:
+    """Model against reference on the seeds both played: the summaries, the per-seed record, and the promotion rule's
+    verdict: `metric` at least `min_ratio` times the reference's, and every metric in `floors` at least its own ratio
+    (a rule on the top of the distribution with a floor under its middle, for instance)."""
     a, b = {int(r["seed"]): r for r in mine}, {int(r["seed"]): r for r in theirs}
     seeds = sorted(set(a) & set(b))
     sa, sb = summarize([a[s] for s in seeds]), summarize([b[s] for s in seeds])
@@ -82,8 +93,16 @@ def compare(mine: list[dict[str, Any]], theirs: list[dict[str, Any]], metric: st
         raise KeyError(f"unknown promotion metric {metric!r} (known: {', '.join(k for k in sa if k != 'zones')})")
     wins = sum(1 for s in seeds if score(a[s]) > score(b[s]))
     losses = sum(1 for s in seeds if score(a[s]) < score(b[s]))
-    ratio = (sa[metric] / sb[metric]) if sb[metric] else (float("inf") if sa[metric] > 0 else 1.0)
-    out.update(ratio=ratio, passed=bool(ratio >= min_ratio), per_seed_by_score={"wins": wins, "losses": losses, "ties": len(seeds) - wins - losses})
+    def ratio_of(m: str) -> float:
+        if m not in sa or m == "zones":
+            raise KeyError(f"unknown promotion metric {m!r} (known: {', '.join(k for k in sa if k != 'zones')})")
+        return (sa[m] / sb[m]) if sb[m] else (float("inf") if sa[m] > 0 else 1.0)
+
+    ratio = ratio_of(metric)
+    floor_ratios = {m: ratio_of(m) for m in (floors or {})}
+    held = {m: bool(floor_ratios[m] >= float(f)) for m, f in (floors or {}).items()}
+    out.update(ratio=ratio, floors={m: {"ratio": floor_ratios[m], "needed": float(f), "held": held[m]} for m, f in (floors or {}).items()},
+               passed=bool(ratio >= min_ratio and all(held.values())), per_seed_by_score={"wins": wins, "losses": losses, "ties": len(seeds) - wins - losses})
     return out
 
 
@@ -366,7 +385,7 @@ def main(argv: list[str] | None = None) -> int:
         comparison = None
         passed: bool | None = None
         if ref_rows is not None:
-            comparison = compare(rows, ref_rows, str(rule["metric"]), float(rule["min_ratio"]))
+            comparison = compare(rows, ref_rows, str(rule["metric"]), float(rule["min_ratio"]), {str(k): float(v) for k, v in (rule.get("floors") or {}).items()})
             passed = bool(comparison["passed"]) and lost == 0
             if lost:
                 comparison["why"] = f"{lost} episode(s) lost to errors"
@@ -388,14 +407,15 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"\nevaluation {evaluation_id} (batch {batch_id}): {summary['episodes']} of {len(seeds)} episodes, {lost} lost to errors")
         if summary["episodes"]:
-            line = lambda name, s: (f"  {name:<10} KOs mean {s['kos_mean']:.0f}, median {s['kos_median']:.0f}, max {s['kos_max']:.0f}; score mean {s['score_mean']:.0f}, median {s['score_median']:.0f}; "  # noqa: E731
+            line = lambda name, s: (f"  {name:<10} KOs mean {s['kos_mean']:.0f}, median {s['kos_median']:.0f}, max {s['kos_max']:.0f}; score mean {s['score_mean']:.0f}, median {s['score_median']:.0f}, p90 {s['score_p90']:.0f}, best {s['score_max']:.0f}; "  # noqa: E731
                                     f"completed {s['completed']}, died {s['died']}, invalid (stood still) {s.get('invalid', 0)}; zones {s['zones']}")
             print(line("model", summary))
             if comparison is not None and comparison["seeds_compared"]:
                 print(line("reference", comparison["reference"]) + f"   [{ref_text}]")
                 if comparison.get("ratio") is not None:
                     ps = comparison["per_seed_by_score"]
-                    print(f"  {rule['metric']} ratio {comparison['ratio']:.3f} (needed: {rule['min_ratio']}); per seed by score: {ps['wins']} better, {ps['losses']} worse, {ps['ties']} equal")
+                    floors_text = "".join(f"; floor {m} ratio {f['ratio']:.3f} (needed: {f['needed']})" for m, f in (comparison.get("floors") or {}).items())
+                    print(f"  {rule['metric']} ratio {comparison['ratio']:.3f} (needed: {rule['min_ratio']}){floors_text}; per seed by score: {ps['wins']} better, {ps['losses']} worse, {ps['ties']} equal")
         if comparison is not None and not comparison["verdict"]:
             print(f"  for information ({'met' if comparison['met_the_rule'] else 'did not meet'} the rule" + (f": {comparison['why']}" if comparison.get("why") else "") + "); "
                   f"not a promotion verdict: {'; '.join(not_a_verdict)}")
