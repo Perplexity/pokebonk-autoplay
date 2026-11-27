@@ -96,6 +96,7 @@ fresh game process that loads the source as it is at that moment.
 
 ## Working on it
 
-Changes go through pull requests: a branch per change, reviewed by Claude (`.github/workflows/claude-code-review.yml`,
-with `REVIEW.md` as its guide) before it is merged into `main`. A change to how anything plays comes with a test and
+Changes go through pull requests: a branch per change, reviewed by Claude as a senior machine learning engineer and
+programmer (`.github/workflows/claude-code-review.yml`, with `REVIEW.md` as its guide). A pull request the reviewer
+calls ready is merged into `main` by the workflow; one it does not is left open with its findings. A change to how anything plays comes with a test and
 with a measured batch on seeds 1–30; a change meant to become a default is also played on the development seeds.

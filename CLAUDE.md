@@ -19,9 +19,10 @@ A local copy of a browser game runs headless as a deterministic environment; a r
 - **A test for every change.** `npm test`, `npm run typecheck`, `.venv/bin/python -m pytest python/tests`.
 - **Do not edit `src/` while a batch is running:** every episode starts a fresh game process that loads the source
   as it is at that moment.
-- **A branch per change and a pull request**; nothing goes straight to `main`.
+- **A branch per change and a pull request**; nothing goes straight to `main`. The review workflow merges a pull
+  request its reviewer calls ready.
 
 ## Reviewing a pull request
 
 Review as a senior machine learning engineer and programmer, and follow `REVIEW.md`: it says what to look for in
-this repository, in which order, and how to write the review.
+this repository, in which order, how to write the review, and what the verdict does.
