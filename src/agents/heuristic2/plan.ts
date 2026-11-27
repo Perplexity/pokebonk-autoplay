@@ -1,5 +1,5 @@
 import type { Tuning } from '../../bot/brain/tuning.ts';
-import { DIRECTION_V1 } from './values.ts';
+import { DIRECTION_V1, DIRECTION_V2 } from './values.ts';
 import type { Direction } from './values.ts';
 
 /**
@@ -206,11 +206,30 @@ export const PLAN_V3: Plan = { ...PLAN_V2, version: 'plan-3', roarsFirst: true }
  */
 export const PLAN_V4: Plan = { ...PLAN_V3, version: 'plan-4', fuseNeeds: 'tm-case', errands: [...PLAN_V3.errands, 'bill'] };
 
-export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4 };
+/**
+ * plan-5 (measured, NOT the default yet: the manager's copy and its start models are of plan-3): plan-3 with the
+ * second build direction (values.ts, `luck-experience-1`). Tier 2, the same account preset, seeds 1 to 30: median
+ * 5.73 million against 2.13, mean 5.52 against 2.44, p90 8.27 against 5.24, best 10.48 against 7.07. On 100 seeds
+ * nothing was chosen on (2000001 to 2000100): median 4.82 million against 1.47, p90 8.29 against 4.16, better on 75
+ * (docs/phase-3-report.md part 4).
+ */
+export const PLAN_V5: Plan = { ...PLAN_V3, version: 'plan-5', direction: DIRECTION_V2 };
+
+/**
+ * plan-6 (NOT the default): plan-5 for the item archive `stack-2` (values.ts), with a build that kills at the Overtime
+ * ceiling for longer: Overtime is cashed when the HP bar falls under 30 % (not 75 %, and not on half a bar lost in 4 s),
+ * and a cleared zone is left under 40 % HP (not 65 %). Each measured on seeds 1 to 30 with `stack-2`, against plan-5
+ * there: the cash rule ×1.13 (better on 29 of 30, no bonus lost), the leave rule ×1.10. Together, on 100 seeds
+ * nothing was chosen on: median 7.43 million against plan-5's 4.82 and plan-3's 1.47, p90 9.22, best 10.90; 86 runs
+ * of 100 over 5 million (docs/phase-3-report.md part 5).
+ */
+export const PLAN_V6: Plan = { ...PLAN_V5, version: 'plan-6', cashHp: 0.3, cashLoss: 2, leaveHp: 0.4 };
+
+export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6 };
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). The key `base` names the plan to start from
- * ('plan-1' … 'plan-4'; default: plan-3, the newest that was measured). Unknown keys are an error: a typo must not play silently.
+ * ('plan-1' … 'plan-6'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
  */
 export function planWith(over: Record<string, unknown> | undefined, from?: Plan): Plan {
   const name = over?.base;

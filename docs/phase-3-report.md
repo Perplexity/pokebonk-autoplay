@@ -378,3 +378,226 @@ A measured study of the long run before any more training, in the manner of phas
 build, how long each zone's final swarm can be held and what a minute of it yields in levels, items and
 Pokédollars; then a plan-4 of the heuristic that stays for it, tuned on seeds 1–30. The manager and reward v7 stay
 as they are for the day the default plan is strong enough for deviations from it to matter.
+
+
+---
+
+# Part 4: what the build needs, and a first plan built on it (plan-5)
+
+2026-11-27. No training. The study part 3 recommended, as far as it has got. Everything marked **cheat** is a
+probe in the manner of phase 0: the real game and the phase 1 heuristic, with a stat of the build multiplied from
+the first second of the run; never training, never evaluation, nothing stored in the database. The probe without a
+multiplier reproduces the stored runs of seeds 1, 7 and 23 to the KO.
+
+**In one paragraph.** Luck, experience and Pokédollars are what the score follows; armor and healing are worth
+nothing to the heuristic as it plays. With luck, experience, Pokédollars and damage raised together the heuristic
+scores a median of 14.0 million and kills at the spawn ceiling until it cashes in round 18. The heuristic's item
+valuation had it the other way round. A valuation with the measured weights, **without any cheat**, raises the
+median on seeds 1–30 from 2.13 to 5.73 million (plan-5), and on 100 seeds that were never used to choose
+anything from 1.47 to 4.82 million.
+
+## Measured
+
+**A zone, minute by minute** (seeds 1 and 23 traced):
+
+- Before the final swarm (zone clock under 600 s) a minute gives at most 17,000 KOs and 27 levels. In the
+  final swarm it gives 26,000 to 108,000 KOs and 45 to 90 levels; 108,600 KOs a minute is the swarm's ceiling
+  (seed 23, zone 3, four minutes in a row).
+- The heuristic holds a swarm 3 to 7 minutes and takes no hit in it. It leaves when the enemies' HP has outgrown its
+  damage: the number alive rises from about 100 to 600 and more, the KOs of a minute fall, and one hit of the
+  horde, 0.2 to 0.3 of the HP bar in the swarm's first minute, would take 1 to 46 bars by the time it leaves. The
+  same thing as in Overtime.
+- **Correction:** an interim note said the heuristic leaves zone 1 before the swarm. That read the record's
+  `splits` as zone exits; they are the times the guardians fell.
+
+**Experience** (read in the bundle): a level costs `8 + 5.5 L + L^1.8` experience, so the level grows with the
+total experience to the power 0.36: five times the experience is 1.8 times the levels. A level with nothing left to
+offer (Training) heals 20 % of max HP and adds a small permanent stat.
+
+**One stat multiplied, seeds 1–30, cheat.** "Seed by seed" is the mean ratio of the score to the heuristic's own
+score on the same seed (geometric), with a 95 % range from resampling the seeds:
+
+| Stat | Median | Mean | p90 | Best | ≥ 5 M | Seed by seed |
+|---|---|---|---|---|---|---|
+| none (the heuristic, batch 32) | 2,127,158 | 2,438,325 | 5,241,253 | 7,069,176 | 4 | |
+| luck ×3 | 7,469,516 | 6,646,165 | 9,601,637 | 11,464,602 | 22 | ×2.82 (1.85 to 4.20), better on 26 |
+| experience ×5 | 4,835,202 | 4,837,811 | 7,568,871 | 8,997,542 | 15 | ×2.40 (1.83 to 3.19), 27 |
+| Pokédollars ×5 | 5,230,653 | 4,601,201 | 8,546,316 | 10,273,072 | 16 | ×1.78 (1.31 to 2.40), 22 |
+| damage ×10 | 5,221,722 | 4,350,860 | 7,649,002 | 9,059,138 | 15 | ×1.52 (0.90 to 2.43), 20 |
+| armor ×3 | 1,815,064 | 2,134,706 | 3,594,876 | 6,709,881 | 1 | ×0.99 (0.77 to 1.28), 11 |
+| healing ×5 | 2,258,117 | 2,344,809 | 3,909,676 | 9,212,879 | 2 | ×0.91 (0.66 to 1.24), 15 |
+| luck ×3 and experience ×5 | 9,076,060 | 8,870,610 | 11,690,917 | 13,175,905 | 28 | ×4.59 (3.45 to 6.14), 29 |
+| luck ×3, experience ×5, Pokédollars ×5, damage ×10 | 14,004,486 | 13,505,776 | 14,655,060 | 15,345,339 | 30 | ×7.53 (5.57 to 10.43), 30 |
+
+- The leaderboard Mewtwo of phase 0 has luck 944 against the heuristic's 150, experience ×44 against ×9 and
+  Pokédollars ×55 against ×7.6: the three stats that pay here.
+- With all four raised the runs last 62 minutes, reach level 2,380, stay in every zone until the plan's own limit
+  (1,060 s) and kill at the Overtime ceiling (94,500 a round) from round 10 until they cash in round 18 or 19. No
+  run reaches 20 million. By phase 0's table the ceiling pays 15.5 million of bonus after round 20 and 19.2 after
+  round 22: two to four more rounds at the ceiling. **Expected, not measured:** what is missing then is surviving
+  the tide of those rounds, and zone time beyond the plan's limit.
+- **Not valid: max HP.** Two attempts to multiply max HP failed as measurements: the game adds only the unmultiplied
+  amount of HP when max HP grows, the bar stands nearly empty and the heuristic plays as if dying (23 of 30 runs
+  fainted). Discarded. Nothing here says what max HP is worth.
+- Three single cheated runs I looked at before the arms were played pointed the other way for experience (two of
+  three scored lower). One run says nothing at this noise; the 30-seed arm is the measurement.
+
+**The valuation's weights against what was measured.** The first direction (`special-sustain-1`) gives damage 1,
+healing 0.7, armor 0.8 a point, experience 0.8, Pokédollars 0.45, luck 0.25 a point. Measured as the gain in
+log-score per unit, with damage as the yardstick: luck about 1.2 a point, experience 1.7, Pokédollars 1.5, armor and
+healing about 0.
+
+**plan-5: plan-3 with the second direction** (`luck-experience-1`: damage as before; luck 1.2, experience 1.7,
+Pokédollars 1.5; armor, healing, regeneration, lifesteal, evasion and overheal at a fifth to a quarter; max HP a
+little lower; a second life as before). No cheat, the same account preset and item archive (the two directions
+archive the same items but for five), seeds 1–30, one episode per process, rules off as the reference:
+
+| | Median | Mean | p90 | Best | ≥ 1 M | ≥ 5 M | Level | Luck | Experience × | Pokédollars × |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plan-3 (batch 32) | 2,127,158 | 2,438,325 | 5,241,253 | 7,069,176 | 24 | 4 | 817 | 149 | 8.9 | 7.2 |
+| plan-5 (batch 55) | 5,732,607 | 5,467,547 | 8,357,433 | 10,479,709 | 29 | 18 | 1,076 | 343 | 12.3 | 14.6 |
+
+- Seed by seed ×2.51 (1.64 to 3.87), better on 24 of 30.
+- 29 of 30 cashed Overtime. **One run (seed 9) did not end**: it reached the sanctuary and played to the 7,200 s
+  cap without starting Overtime (561,881 KOs). Under the evaluation's rules it would score 0.
+- Its damage did not fall for it (×15.1 against ×9.1): more luck brings better rarities of everything.
+- **These are the seeds the weights were measured on.** The check on seeds they were not:
+
+**The 100 development seeds** (2000001–2000100, never used to choose anything; one episode per process, rules off):
+
+| | Median | Mean | p90 | Best | Worst | ≥ 1 M | ≥ 5 M | Level | Minutes | Overtime rounds |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plan-3 (batch 54) | 1,465,290 | 1,964,935 | 4,158,466 | 8,031,427 | 92,527 | 69 | 8 | 825 | 47.7 | 11 |
+| plan-5 (batch 56) | 4,821,770 | 4,622,592 | 8,287,315 | 11,201,881 | 133,459 | 85 | 46 | 1,071 | 52.4 | 14 |
+
+- Seed by seed ×2.20 (1.72 to 2.80), better on 75 of 100. No run of 20 million.
+- 99 of 100 cashed Overtime; one fainted in it and lost the bonus (seed 2000022, 1,050,386 KOs kept).
+- The gain on seeds 1–30 (×2.51) was not a fit to those seeds.
+
+**The run that stood still (seed 9), found and fixed.** In its second phase the legendary raises three walls of
+roots, each 10 m wide, 21 m from the shrine; they are solid and stay standing when it falls (read in the bundle:
+only the brambles and spores are removed at the victory). The run stood directly behind one with the portal 10 m
+beyond it. Every heading with a step towards the portal read as blocked, standing still scored best, and it stood
+there for 74 minutes. Checked in play: walking straight at the portal does not move it, walking away does; the
+environment's route planner does not know the roots and gives the straight line. It is probably not of plan-5 alone: one run in
+each of two cheat arms also played to the time cap, and phase 1b's held-out seed 900029 ("stands still 26 m from
+the portal") reads like it. Those were not traced.
+- **Fix** (`src/bot/brain/movement.ts`): a forced goal out of reach is not waited for. After two seconds of standing
+  in front of it the bot walks round, well to one side and a little away, the other side each time. With a test
+  that reproduces the standing and the way round.
+- **Checked in play, seeds 1–30 again with the fix.** plan-3 (batch 58): all 30 runs identical to batch 32, to the
+  KO. plan-5 (batch 57): 28 of 30 identical to batch 55; seed 9 now cashes Overtime (3,809,040); seed 7 took the
+  new rule once and went another way (6,526,524 against 8,216,550). plan-5 with the fix: median 5,732,607, mean
+  5,519,452, p90 8,265,300, best 10,479,709; 30 of 30 cash Overtime, 30 reach 1 million, 18 reach 5 million.
+
+## What it means
+
+- **The default plan can be made about three times as good without any learning**, by valuing what the score
+  follows. plan-5 is that for the item valuation alone.
+- **20 million is still a factor of two beyond its best run** (11.2 million). The cheat arms say where the rest is:
+  the same three stats further up (with all four levers the median is 14 million), then two to four more Overtime
+  rounds at the ceiling.
+- **The manager is still a copy of plan-3.** Making plan-5 the default means collecting the copy data again and
+  fitting a new start model (about two hours); the observation, the action table and the reward do not change.
+
+## Limitations and unresolved questions
+
+- The weights of the second direction were set from six single-stat arms, by hand, once. No second setting was
+  tried: stronger or weaker weights may do better.
+- Max HP was not measured (above). Attack speed, area, crit and the spawn stats were not played as arms.
+- The cheat arms multiply a stat from the first second; a real build earns it over the run. The honest gain (×2.2
+  to ×2.5) is the measurement; the arms only said where to look.
+- plan-5 was not played on the held-out seeds: they are kept for a candidate that could reach 20 million.
+- The fainting in Overtime on development seed 2000022 was not looked into.
+- The account preset is unchanged (`unlocked-v4:balanced`, its archive made with the first direction). An archive
+  made with the second direction would be a new preset version and was not tried.
+
+## Recommended next stage
+
+1. More of the same, each as one batch on seeds 1–30 and the survivors on the development seeds: where the
+   Pokédollars go (the plan spends a third of what it earns; the money arm paid ×1.8), how long a zone is held,
+   the cash rule in Overtime, and the weights of the direction themselves.
+2. Then an archive made with the second direction (preset `unlocked-v5`, the old one kept).
+3. Then plan-5 or its successor as the manager's default, a new copy, and PPO only if the gate of part 2 can be
+   met on the development seeds.
+
+
+---
+
+# Part 5: plan-6 and an item archive that stacks
+
+2026-11-27. No training, no cheat. Every batch: tier 2, Mewtwo, forest, one episode per process, rules off as the
+references. "Seed by seed" as in part 4.
+
+**In one paragraph.** A smaller item pool that keeps what can be held ten times (`stack-2`), a later cash-out and a
+later leave make plan-6. On the 100 development seeds its median is 7.43 million against plan-3's 1.47 and plan-5's
+4.82; 86 runs of 100 pass 5 million. The best run is 10.9 million: the top has not moved since plan-5. Every run now
+stops at the same wall, the enemies' HP in Overtime rounds 13 to 16.
+
+## Measured
+
+**Single changes to plan-5, seeds 1–30** (against plan-5 on the same pool, batch 57 or 65):
+
+| Change | Median | Mean | p90 | Best | Seed by seed |
+|---|---|---|---|---|---|
+| plan-5, pool `balanced` (batch 57) | 5,732,607 | 5,519,452 | 8,265,300 | 10,479,709 | |
+| three times the spending shares (slots, restocks) | 6,370,536 | 6,009,663 | 8,455,200 | 9,771,746 | ×1.10 (0.83 to 1.44) |
+| zone limit 1,300 s for 1,060 s | 5,801,962 | 5,625,763 | 8,326,505 | 10,564,270 | ×1.04 (1.00 to 1.09) |
+| luck, experience, Pokédollar weights doubled again | 5,998,630 | 5,939,815 | 8,739,558 | 10,303,672 | ×1.11 (0.92 to 1.35) |
+| cash under 50 % HP, 80 % lost in 4 s | 5,903,039 | 5,780,796 | 8,349,195 | 11,157,242 | ×1.08 (1.02 to 1.17) |
+| cash under 30 % HP, no loss rule | 5,981,208 | 5,908,198 | 8,994,898 | 11,378,722 | ×1.10 (1.03 to 1.19) |
+| pool `narrow` (57 items out, by the first direction) | 5,402,411 | 5,136,605 | 8,958,332 | 9,788,217 | ×0.75 (0.51 to 1.09) |
+| pool `balanced-2` (40 out, by the second direction) | 4,832,448 | 4,671,143 | 7,324,898 | 9,757,771 | ×0.84 (0.63 to 1.12) |
+| **pool `stack-2`** (105 out: batch 65) | 6,715,430 | 6,179,225 | 7,941,530 | 9,739,369 | ×1.20 (0.91 to 1.56) |
+| `stack-2` and fusing two moves at level 10 (all 30 fused) | 4,783,630 | 4,855,447 | 8,600,966 | 10,289,904 | ×0.74 (0.57 to 1.00) of batch 65 |
+| `stack-2` and cash under 30 % HP | 7,053,472 | 6,735,386 | 9,059,141 | 10,518,079 | ×1.13 (1.06 to 1.27) of batch 65, better on 29 |
+| `stack-2` and leaving a cleared zone under 40 % HP | 7,100,940 | 6,748,294 | 8,493,006 | 9,878,260 | ×1.10 (1.04 to 1.19) of batch 65 |
+
+- **`stack-2`** takes as many items out of the pool as the account has archive slots (105 of 142), the ones that
+  cannot be stacked without limit first. What a run then holds: 153 items of 35 kinds against 142 of 70; 8.5 Comet
+  Shards against 1.9, 10 Exp. Shares against 2.7, 10 Star Pieces against 1.7. Luck 811 against 343, experience ×25.9
+  against ×12.3, Pokédollars ×31.4 against ×14.8, damage ×23.5 against ×15.1, level 1,435 against 1,076. The
+  leaderboard Mewtwo: luck 944, experience ×44, Pokédollars ×55, damage ×152, level 6,293.
+- The cash rule and the leave rule are compared run by run with the same play up to the point they differ: their
+  ranges are narrow for that reason.
+- Fusing lowers the score. plan-4's fusion stays out.
+
+**plan-6** = plan-5 with cash under 30 % HP (no loss rule) and leave under 40 % HP, on the pool `stack-2`
+(account preset `unlocked-v4:stack-2`):
+
+| | Seeds | Median | Mean | p90 | Best | ≥ 1 M | ≥ 5 M | Level | Minutes | Rounds |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plan-3, `balanced` (batch 32) | 1–30 | 2,127,158 | 2,438,325 | 5,241,253 | 7,069,176 | 24 | 4 | 817 | 49.4 | 13 |
+| plan-5, `balanced` (batch 57) | 1–30 | 5,732,607 | 5,519,452 | 8,265,300 | 10,479,709 | 30 | 18 | 1,076 | 53.1 | 14 |
+| plan-6, `stack-2` (batch 70) | 1–30 | 7,552,407 | 7,490,980 | 10,021,713 | 10,518,079 | 30 | 27 | 1,537 | 55.1 | 16 |
+| plan-3, `balanced` (batch 54) | development 100 | 1,465,290 | 1,964,935 | 4,158,466 | 8,031,427 | 69 | 8 | 825 | 47.7 | 11 |
+| plan-5, `balanced` (batch 56) | development 100 | 4,821,770 | 4,622,592 | 8,287,315 | 11,201,881 | 85 | 46 | 1,071 | 52.4 | 14 |
+| **plan-6, `stack-2`** (batch 71) | development 100 | **7,430,752** | 7,087,624 | 9,221,229 | 10,899,768 | 98 | 86 | 1,613 | 54.4 | 15.5 |
+
+- Development seeds, plan-6 against plan-3: seed by seed ×4.44 (3.69 to 5.32), better on 95 of 100. Against
+  plan-5: ×2.01 (1.64 to 2.47), better on 80.
+- 99 of 100 cash Overtime; one faints before it (209,738 KOs).
+- **The top does not move**: best 10.9 million, 3 runs of 100 over 10 million (plan-5: 4). The median run kills at
+  the Overtime ceiling in rounds 10 and 11 (94,000 a round), 85,000 in round 12, 63,000 in round 13, 30,000 in
+  round 15; half the runs have cashed by round 16, none plays round 18. Three rounds at 85,000 KOs or more in the
+  median run, six at most.
+
+## What it means
+
+- The default plan is five times as good as it was (median, development seeds), without learning and without a
+  cheat. 1 million and 5 million are now what an ordinary run does.
+- **20 million is not nearer at the top.** It needs the ceiling held through round 21 or 22; plan-6 holds it to
+  round 12, its best runs to round 14. Past that the enemies' HP grows faster than anything in the pool adds
+  damage: the stackable damage items are at 8 to 10 of 10 already. What the leaderboard build has beyond them is
+  levels (6,293 against 1,600), from runs of 96 minutes against 54.
+- So the next question is the one part 3 ended on, now with a build that can use the answer: what ends a stay in a
+  final swarm, and can it be survived for another ten minutes a zone.
+
+## Limitations and unresolved questions
+
+- `stack-2`'s rule (three times the worth for an item without a stack limit of its own) was set once and not varied.
+- plan-6 was chosen on seeds 1–30 from single changes; their combination was played once there (batch 70) and once
+  on the development seeds (batch 71). It was not played on the held-out seeds.
+- The manager is still a copy of plan-3 on `unlocked-v4:balanced`. plan-6 as its default is a new account preset for
+  the model as well: a new copy and a new start model.
+- The faint before Overtime on one development seed (batch 71) and the lost Overtime of plan-5's batch 56 were not looked into.

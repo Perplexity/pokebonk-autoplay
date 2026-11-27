@@ -283,7 +283,7 @@ export interface GameEnvironmentOptions {
   profile?: 'unlocked' | 'starter';
   /**
    * Preset unlocked-v4: the item archive of the unlocked account (`profile.itemsOff`), by the name of a version in
-   * src/agents/heuristic2/values.ts (`empty`, `loose`, `balanced`, `narrow`). The archived items are generated from the
+   * src/agents/heuristic2/values.ts (`empty`, `loose`, `balanced`, `narrow`, `balanced-2`, `stack-2`). The archived items are generated from the
    * game's item effects for the kit of `species`, never more than the account has archive slots, and are taken out of
    * every Poké Ball and shop of the run by the game itself. Absent: unlocked-v3 (nothing archived).
    */

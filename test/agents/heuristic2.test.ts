@@ -5,10 +5,10 @@ import { test } from 'node:test';
 import type { Snapshot } from '../../src/bot/snapshot.ts';
 import { choose2, scoreLevelUp2, worthNow } from '../../src/agents/heuristic2/chooser.ts';
 import type { Chooser2Context } from '../../src/agents/heuristic2/chooser.ts';
-import { PLAN_V1, PLAN_V2, PLAN_V3, planWith } from '../../src/agents/heuristic2/plan.ts';
+import { PLAN_V1, PLAN_V2, PLAN_V3, PLAN_V5, PLAN_V6, planWith } from '../../src/agents/heuristic2/plan.ts';
 import { directiveFor2, errandFor, heaviestHit, hordeHit, hpLost, lootGoal, lowestHp, newLife, spawnEstimate } from '../../src/agents/heuristic2/policy.ts';
 import type { World } from '../../src/agents/heuristic2/policy.ts';
-import { ARCHIVES, itemArchive, itemWorth, kitOf, loadValuationKnowledge, textMultiplier, vitaminWorth } from '../../src/agents/heuristic2/values.ts';
+import { ARCHIVES, ARCHIVE_NAMES, archiveOf, DIRECTION_V1, DIRECTION_V2, DIRECTIONS, itemArchive, itemWorth, kitOf, loadValuationKnowledge, textMultiplier, vitaminWorth } from '../../src/agents/heuristic2/values.ts';
 import { DEFAULT_TUNING } from '../../src/bot/brain/tuning.ts';
 import { buildFor } from '../../src/bot/brain/builds.ts';
 
@@ -44,6 +44,33 @@ test('the valuation agrees with a leaderboard Mewtwo on what is worth stacking',
   assert.ok(mean(stacked.map((x) => worth(x))) > mean(absent.map((x) => worth(x))) * 1.2, 'items it held five or more of are worth more on average than items it did not hold');
 });
 
+test('the second direction: luck, experience and Pokédollars against damage as measured; taking hits at a fraction', () => {
+  const w2 = (key: string) => itemWorth(k.items.get(key)!, mewtwo, DIRECTION_V2).value;
+  assert.deepEqual(Object.keys(DIRECTIONS), ['special-sustain-1', 'luck-experience-1']);
+  // Damage is the yardstick and is not moved: what a damage item is worth is the same in both.
+  for (const key of ['twisted-spoon', 'wise-glasses', 'dusk-stone']) assert.equal(w2(key), worth(key), key);
+  // The levers measured on seeds 1-30 are worth more than a damage item of their rarity…
+  for (const key of ['comet-shard', 'star-piece', 'exp-share', 'lucky-egg', 'amulet-coin', 'macho-brace']) assert.ok(w2(key) > worth(key) * 1.5, `${key} rises`);
+  assert.ok(w2('comet-shard') > w2('twisted-spoon') && w2('exp-share') > w2('wise-glasses'));
+  // …and what only helps to take a hit falls, without becoming worthless (no run was measured with less of it).
+  for (const key of ['berry-juice', 'shell-bell', 'leftovers', 'assault-vest']) assert.ok(w2(key) < worth(key) && w2(key) > 0, `${key} falls`);
+  // A second life keeps its worth: staying in a final swarm rests on it.
+  assert.equal(w2('max-revive'), worth('max-revive'));
+  // The first direction is what it was, and the account preset's archive is still made with it.
+  assert.deepEqual([DIRECTION_V1.mul.xpGain, DIRECTION_V1.add.luck, DIRECTION_V1.add.armor, DIRECTION_V1.mul.healing], [0.8, 0.25, 0.8, 0.7]);
+  const a1 = itemArchive(k, mewtwo, { count: 40, slots: 999 }), a2 = itemArchive(k, mewtwo, { count: 40, slots: 999, direction: DIRECTION_V2 });
+  assert.ok(a1.filter((x) => a2.includes(x)).length >= 35, 'the two directions archive nearly the same items: plan-5 was measured on the preset of plan-3');
+  assert.ok(!a1.some((x) => ['comet-shard', 'star-piece', 'exp-share', 'lucky-egg', 'amulet-coin', 'macho-brace', 'lucky-punch'].includes(x)), 'none of the levers is archived');
+  assert.deepEqual([PLAN_V5.version, PLAN_V5.direction.version, PLAN_V3.direction.version], ['plan-5', 'luck-experience-1', 'special-sustain-1']);
+  assert.deepEqual({ ...PLAN_V5, version: '', direction: null }, { ...PLAN_V3, version: '', direction: null }, 'plan-5 is plan-3 but for the direction');
+  assert.deepEqual(planWith({ base: 'plan-5' }), PLAN_V5);
+  // plan-6: plan-5 with a later cash-out and a later leave, for the archive that stacks.
+  assert.deepEqual([PLAN_V6.version, PLAN_V6.cashHp, PLAN_V6.cashLoss, PLAN_V6.leaveHp, PLAN_V5.cashHp, PLAN_V5.cashLoss, PLAN_V5.leaveHp], ['plan-6', 0.3, 2, 0.4, 0.75, 0.5, 0.65]);
+  assert.deepEqual({ ...PLAN_V6, version: '', cashHp: 0, cashLoss: 0, leaveHp: 0 }, { ...PLAN_V5, version: '', cashHp: 0, cashLoss: 0, leaveHp: 0 });
+  assert.deepEqual(planWith({ base: 'plan-6' }), PLAN_V6);
+  assert.equal(planWith(undefined).version, 'plan-3', 'the default is still the plan the manager copies');
+});
+
 test('archives: the least valuable items, within the slots, never a valuable one', () => {
   assert.deepEqual(ARCHIVES, { empty: 0, loose: 20, balanced: 40, narrow: 105 });
   const narrow = itemArchive(k, mewtwo, { count: 105, slots: 105 }), loose = itemArchive(k, mewtwo, { count: 20, slots: 105 });
@@ -53,6 +80,20 @@ test('archives: the least valuable items, within the slots, never a valuable one
   for (const key of ['twisted-spoon', 'wise-glasses', 'tm-case', 'max-ether', 'berry-juice', 'exp-share', 'dusk-stone', 'razor-claw', 'pp-max', 'metronome', 'white-flute']) assert.ok(!narrow.includes(key), `${key} must stay in the pool`);
   assert.ok(narrow.includes('muscle-band') === false || worth('muscle-band') < 8);
   assert.ok(narrow.every((x) => worth(x) < 8));
+});
+
+test('archives of the second direction: new names, the old ones as they were; stack-2 keeps what can be stacked', () => {
+  assert.deepEqual(ARCHIVE_NAMES, ['empty', 'loose', 'balanced', 'narrow', 'balanced-2', 'stack-2']);
+  for (const name of Object.keys(ARCHIVES)) assert.deepEqual(archiveOf(name, k, mewtwo, 105), itemArchive(k, mewtwo, { count: ARCHIVES[name], slots: 105 }), `${name} is what it was`);
+  assert.deepEqual(archiveOf('balanced-2', k, mewtwo, 105), itemArchive(k, mewtwo, { count: 40, slots: 105, direction: DIRECTION_V2 }));
+  const stack = archiveOf('stack-2', k, mewtwo, 105), pool = [...k.items.keys()].filter((x) => !stack.includes(x));
+  assert.equal(stack.length, 105, 'every slot of the account is used');
+  assert.equal(archiveOf('stack-2', k, mewtwo, 60).length, 60, 'never more than the slots');
+  // What the leaderboard Mewtwo held ten of, as far as the second direction values it, and what a run cannot do without.
+  for (const key of ['comet-shard', 'exp-share', 'lucky-egg', 'star-piece', 'amulet-coin', 'twisted-spoon', 'wise-glasses', 'shiny-stone', 'dusk-stone', 'razor-claw', 'metronome', 'pp-max', 'cleanse-tag', 'macho-brace', 'max-revive', 'revive', 'tm-case', 'max-ether']) assert.ok(pool.includes(key), `${key} stays in the pool`);
+  const unlimited = pool.filter((x) => k.items.get(x)!.maxStack == null).length;
+  assert.ok(unlimited >= 13 && unlimited / pool.length > 0.3, `a third of the pool or more stacks without a limit of its own (${unlimited} of ${pool.length})`);
+  assert.throws(() => archiveOf('narrow-9', k, mewtwo, 105), /unknown archive "narrow-9"/);
 });
 
 const snap = (over: Record<string, unknown>): Snapshot => ({ t: 100, stage: 1, stageTime: 100, stageCleared: false, bossSpawned: false, gold: 0, ballCost: 50, points: [], player: { hp: 200, maxHp: 200, level: 20, species: 150, moves: [{ key: 'psycho-cut', name: 'Psycho Cut', cls: 'physical' }], moveSlots: 4, items: {}, vitamins: {} }, ...over } as unknown as Snapshot);

@@ -58,6 +58,25 @@ export const DIRECTION_V1: Direction = {
   risk: ['enemyAmount', 'eliteSpawn', 'difficulty'],
 };
 
+/**
+ * The second direction (phase 3, docs/phase-3-report.md part 4): luck, experience and Pokédollars at what they were
+ * measured to be worth against damage; armor, healing, regeneration and the other ways of taking a hit at a fraction.
+ * Measured on tier 2, Mewtwo, seeds 1 to 30, with one stat of the build multiplied from the first second of the run
+ * (a cheating probe, never training or evaluation): luck ×3 gave ×2.8 of the score, experience ×5 gave ×2.4,
+ * Pokédollars ×5 gave ×1.8, damage ×10 gave ×1.5; armor ×3 and healing ×5 gave nothing. The plan takes no hit while
+ * it still kills, and leaves or cashes when it no longer does: what stops a run is the kill rate, and behind it levels,
+ * rarities and what can be bought. Damage keeps its weight; the others are set against it.
+ */
+export const DIRECTION_V2: Direction = {
+  ...DIRECTION_V1,
+  version: 'luck-experience-1',
+  mul: { ...DIRECTION_V1.mul, xpGain: 1.7, gold: 1.5, maxHp: 0.5, healing: 0.15, regen: 0.05 },
+  add: { ...DIRECTION_V1.add, luck: 1.2, armor: 0.15, lifesteal: 60, regen: 1, evasion: 20, overheal: 5, shieldMax: 0.1, maxHp: 0.25 },
+  text: DIRECTION_V1.text.map((r) => (r.why === 'heals' ? { ...r, worth: 10 } : r)),
+};
+
+export const DIRECTIONS: Record<string, Direction> = { [DIRECTION_V1.version]: DIRECTION_V1, [DIRECTION_V2.version]: DIRECTION_V2 };
+
 export interface Knowledge { items: Map<string, ItemInfo>; vitamins: Map<string, VitaminInfo>; moves: Map<string, MoveInfo>; movesById: Map<number, MoveInfo>; kitOf(species: number): string[] }
 
 /** The knowledge export of a game build, as the valuation needs it. */
@@ -155,4 +174,29 @@ export function itemArchive(k: Knowledge, kit: Kit, opts: { count: number; slots
   const scored = [...k.items.values()].map((it) => { const w = itemWorth(it, kit, d); return { key: it.key, v: w.value + (opts.archiveRisk ? 0 : Math.max(0, w.risk)) }; });
   scored.sort((a, b) => a.v - b.v || a.key.localeCompare(b.key));
   return scored.filter((s) => s.v < keepAbove).slice(0, Math.max(0, Math.min(opts.count, opts.slots))).map((s) => s.key);
+}
+
+/**
+ * Archive versions made with the second direction (phase 3; the four above are kept as they are):
+ *   balanced-2   the 40 least valuable items by the second direction (the same size as `balanced`)
+ *   stack-2      as many as the account has slots for, the items that cannot be stacked without limit first: what
+ *                stays in the pool is what the second direction values highly and what can be held ten times
+ * Why `stack-2` (docs/phase-3-report.md part 5): plan-5 ends a run with about 140 items of 70 kinds, two of each; the
+ * leaderboard Mewtwo held 308 of 71 kinds, ten each of the multipliers. A smaller pool offers the same item more often.
+ */
+export const ARCHIVE_NAMES: string[] = [...Object.keys(ARCHIVES), 'balanced-2', 'stack-2'];
+
+/** How many times more an item that stacks without a limit of its own is worth keeping in the pool (`stack-2`). */
+const STACK_BONUS = 3;
+
+/** The items an archive version takes out of the pool for this kit, never more than the account's slots. */
+export function archiveOf(name: string, k: Knowledge, kit: Kit, slots: number): string[] {
+  if (name in ARCHIVES) return itemArchive(k, kit, { count: ARCHIVES[name], slots });
+  if (name === 'balanced-2') return itemArchive(k, kit, { count: ARCHIVES.balanced, slots, direction: DIRECTION_V2 });
+  if (name === 'stack-2') {
+    const scored = [...k.items.values()].map((it) => { const w = itemWorth(it, kit, DIRECTION_V2); return { key: it.key, v: (w.value + Math.max(0, w.risk)) * (it.maxStack == null ? STACK_BONUS : 1) }; });
+    scored.sort((a, b) => a.v - b.v || a.key.localeCompare(b.key));
+    return scored.slice(0, Math.max(0, slots)).map((x) => x.key);
+  }
+  throw new Error(`unknown archive "${name}": use one of ${ARCHIVE_NAMES.join(', ')}`);
 }

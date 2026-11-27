@@ -525,3 +525,34 @@ test('a forced order is carried out through the horde: the crowd does not push t
   const round = decide(wall, newMemory(), T, { holdPortal: true, goto: cash }).action;
   assert.ok(round.move && round.move.z < 0 && Math.abs(round.move.x) > 0.5, `around the wall (got ${JSON.stringify(round.move)})`);
 });
+
+test('boxed in behind something solid, a forced goal is walked round, not waited for', () => {
+  // Headless play (tier 2, seed 9, plan-5): the legendary's wall of roots stood between the run and the portal 10 m
+  // away. Every heading with a step towards the portal was blocked, and the run stood there to the time cap.
+  const behind = vary(quiet(base), (q) => {
+    q.stage = 4; q.bossSpawned = true; q.stageCleared = true; q.terrain.bounds = 63;
+    q.points = [{ kind: 'portal', sub: '', x: q.player.x, z: q.player.z - 10, r: 3.4, used: false, cost: 0, d: 10 }];
+    // Headings are angles of 22.5° from +x towards +z: 1 to 7 lead away from the wall, the rest into it or along it.
+    q.terrain.free = new Array(16).fill(0); q.terrain.hop = new Array(16).fill(0);
+    for (let k = 1; k <= 7; k++) { q.terrain.free![k] = 9; q.terrain.hop![k] = 9; }
+  });
+  let mem = newMemory(), t0 = behind.t, first: ReturnType<typeof decide>['action'] | null = null, moved: ReturnType<typeof decide>['action'] | null = null, at = 0;
+  for (let i = 0; i < 80 && !moved; i++) {
+    const out = decide(vary(behind, (q) => { q.t = t0 + i * 0.05; }), mem, T);
+    mem = out.mem; first ??= out.action;
+    if (out.action.move) { moved = out.action; at = i * 0.05; }
+  }
+  assert.equal(first!.intent, 'portal');
+  assert.equal(first!.move, null, 'for a moment it waits: a strike about to land is a reason to stand');
+  assert.ok(moved && at >= 2 && at <= 2.2, `after two seconds it walks (walked after ${at} s)`);
+  assert.ok(moved!.move!.z >= 0 && Math.abs(moved!.move!.x) > 0.5, `sideways, clear of the wall (got ${JSON.stringify(moved!.move)})`);
+  assert.equal(moved!.intent, 'portal', 'the goal is still the portal');
+  // Once the way is clear it is the straight line again.
+  const clear = vary(behind, (q) => { q.t = t0 + 6; q.terrain.free = new Array(16).fill(9); q.terrain.hop = new Array(16).fill(9); });
+  const on = decide(clear, mem, T).action;
+  assert.ok(on.move && on.move.z < -0.7, `straight at the portal (got ${JSON.stringify(on.move)})`);
+  // An ordinary goal is still given up on, not walked round for ever, and nothing changes while the way is open.
+  const open = vary(clear, (q) => { q.t = t0; });
+  assert.ok(decide(open, newMemory(), T).action.move!.z < -0.7);
+  assert.deepEqual([newMemory().boxedSince, newMemory().aroundUntil], [-1, 0]);
+});

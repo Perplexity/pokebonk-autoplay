@@ -17,7 +17,7 @@ import { DialogCapture, HANDLED_METHODS, HANDLER_WRITES, REFUSED_METHODS, resolv
 import type { BuildNames } from './dialogs.ts';
 import { resolveGameFns } from './gamefns.ts';
 import type { GameFns } from './gamefns.ts';
-import { ARCHIVES, itemArchive, kitOf, loadValuationKnowledge } from '../agents/heuristic2/values.ts';
+import { ARCHIVE_NAMES, archiveOf, kitOf, loadValuationKnowledge } from '../agents/heuristic2/values.ts';
 import { UNLOCKED_PRESET, playableMaps, readRegistries, unlockedProfile, verifyUnlocked } from './profile.ts';
 import type { Registries, UnlockCheck } from './profile.ts';
 import { ACTION_SCHEMA, DECISION_SCHEMA, InvalidActionError, MOVES, MOVE_VECTORS, OBSERVATION_SCHEMA, PLAY_BUTTONS, UnknownSituationError } from './types.ts';
@@ -188,7 +188,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     };
     if (!Number.isInteger(this.options.actionRepeat) || this.options.actionRepeat < 1) throw new Error('actionRepeat must be a positive integer');
     if (!(this.options.maxIdleGameTime >= 0) || !(this.options.idleRadius > 0)) throw new Error('maxIdleGameTime must be 0 (no rule) or a positive number of game seconds, and idleRadius a positive number of metres');
-    if (this.options.archive != null && !(this.options.archive in ARCHIVES)) throw new Error(`unknown archive "${this.options.archive}": use one of ${Object.keys(ARCHIVES).join(', ')}`);
+    if (this.options.archive != null && !ARCHIVE_NAMES.includes(this.options.archive)) throw new Error(`unknown archive "${this.options.archive}": use one of ${ARCHIVE_NAMES.join(', ')}`);
     if (!(this.options.maxKoGapGameTime >= 0)) throw new Error('maxKoGapGameTime must be 0 (no rule) or a positive number of game seconds');
     if (!(this.options.koGapGraceGameTime >= 0)) throw new Error('koGapGraceGameTime must be 0 (no grace) or a positive number of game seconds');
     if (this.options.invalidAction !== 'throw' && this.options.invalidAction !== 'penalty') throw new Error('invalidAction must be "throw" or "penalty"');
@@ -238,11 +238,10 @@ export class HeadlessGameEnvironment implements GameEnvironment {
         if (this.options.archive == null) return profile;
         // unlocked-v4: the same account with an item archive. The game applies its slot limit only when an item is
         // toggled in the menu, not when a run starts, so the preset keeps to it itself.
-        const count = ARCHIVES[this.options.archive];
-        if (count == null) throw new Error(`[environment] unknown archive "${this.options.archive}": use one of ${Object.keys(ARCHIVES).join(', ')}`);
+        if (!ARCHIVE_NAMES.includes(this.options.archive)) throw new Error(`[environment] unknown archive "${this.options.archive}": use one of ${ARCHIVE_NAMES.join(', ')}`);
         const slots = 5 * (Number(profile.lab?.archive) || 0) + (profile.itemsOwned?.length ?? 0);
         const knowledge = loadValuationKnowledge(this.buildId());
-        this.archived = itemArchive(knowledge, kitOf(knowledge, this.options.species), { count, slots });
+        this.archived = archiveOf(this.options.archive, knowledge, kitOf(knowledge, this.options.species), slots);
         if (this.archived.length > slots) throw new Error(`[environment] the archive holds ${this.archived.length} items, the account has ${slots} slots`);
         return { ...profile, itemsOff: [...this.archived] };
       };

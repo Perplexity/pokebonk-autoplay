@@ -14,7 +14,7 @@
  *   --workers=K (default 1)            --species=<dex>  --map=<id>  --tier=0..2  --classic
  *   --max-time=<game seconds, 0 = none>   --action-repeat=3   --hz=60
  *   --max-idle=<game seconds>          end an episode as invalid after this long without a KO and without movement
- *   --archive=empty|loose|balanced|narrow   account preset unlocked-v4 with that item archive (default: unlocked-v3)
+ *   --archive=empty|loose|balanced|narrow|balanced-2|stack-2   account preset unlocked-v4 with that item archive (default: unlocked-v3)
  *   --max-ko-gap=<game seconds>        end an episode as invalid after this long without a KO (boss fights do not count)
  *   --ko-gap-grace=<game seconds>      ...but not during this long at the start of a run (the opening's grace)
  *                                      (default: no such rule; training and evaluation use 30)

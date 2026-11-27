@@ -43,6 +43,8 @@ export interface Memory {
   lastStage: number;
   /** Run time until which priority targets are ignored (the last hunt went nowhere). */
   noHuntUntil: number;
+  /** Run time since which the bot has stood still in front of a forced goal out of reach (-1: it has not), and until which it walks round what is in the way. */
+  boxedSince: number; aroundUntil: number;
   /** Interact presses made at the service point being visited: after two it is done with for this zone. */
   visitPresses: number;
   /** Key of the service point being visited ("" when none): see `markVisited`. */
@@ -81,7 +83,7 @@ export function liveBoss(s: Snapshot): Snapshot['boss'] {
 }
 
 export const newMemory = (): Memory => ({
-  dir: null, px: 0, pz: 0, pt: -1, stuck: 0, detourUntil: 0, detourSide: 1, speed: 6, skip: [], goal: '', goalSince: 0, lastInteract: -10, wander: 0.7, lastStage: 0, noHuntUntil: 0, visitPresses: 0, visitKey: '',
+  dir: null, px: 0, pz: 0, pt: -1, stuck: 0, detourUntil: 0, detourSide: 1, speed: 6, skip: [], goal: '', goalSince: 0, lastInteract: -10, wander: 0.7, lastStage: 0, noHuntUntil: 0, boxedSince: -1, aroundUntil: 0, visitPresses: 0, visitKey: '',
 });
 
 /** How much of the threats (enemies, crowding, shots, ground hazards) still counts on the way to a forced goal: none. In a horde of hundreds any share of it outweighs the goal. */
@@ -433,6 +435,13 @@ export function decide(s: Snapshot, mem: Memory, base: Tuning, directive: Direct
     pull = { x: Math.cos(a), z: Math.sin(a) };
   }
 
+  // Walking round something solid that stands between here and a forced goal (see below, "boxed in"): well to one
+  // side of the goal and a little away from it, so that the way is clear of what blocks every step towards it.
+  if (s.t < m.aroundUntil && goal.forced && !goal.ring && gd > goal.reach) {
+    const a = Math.atan2(gz, gx) + m.detourSide * 1.9;
+    pull = { x: Math.cos(a), z: Math.sin(a) };
+  }
+
   // ---- chargers: enemies that dash in a straight line, faster than we walk ----
   // Running away along the line gets us caught; the answer is to leave the lane sideways. A lane is either the dash
   // under way (along its velocity) or the one about to start (from the charger to where we stand now).
@@ -559,6 +568,24 @@ export function decide(s: Snapshot, mem: Memory, base: Tuning, directive: Direct
   }
 
   let move: Vec | null = best >= 0 ? DIRS[best] : null;
+
+  // ---- boxed in: a forced goal out of reach is not waited for ----
+  // Headless play before this rule (tier 2, seed 9 under plan-5; one run in thirty to fifty of any plan): the legendary
+  // raises three walls of roots, 10 m wide, that stay standing when it falls. The run stood right behind one with the
+  // portal 10 m beyond it: every step towards the portal was blocked, standing still scored best, and it stood there
+  // for the remaining 74 minutes. After two seconds of that it walks round, the other side each time.
+  const waiting = !move && !!goal.forced && !goal.ring && gd > goal.reach + 0.5;
+  if (!waiting || s.t < m.boxedSince) m.boxedSince = -1;
+  if (waiting && s.t >= m.aroundUntil) {
+    if (m.boxedSince < 0) m.boxedSince = s.t;
+    else if (s.t - m.boxedSince >= 2) { m.boxedSince = -1; m.detourSide = -m.detourSide; m.aroundUntil = s.t + 1.5; }
+  }
+  if (waiting && s.t < m.aroundUntil) {
+    // The best direction there is: standing is not one of them now.
+    let b2 = Infinity, k2 = -1;
+    for (let k = 0; k < 16; k++) if (scores[k + 1] < b2) { b2 = scores[k + 1]; k2 = k; }
+    if (k2 >= 0) { best = k2; move = DIRS[k2]; }
+  }
 
   // ---- stuck: jump, and start walking around whatever it is ----
   let jump = false;
