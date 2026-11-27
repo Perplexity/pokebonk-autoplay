@@ -22,7 +22,6 @@ Median, 90th percentile and best score of the heuristic's plans, one episode per
 | | | 50 held-out | 1,528,620 | 4,034,675 | 9,052,797 |
 | plan-5 | items valued by what the score follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
 | plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 development | 7,430,752 | 9,221,229 | 10,899,768 |
-| | | 50 held-out | 7,780,684 | 9,619,558 | 10,299,849 |
 
 No run has reached 20 million. `docs/phase-3-report.md` has every measurement, including what failed: the first
 PPO runs on top of plan-3 changed none of its choices, and what limits a run today is how long its build keeps
@@ -98,5 +97,7 @@ fresh game process that loads the source as it is at that moment.
 
 Changes go through pull requests: a branch per change, reviewed by Claude as a senior machine learning engineer and
 programmer (`.github/workflows/claude-code-review.yml`, with `REVIEW.md` as its guide). A pull request the reviewer
-calls ready is merged into `main` by the workflow; one it does not is left open with its findings. A change to how anything plays comes with a test and
-with a measured batch on seeds 1–30; a change meant to become a default is also played on the development seeds.
+calls ready is merged into `main` by the workflow; one it does not is left open with its findings.
+
+A change to how anything plays comes with a test and with a measured batch on seeds 1–30; a change meant to become
+a default is also played on the development seeds.
