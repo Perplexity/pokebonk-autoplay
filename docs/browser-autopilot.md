@@ -14,7 +14,8 @@ dodges with.
 **Offline by design.** The bot plays the copy on `localhost`. The sandbox browser cannot resolve any hostname but
 `localhost`, every request it makes is routed (API calls → the local mock, anything else → blocked and logged), and
 the bot refuses to act on a page that is not the sandbox origin. Nothing is submitted to the live game service, no
-real account is used, no leaderboard or other player is involved.
+real account is used, no leaderboard or other player is involved. This project is not for playing on the live
+service and has no option to point it there.
 
 The game's own code marks automated clients in the result it reports at the end of a run. The sandbox browser is
 started with Chrome's standard automation flag and makes no attempt to hide: that marker (`end.env`) is in the run

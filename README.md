@@ -74,11 +74,23 @@ python3.13 -m venv .venv && .venv/bin/python -m pip install torch && .venv/bin/p
 .venv/bin/python -m pokebonk_rl.bc fit --config configs/manager.yaml --data data/bc/plan3 --name manager-copy-01
 .venv/bin/python -m pokebonk_rl.train --config configs/manager.yaml --name my-run --set manager.init_from=manager-copy-01
 .venv/bin/python -m pokebonk_rl.evaluate --config configs/manager-evaluation.yaml --model my-run --seeds 1-30
+.venv/bin/python -m pokebonk_rl.train --resume my-run  # continue a run from its newest checkpoint
+.venv/bin/python -m pokebonk_rl.registry list          # candidate and stable models
+.venv/bin/tensorboard --logdir logs/tensorboard --host 127.0.0.1
 .venv/bin/python -m pytest python/tests                # 48 tests
 ```
 
-On Windows the Python commands are `py -3.13 -m venv .venv` and `.venv\Scripts\python -m …`. `device: cpu` is the
-measured choice on an Apple-silicon Mac too. Do not edit `src/` while a batch is running: every episode starts a
+The training dashboard (`docs/dashboard.md`):
+
+```sh
+npm run dashboard:install && npm run dashboard:build   # once: the dashboard's page
+npm run dashboard                                       # http://127.0.0.1:8090 (this machine only)
+```
+
+On Windows the Python commands are `py -3.13 -m venv .venv` and `.venv\Scripts\python -m …`, and PyTorch for an
+NVIDIA card is installed with `pip install torch --index-url https://download.pytorch.org/whl/cu128`. `device: cpu`
+is the measured choice on an Apple-silicon Mac too (914 against 249 decisions a second on its GPU). Installing the
+packages and `npm run mirror` are the only steps that download anything. Do not edit `src/` while a batch is running: every episode starts a
 fresh game process that loads the source as it is at that moment.
 
 ## Read more
