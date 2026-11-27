@@ -157,9 +157,10 @@ export interface Plan {
   vitaminsFarm: string[]; vitaminsFinal: string[]; swapZone: number; swapAtSec: number;
   /**
    * A vitamin of the plan that makes the horde bigger or stronger (its stat is one of the direction's `risk` stats:
-   * Cursed Incense, Super Lure) comes after any move upgrade until this level (0 = first, like the others). Measured without it, plan-7 on
-   * the 100 development seeds: 3 runs fainted in zone 1 after 3.5 to 4.5 minutes, at level 52 to 59 with both at
-   * level 10, 12 to 14 items and no move upgraded: every early level had gone into vitamins.
+   * Cursed Incense, Super Lure) comes after any move upgrade until this level (0 = first, like the others).
+   * Chosen on the development seeds 2000001 to 2000100, which are tuning seeds for plan-7 since: without it 3 of
+   * those 100 runs fainted in zone 1 after 3.5 to 4.5 minutes, at level 52 to 59 with both vitamins at level 10, 12
+   * to 14 items and no move upgraded, because every early level had gone into vitamins.
    */
   vitaminsRiskLevel: number;
 }
@@ -246,9 +247,10 @@ export const PLAN_V6: Plan = { ...PLAN_V5, version: 'plan-6', cashHp: 0.3, cashL
 
 /**
  * plan-7 (NOT the default): plan-6 with the owner's vitamins by phase (above), on the archive `stack-2`. On 100 seeds
- * nothing was chosen on: median 11.47 million against plan-6's 7.43 and plan-3's 1.47, p90 12.55, best 13.36; 78 runs
- * of 100 over 10 million, none fainted. The five farm vitamins without the change at Hypno scored the same as plan-6
- * (docs/phase-3-report.md part 6).
+ * nothing was chosen on (3000001 to 3000100), both plans by the same code: median 11.37 million against plan-6's
+ * 7.84, p90 12.45 against 9.51, best 12.98 against 11.35; better on 88 of 100 (batches 86 and 87). The five farm
+ * vitamins without the change at Hypno scored the same as plan-6. `vitaminsRiskLevel` was chosen on seeds 2000001 to
+ * 2000100: plan-7's figures there are tuned (docs/phase-3-report.md part 6).
  */
 export const PLAN_V7: Plan = {
   ...PLAN_V6, version: 'plan-7',

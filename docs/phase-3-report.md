@@ -622,8 +622,9 @@ default to build and measure. This part: vitamins, a first look at rifts and at 
 
 **In one paragraph.** With the owner's five vitamins a run reaches level 2,586 for 1,570, and scores the same: the
 enemies of Overtime are harder for them. With the change at Hypno in zone 3 to Calcium, HP Up, Ether, Stardust and
-PP Up (plan-7) the median on seeds 1–30 is 10.80 million for 7.52, the best 12.66 million; on the 100 development
-seeds 11.47 million for 7.43, the best 13.36 million, with 78 runs of 100 over 10 million and none that faints.
+PP Up (plan-7) the median on seeds 1–30 is 10.80 million for 7.52, the best 12.66 million; on 100 seeds
+nothing was chosen on (3000001–3000100) 11.37 million for 7.84 by the same code, the best 12.98 million, with 74
+runs of 100 over 10 million.
 
 ## Measured
 
@@ -716,20 +717,45 @@ way to a portal in the sanctuary with no enemy within 4 m. Seed 900038 then cash
 | plan-7 without the gate | 1–30 | 10,796,478 | 9,993,619 | 12,372,180 | 12,657,549 | 3,326,478 | 30 | 28 | 18 | 0 | 2,265 | 17 |
 | **plan-7** | 1–30 | 11,396,169 | 10,588,606 | 12,373,286 | 12,946,200 | 611,975 | 29 | 28 | 24 | 0 | 2,454 | 18 |
 
-- Development seeds: all 100 runs cash Overtime; none faints. Seed by seed ×1.64 of plan-6 (1.48 to 1.84), better
-  on 92 of 100; better than plan-3 on 100 of 100. Against plan-7 without the gate ×1.37 (1.04 to 1.98), which is
-  the three early faints; the medians are the same.
+- Development seeds: all 100 runs cash Overtime; none faints. Against plan-7 without the gate ×1.37 seed by seed
+  (1.04 to 1.98), which is the three early faints; the medians are the same.
+- **These 100 seeds are no longer seeds nothing was chosen on.** The gate was added because of three runs on them
+  and two versions of it were judged on them. Batch 83 is a tuned figure. The clean check is below, on a second set.
+- Against plan-6 there (batch 71): ×1.64 seed by seed (1.48 to 1.84), better on 92 of 100. Batch 71 was played
+  before the movement rule of this part and batch 83 after it: not the same code on both sides. plan-6 replays
+  seeds 1–30 identically with the rule (below), so the difference is probably nothing, but it was not measured on
+  these seeds.
 - Seeds 1–30: ×1.01 of plan-7 without the gate (0.80 to 1.23). One run scores 611,975 (not looked into).
 - No run of 20 million: the best of the 130 is 13.4 million.
 
+**The clean check: a second development set, 3000001–3000100** (played once, after plan-7 and its gate were
+fixed; nothing was chosen on it; both plans by the same code, the one this part ends with):
+
+| | Batch | Median | Mean | p90 | Best | Worst | ≥ 1 M | ≥ 5 M | ≥ 10 M | Level | Minutes | Rounds |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| plan-6 | 87 | 7,838,016 | 7,514,490 | 9,514,985 | 11,345,601 | 1,113,647 | 100 | 89 | 5 | 1,576 | 55.3 | 16 |
+| **plan-7** | 86 | **11,373,575** | 10,572,553 | 12,446,802 | 12,979,411 | 743,808 | 99 | 97 | 74 | 2,423 | 57.3 | 17 |
+
+- Seed by seed plan-7 is ×1.42 of plan-6 (1.29 to 1.56), better on 88 of 100. All 200 runs cash Overtime.
+- No run of 20 million.
+
+**The movement rule and the plans before plan-7.** With the rule as kept, plan-6 replays seeds 1–30 identically to
+batch 70, which was played before any such rule: 30 of 30 (batch 85). plan-3 likewise (batch 79 against 32). Plans
+1, 2, 4 and 5 were not replayed: the rule runs only on the way to a portal in the sanctuary after two seconds
+without moving and with no enemy near, the case in which a run of any plan stood until the time cap.
+
+**A held-out seed is spent.** The second stall was found by looking into held-out seed 900038 (batch 72) and the
+rule was checked on that seed. That is a choice made with a held-out seed. From here on a result on the held-out
+seeds is given over all 50 and over the 49 without 900038, and no claim rests on that seed.
+
 ## What it means
 
-- The owner's vitamin order is worth about half as much again as plan-6 (×1.64 seed by seed on the development
-  seeds), and all of it comes from the change before the final stage: the five farm vitamins without it scored
+- The owner's vitamin order is worth about two fifths more than plan-6 (×1.42 seed by seed on seeds nothing was
+  chosen on), and all of it comes from the change before the final stage: the five farm vitamins without it scored
   the same as plan-6.
-- The median run is now over 11 million and 78 of 100 are over 10 million. The top moved less: 13.4 million against
-  plan-6's 10.9. A 20 million run still needs the Overtime ceiling held four or five rounds longer than plan-7
-  holds it (through round 13 or 14).
+- The median run is over 11 million and 74 of 100 are over 10 million, against 5 of 100 for plan-6. The top moved
+  less: 13.0 million against 11.3. A 20 million run still needs the Overtime ceiling held four or five rounds
+  longer than plan-7 holds it (through round 13 or 14).
 - What is left of the owner's account, in the order the evidence here suggests: the kit (the heavy moves, one
   fusion, no filler), every altar on the map, rifts built into the heuristic.
 
@@ -740,5 +766,6 @@ way to a portal in the sanctuary with no enemy within 4 m. Seed 900038 then cash
   Stardust.
 - 2 of 30 runs of batch 76 never changed vitamins; whether the same happens with the gate was not counted.
 - plan-7 was not played on the held-out seeds.
+- The gate's level (120) was set once, from three runs on the first development set, and not varied.
 - The rift prototype's stalls are the prototype's; rifts inside the heuristic are not built.
 - The manager is still a copy of plan-3.

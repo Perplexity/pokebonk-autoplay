@@ -23,7 +23,8 @@ Median, 90th percentile and best score of the heuristic's plans, one episode per
 | plan-5 | items valued by what the score follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
 | plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 development | 7,430,752 | 9,221,229 | 10,899,768 |
 | | | 50 held-out | 7,780,684 | 9,619,558 | 10,299,849 |
-| plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 development | 11,469,680 | 12,545,168 | 13,363,218 |
+| | | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
+| plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
 
 No run has reached 20 million. `docs/phase-3-report.md` has every measurement, including what failed: the first
 PPO runs on top of plan-3 changed none of its choices, and what limits a run today is how long its build keeps
@@ -44,8 +45,10 @@ python/pokebonk_rl                 PPO for the manager, copying the heuristic fi
 - **A plan is data.** `plan-1` to `plan-7` live in `src/agents/heuristic2/plan.ts`; an old plan is never edited, a
   new one is added and measured. The same holds for rewards (`configs/reward-v*.yaml`), item archives and
   observation and action layouts: new versions only, old ones kept.
-- **Seeds.** 1–30 are for tuning. 2000001–2000100 are development seeds nothing is chosen on: a change that wins
-  on 1–30 is checked there. 900001–900050 are held out and are never tuned on.
+- **Seeds.** 1–30 are for tuning. A change that wins there is checked once on development seeds nothing was
+  chosen on: 2000001–2000100 for plans up to plan-6 (one setting of plan-7 was chosen on them, so for plan-7 and
+  later they count as tuning seeds) and 3000001–3000100 since. 900001–900050 are held out and are never tuned on;
+  seed 900038 is spent (a stall was diagnosed on it), so held-out results are also given without it.
 - **One run's score is noisy** (its standard deviation is about three quarters of its mean), so nothing is
   concluded from a few runs. Reports give median, mean, p90 and best over a whole batch.
 
