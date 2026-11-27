@@ -24,6 +24,18 @@ export function worthNow(key: string, s: Snapshot, ctx: Chooser2Context): number
   return w.value + (hpFrac(s) >= ctx.plan.riskHp ? w.risk : Math.min(0, w.risk) - Math.max(0, w.risk));
 }
 
+/**
+ * The plan's vitamins for this moment of the run, or null when the plan has none (plan.ts, `vitaminsFarm`): the
+ * wanted ones in order of preference, those of the later phase (kept out of the banishes), and whether the final
+ * phase has begun. A function of the zone and its clock alone.
+ */
+export function vitaminPhase(s: Snapshot, plan: Plan): { wanted: string[]; later: string[]; final: boolean } | null {
+  if (!plan.vitaminsFarm.length && !plan.vitaminsFinal.length) return null;
+  const final = plan.vitaminsFinal.length > 0 && (s.stage > plan.swapZone || (s.stage === plan.swapZone && s.stageTime >= plan.swapAtSec));
+  if (final || !plan.vitaminsFarm.length) return { wanted: plan.vitaminsFinal, later: [], final };
+  return { wanted: plan.vitaminsFarm, later: plan.vitaminsFinal, final };
+}
+
 /** Score of one level-up offer (0–100) and why. Exported for tests. */
 export function scoreLevelUp2(opt: DecisionOption, s: Snapshot, ctx: Chooser2Context): { score: number; why: string; junk: boolean } {
   const d = opt.data as { kind?: string; slot?: number; vit?: string; rarity?: number; from?: number | null; id?: number };
@@ -51,6 +63,17 @@ export function scoreLevelUp2(opt: DecisionOption, s: Snapshot, ctx: Chooser2Con
     case 'upVit': {
       const v = ctx.knowledge.vitamins.get(String(d.vit ?? ''));
       if (!v) return { score: 20, why: `vitamin "${String(d.vit)}" is not in the knowledge export`, junk: false };
+      const phase = vitaminPhase(s, ctx.plan);
+      if (phase) {
+        const rank = phase.wanted.indexOf(v.key);
+        // The ones that make the horde bigger or stronger wait until the build can take it (plan.ts, `vitaminsRiskLevel`).
+        // (Under any move upgrade, over everything else: left at the bottom, the refreshes and skips were spent on
+        // waiting for it and the two slots went to whatever was offered when they ran out.)
+        if (rank >= 0 && s.player.level < ctx.plan.vitaminsRiskLevel && ctx.plan.direction.risk.includes(v.stat)) return { score: 60 - rank, why: `${v.name}: a vitamin of the plan, after the moves until level ${ctx.plan.vitaminsRiskLevel}`, junk: false };
+        if (rank >= 0) return { score: Math.min(94, 91 - rank + rarity), why: `${v.name}: a vitamin of the plan${phase.final ? ' for the final stage' : ''}`, junk: false };
+        if (d.kind === 'upVit') return { score: 25, why: `${v.name}: held, but not one of the plan's vitamins now`, junk: false };
+        return { score: 12, why: `${v.name}: not one of the plan's vitamins${phase.later.includes(v.key) ? ' yet' : ''}`, junk: !phase.later.includes(v.key) };
+      }
       const w = vitaminWorth(v, ctx.kit, ctx.plan.direction), worth = w.value + (hpFrac(s) >= ctx.plan.riskHp ? w.risk : -Math.abs(w.risk));
       if (d.kind === 'newVit' && worth < ctx.plan.vitaminMin) return { score: 15, why: `${v.name}: one level is worth ${worth.toFixed(1)}, under ${ctx.plan.vitaminMin}`, junk: worth < ctx.plan.banishBelow };
       return { score: Math.min(94, (d.kind === 'newVit' ? 55 : 50) + 5 * worth + rarity * 2), why: `${v.name} (${v.desc.toLowerCase()}): ${worth.toFixed(1)} a level`, junk: false };
@@ -138,6 +161,15 @@ export function choose2(obs: Observation, ctx: Chooser2Context): Choice {
     case 'overtimeOffer': {
       for (const key of ctx.plan.offerings) { const c = option(d.options.findIndex((o) => o.id === key), `offering "${key}"`); if (c) return c; }
       return extra('decline', 'none of the wanted offerings is offered') ?? fallback('declining the offering');
+    }
+    case 'forget': {
+      // Hypno: in the final phase the vitamins that are not of it are forgotten, one answer each (he pays for them).
+      const phase = vitaminPhase(s, ctx.plan);
+      if (phase?.final) {
+        const i = d.options.findIndex((o, j) => mask.options[j] && o.data.what === 'vitamin' && !phase.wanted.includes(String(o.data.key)));
+        if (i >= 0) { const c = option(i, `forget ${String(d.options[i].data.key)}: a vitamin of the final stage takes its place`); if (c) return c; }
+      }
+      return extra('leave', phase?.final ? 'the vitamins held are those of the final stage' : 'nothing to forget') ?? fallback('leaving Hypno');
     }
     case 'fusion': {
       const pick = fusionPick(d, s, ctx.plan);

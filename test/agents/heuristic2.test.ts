@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import type { Snapshot } from '../../src/bot/snapshot.ts';
-import { choose2, scoreLevelUp2, worthNow } from '../../src/agents/heuristic2/chooser.ts';
+import { choose2, scoreLevelUp2, vitaminPhase, worthNow } from '../../src/agents/heuristic2/chooser.ts';
 import type { Chooser2Context } from '../../src/agents/heuristic2/chooser.ts';
-import { PLAN_V1, PLAN_V2, PLAN_V3, PLAN_V5, PLAN_V6, planWith } from '../../src/agents/heuristic2/plan.ts';
+import { PLAN_V1, PLAN_V2, PLAN_V3, PLAN_V5, PLAN_V6, PLAN_V7, planWith } from '../../src/agents/heuristic2/plan.ts';
 import { directiveFor2, errandFor, heaviestHit, hordeHit, hpLost, lootGoal, lowestHp, newLife, spawnEstimate } from '../../src/agents/heuristic2/policy.ts';
 import type { World } from '../../src/agents/heuristic2/policy.ts';
 import { ARCHIVES, ARCHIVE_NAMES, archiveOf, DIRECTION_V1, DIRECTION_V2, DIRECTIONS, itemArchive, itemWorth, kitOf, loadValuationKnowledge, textMultiplier, vitaminWorth } from '../../src/agents/heuristic2/values.ts';
@@ -110,6 +110,46 @@ test('level-ups: the kit first, then what the build direction values; junk is ma
   const healthy = scoreLevelUp2(offer({ kind: 'newVit', vit: 'cursed' }), s, ctx).score, hurt = scoreLevelUp2(offer({ kind: 'newVit', vit: 'cursed' }), snap({ player: { ...s.player, hp: 80 } }), ctx).score;
   assert.ok(healthy > hurt);
   assert.ok(worthNow('white-flute', s, ctx) > worthNow('white-flute', snap({ player: { ...s.player, hp: 80 } }), ctx));
+});
+
+test('plan-7: vitamins by phase, the swap at Hypno, and nothing of it in the plans before', () => {
+  assert.deepEqual([PLAN_V7.version, PLAN_V7.vitaminsFarm, PLAN_V7.vitaminsFinal, PLAN_V7.swapZone, PLAN_V7.swapAtSec], ['plan-7', ['exp-candy', 'cursed', 'super-lure', 'nugget', 'star-piece-v'], ['calcium', 'hp-up', 'ether', 'stardust', 'pp-up'], 3, 720]);
+  assert.ok(PLAN_V7.errands.includes('hypno') && !PLAN_V6.errands.includes('hypno'));
+  for (const p of [PLAN_V1, PLAN_V3, PLAN_V5, PLAN_V6]) assert.equal(vitaminPhase(snap({}), p), null, `${p.version} has no vitamin plan`);
+  const at = (stage: number, stageTime: number) => vitaminPhase(snap({ stage, stageTime }), PLAN_V7)!;
+  assert.deepEqual([at(1, 0).final, at(2, 1000).final, at(3, 719).final, at(3, 720).final, at(4, 0).final], [false, false, false, true, true]);
+  assert.deepEqual([at(1, 0).wanted, at(1, 0).later, at(3, 800).wanted, at(3, 800).later], [PLAN_V7.vitaminsFarm, PLAN_V7.vitaminsFinal, PLAN_V7.vitaminsFinal, []]);
+  // Level-ups. Farming: the plan's vitamins before a move upgrade, in the plan's order; one of the final stage is left
+  // alone but not banished; any other is junk.
+  const c7: Chooser2Context = { ...ctx, plan: PLAN_V7 }, farm = snap({ stage: 1, stageTime: 100, player: { ...snap({}).player, level: 200 } }), late = snap({ stage: 3, stageTime: 800 });
+  const sc = (vit: string, where: Snapshot, kind = 'newVit') => scoreLevelUp2(offer({ kind, vit }), where, c7);
+  assert.ok(sc('exp-candy', farm).score > sc('cursed', farm).score && sc('cursed', farm).score > sc('star-piece-v', farm).score);
+  assert.ok(sc('star-piece-v', farm).score > scoreLevelUp2(offer({ kind: 'upMove', slot: 0 }), farm, c7).score, 'a vitamin of the plan comes before a move upgrade');
+  assert.deepEqual([sc('calcium', farm).score < 20, sc('calcium', farm).junk, sc('iron', farm).junk], [true, false, true]);
+  assert.match(sc('calcium', farm).why, /not one of the plan's vitamins yet/);
+  // Cursed Incense and Super Lure make the horde stronger: not before the build can take it, and never banished.
+  assert.equal(PLAN_V7.vitaminsRiskLevel, 120);
+  const early = snap({ stage: 1, stageTime: 100, player: { ...farm.player, level: 50 } }), grown = snap({ stage: 1, stageTime: 400, player: { ...farm.player, level: 120 } });
+  const upMove = (where: Snapshot) => scoreLevelUp2(offer({ kind: 'upMove', slot: 0 }), where, c7).score;
+  for (const vit of ['cursed', 'super-lure']) for (const kind of ['newVit', 'upVit']) {
+    const e = sc(vit, early, kind);
+    assert.ok(e.score < upMove(early) && e.score > sc('iron', early).score + 30 && !e.junk, `${vit} ${kind}: after the moves, before anything else, never banished (${e.score})`);
+    assert.ok(sc(vit, grown, kind).score > 85 && sc(vit, grown, kind).score > upMove(grown), `${vit} ${kind}: first from level 120 on`);
+  }
+  assert.ok(sc('exp-candy', early).score > 85 && sc('nugget', early).score > 85, 'the others from the first level');
+  // The final stage: the other set, and the farm vitamins are not taken again.
+  assert.ok(sc('calcium', late).score > 85 && sc('hp-up', late).score > 85 && sc('exp-candy', late).score < 20);
+  assert.match(sc('calcium', late).why, /for the final stage/);
+  assert.equal(sc('nugget', late, 'upVit').score, 25, 'a held vitamin of the other phase is not levelled on purpose');
+  // Without a vitamin plan the score is by worth, as it was.
+  assert.match(scoreLevelUp2(offer({ kind: 'newVit', vit: 'calcium' }), farm, { ...ctx, plan: PLAN_V6 }).why, /a level/);
+  // Hypno is an errand only in the final phase and only while a vitamin of the earlier one is held, also in a swarm and far away.
+  const hyp = [{ kind: 'hypno', sub: '', x: 150, z: 0, r: 2, used: false, cost: 0, d: 150 }];
+  const errand = (stage: number, stageTime: number, vitamins: Record<string, number>, swarm = false) => errandFor(snap({ stage, stageTime, stageCleared: true, points: hyp, player: { ...snap({}).player, vitamins } }), { gold: 0, ballPrice: 0, cagePrice: 0, slotPrice: 0, items: 0, spawn: 1 }, 1, swarm, newLife(), PLAN_V7);
+  assert.equal(errand(3, 700, { nugget: 12 }), null, 'not before the swap');
+  assert.equal(errand(3, 800, { nugget: 12, calcium: 3 }, true)?.note, 'hypno');
+  assert.equal(errand(3, 800, { calcium: 12, 'hp-up': 12 }, true), null, 'nothing left to forget');
+  assert.equal(errandFor(snap({ stage: 3, stageTime: 800, stageCleared: true, points: hyp, player: { ...snap({}).player, vitamins: { nugget: 12 } } }), { gold: 0, ballPrice: 0, cagePrice: 0, slotPrice: 0, items: 0, spawn: 1 }, 1, true, newLife(), PLAN_V6), null, 'plan-6 never walks to Hypno');
 });
 
 test('the plan: unknown keys are refused, tuning is merged', () => {

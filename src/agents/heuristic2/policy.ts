@@ -9,7 +9,7 @@ import type { Policy } from '../../environment/policies.ts';
 import type { Action, Observation, PlayMask } from '../../environment/types.ts';
 import type { RunState } from '../../observations/state.ts';
 import { toPlayAction } from '../heuristic/adapter.ts';
-import { choose2 } from './chooser.ts';
+import { choose2, vitaminPhase } from './chooser.ts';
 import type { Chooser2Context } from './chooser.ts';
 import { EF, E_DMG, E_FLAGS } from '../../bot/snapshot.ts';
 import type { Point } from '../../bot/snapshot.ts';
@@ -142,10 +142,12 @@ export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, lif
       // Bill's machine: with the plan's item held and two moves at the cap (chooser.ts, `fusionPick`).
       case 'bill': return !!plan.fuseNeeds && (s.player.items[plan.fuseNeeds] ?? 0) > 0 && s.player.moves.filter((m) => m.level >= 10).length >= 2;
       case 'cursedchest': case 'cursed': case 'greed': return hp >= plan.riskHp && w.spawn < plan.spawnTarget;
+      // Hypno: once the final phase has begun, while a vitamin of the earlier phase is still held (chooser.ts, 'forget').
+      case 'hypno': { const phase = vitaminPhase(s, plan); return !!phase?.final && Object.keys(s.player.vitamins ?? {}).some((k) => !phase.wanted.includes(k)); }
       default: return false;
     }
   };
-  const q = s.points.filter((x) => !x.used && plan.errands.includes(x.kind) && x.d <= range && (!swarm || x.kind === 'freechest')
+  const q = s.points.filter((x) => !x.used && plan.errands.includes(x.kind) && (x.kind === 'hypno' || (x.d <= range && (!swarm || x.kind === 'freechest')))
     && !life.skip.has(pointKey(x)) && !brainSkip.includes(pointKey(x)) && wanted(x)).sort((a, b) => a.d - b.d)[0];
   if (!q) { life.errand = null; return null; }
   // An errand that does not get done (out of reach, or the press went to another point) is given up for the zone.
