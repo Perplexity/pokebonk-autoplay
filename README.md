@@ -90,8 +90,10 @@ npm run dashboard                                       # http://127.0.0.1:8090 
 On Windows the Python commands are `py -3.13 -m venv .venv` and `.venv\Scripts\python -m …`, and PyTorch for an
 NVIDIA card is installed with `pip install torch --index-url https://download.pytorch.org/whl/cu128`. `device: cpu`
 is the measured choice on an Apple-silicon Mac too (914 against 249 decisions a second on its GPU). Installing the
-packages and `npm run mirror` are the only steps that download anything. Do not edit `src/` while a batch is running: every episode starts a
-fresh game process that loads the source as it is at that moment.
+packages and `npm run mirror` are the only steps that download anything.
+
+Do not edit `src/` while a batch is running: every episode starts a fresh game process that loads the source as it
+is at that moment.
 
 ## Read more
 
