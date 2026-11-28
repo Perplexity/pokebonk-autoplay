@@ -54,7 +54,7 @@ export interface Lifecycle {
   zone: number; skip: Set<string>; errand: { key: string; since: number } | null; shopLeft: number | null;
   /** Gengar curses drawn at slot machines in this run. */
   gengar: number;
-  /** Revives held when last seen; run time a revive was last spent; run time the current zone was cleared, its final swarm was first seen, and Overtime began. */
+  /** Revives held when last seen; run time a revive was last spent; run time the current zone was cleared, its final swarm was first seen with the guardian fallen (the later of the two when the swarm began first), and Overtime began. */
   revives: number | null; revivedAt: number; clearedAt: number | null; swarmAt: number | null; otAt: number | null;
   /** Run time the walk to this zone's Rhydon totem was first ordered ahead of the wake. */
   roarSince: number | null;
