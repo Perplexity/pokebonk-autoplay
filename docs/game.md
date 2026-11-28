@@ -12,7 +12,7 @@ Game build `mwsewi0r` (version 0.10.26). Facts only. Every statement carries one
 
 Identifiers such as `showSeals` are the game's own method names. Names starting with `$` are minified and change with
 every build. Sections 1 to 7 are the run's lifecycle, the dialogs and the account; section 8 is the numbers that
-decide a score. After a game update every **[C]** number in section 8 has to be read again (docs/game-updates.md).
+decide a run's ranked KOs. After a game update every **[C]** number in section 8 has to be read again (docs/game-updates.md).
 
 The path of §1 is **[V]** end to end, although some of its statements still carry the **[V\*]** of the probe that
 first found them: the player completes it without any cheat in nearly every run.
@@ -272,9 +272,12 @@ the real service would return for it is **[U]**.
 - The frame-rate governor lowers the live-enemy cap below 45 measured fps. **[V]** at 60 Hz: measured 60.00, cap never cut,
   including 9 minutes at 800 live enemies.
 
-## 8. The numbers that decide a score
+## 8. The numbers that decide a run's ranked KOs
 
-Score = KOs + the Overtime bonus when Overtime is cashed. With today's player about three quarters of a score is the
+Ranked KOs = the run's own KOs + the Overtime bonus when Overtime is cashed: the number the KO leaderboard shows.
+(The game's own "score" **[C]** is another, far larger number: for an ordinary run (KOs × 2 +
+seconds × 3 + damage dealt / 200 + 1,500 a zone cleared + 800 a guardian + 6,000 for a victory) × (1 + tier / 2). It
+is not used here.) With today's player about three quarters of a run's ranked KOs is the
 bonus.
 
 ### 8.1 Overtime
@@ -298,7 +301,7 @@ them: every stored run's bonus is reproduced exactly by the formula).
 | The ring | closes from second 90 to 240, to 40 % of the arena (60 % with Rompeolas) |
 | A hit | takes at most 40 % of max HP (25 % from elites and Alphas), then nothing lands for 0.45 s. Evasion is capped at 60 %; armor reduces by armor / (armor + 45) |
 
-Score of Overtime alone if cashed at the end of a round, at the ceiling (millions):
+Ranked KOs of Overtime alone (its KOs and its bonus) if cashed at the end of a round, at the ceiling (millions):
 
 | Cashed after round | Tide, % of the reference HP a second | 12 seals and Pleamar | no seals |
 |---|---|---|---|
@@ -324,7 +327,9 @@ Score of Overtime alone if cashed at the end of a round, at the ceiling (million
   (crit chance + mega crit chance above 1) is × crit damage × (1 + 0.5 × (crit damage − 1)). Burn and poison are a
   share of the hit that set them (30 % and 12 % a second, × status damage): nothing deals a share of the enemy's
   HP except the relic Eye of the Abyss (finishes what is under 12 %). One hit is capped at 1e30.
-- **What a 20 million run needs (expected from the above, not measured):** the ceiling held through round 21 or 22.
+- **What a 20 million run needs (expected from the above, not measured):** the ceiling held through round 21 or 22;
+  30 million, the top of the leaderboard, is the ceiling held through round 23 or 24 with four to five million KOs
+  made before Overtime (ours: about two).
   The tide at the end of those rounds asks for a max HP of roughly 15,000 to 30,000, and enemy HP there is 16,000
   to 110,000 times what it is at second 480. A leaderboard Mewtwo (29.4 million, 96 minutes) ended at level 6,293
   with max HP 19,650, damage ×152, special ×50.5, 313 items.

@@ -19,7 +19,8 @@ the player.
   3000001–3000100 now (2000001–2000100 are tuning seeds since a setting was chosen on them). 900001–900050 are held
   out: never tune on them. Seed 900038 is spent (a stall was diagnosed on it): give held-out results with and
   without it. A set that a choice was made on stops being a check: say so and name the next one.
-- **Measure before concluding.** One run's score has a standard deviation of about three quarters of its mean. A
+- **Measure before concluding.** One run's ranked KOs (its KOs plus the Overtime bonus: what the leaderboard shows)
+  have a standard deviation of about three quarters of their mean. A
   change to how anything plays is judged on a whole batch on the same seeds and code for both sides, and reported
   with median, mean, p90 and best.
 - **A test for every change.** `npm test`, `npm run typecheck`.

@@ -6,14 +6,14 @@ by what was measured.
 
 Read `README.md` first if you do not know the project. In short: a local copy of a game runs headless as a
 deterministic environment, and a rule-based player (`src/player`) plays whole runs in it. The player is improved by
-rules and data (`docs/player.md`). The goal is a score, measured over fixed seeds (`docs/results.md`).
+rules and data (`docs/player.md`). The goal is the top of the game's KO leaderboard, measured over fixed seeds as ranked KOs (`docs/results.md`).
 
 ## What to look for, in this order
 
 1. **Correctness.** Bugs, wrong conditions, off-by-one errors, state that leaks between episodes or between game
    processes, anything that makes a run depend on wall-clock time or on the order of workers.
 2. **Measurement.** A change to how anything plays must say what was played to justify it: which seeds, how many
-   episodes, which batch. One run's score has a standard deviation of about three quarters of its mean, so:
+   episodes, which batch. One run's ranked KOs have a standard deviation of about three quarters of their mean, so:
    - a conclusion from a handful of runs is not a conclusion: ask for a batch;
    - a comparison needs the same seeds and the same code for both sides, or says why not;
    - a gain found on seeds 1–30 that is meant to become the plan should also be shown on development seeds that

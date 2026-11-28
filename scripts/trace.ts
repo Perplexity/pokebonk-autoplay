@@ -60,7 +60,7 @@ for (;;) {
   obs = res.observation;
 }
 const info = res.info, ot = info.overtime;
-say(`END ${info.endCause ?? 'unknown'}: score ${info.kills + (ot?.cashed ? ot.bonus : 0)}, ${info.kills} KOs, Overtime round ${ot?.round ?? 0}, bonus ${ot?.bonus ?? 0}, ${Math.round(info.time)} s, level ${info.level}`);
+say(`END ${info.endCause ?? 'unknown'}: ranked KOs ${info.kills + (ot?.cashed ? ot.bonus : 0)} (${info.kills} of its own, Overtime round ${ot?.round ?? 0}, bonus ${ot?.bonus ?? 0}), ${Math.round(info.time)} s, level ${info.level}`);
 say(`moves: ${movesOf(res.observation)}`);
 say(`vitamins: ${res.observation.state.build.vitamins.map((v) => `${v.key}:${v.level}`).join(', ')}`);
 await env.close();

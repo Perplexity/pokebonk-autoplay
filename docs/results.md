@@ -1,8 +1,13 @@
 # Results so far
 
 Game build `mwsewi0r` (0.10.26). Mewtwo, forest, tier 2, Ranked rules, one episode per game process, no cheat, no
-learning. Score = KOs + the Overtime bonus when it is cashed. The goal: one run of 20 million or more in a single
-evaluation of the 50 held-out seeds. **No run has reached 20 million; the best is 15.0 million.**
+learning.
+
+**Every figure here is ranked KOs:** a run's own KOs plus its Overtime bonus when Overtime is cashed, which is the
+number the game's KO leaderboard shows (the owner, 2026-11-28; a saved leaderboard record holds 6.52 million KOs
+of its own and is shown as 29.4 million). The game's "score" is another, larger number (docs/game.md §8) and is not
+used. **The goal is the top of that leaderboard: 30 to 32 million. The best run so far is 15.0 million.** 20 million
+is a waypoint.
 
 The episodes behind every figure are in `data/pokebonk.sqlite` (batch numbers in brackets; docs/storage.md). The
 plans before the current one are no longer in the code: their figures are kept here, and the code that played them
@@ -14,7 +19,7 @@ is in the repository's history.
 |---|---|---|---|---|---|---|
 | plan-3 | errands, seals, the final swarm by the portal, Rhydon's roars | 100 first development [54] | 1,465,290 | 1,964,935 | 4,158,466 | 8,031,427 |
 | | | 50 held-out | 1,528,620 | 2,114,671 | 4,034,675 | 9,052,797 |
-| plan-5 | items valued by what the score follows: luck, experience, Pokédollars | 100 first development | 4,821,770 | | 8,287,315 | 11,201,881 |
+| plan-5 | items valued by what the KO count follows: luck, experience, Pokédollars | 100 first development | 4,821,770 | | 8,287,315 | 11,201,881 |
 | plan-6 | an item pool that stacks (`stack-2`), a later cash-out, a later leave | 100 first development [71] | 7,430,752 | 7,087,624 | 9,221,229 | 10,899,768 |
 | | | 50 held-out | 7,780,684 | | 9,619,558 | 10,299,849 |
 | | | 100 second development [87] | 7,838,016 | 7,514,490 | 9,514,985 | 11,345,601 |
@@ -29,7 +34,7 @@ is in the repository's history.
   linked pair at level 10; they kill at the Overtime ceiling through round 16 (plan-7: round 14), and one run in 89
   still does in round 17. Three of the 100 bring no bonus (two fainted in zone 2, one in Overtime).
 - plan-9 against plan-8 on seeds 1–30: 21 runs are the same run, decision for decision; the other 9 are all
-  better (7 of them were runs under 10.5 million and score 12.8 to 14.7 million). 29 of 30 end with the whole
+  better (7 of them were runs under 10.5 million and reach 12.8 to 14.7 million). 29 of 30 end with the whole
   build, and no zone is left before its final swarm. The best run barely moves: the runs now sit in a band of 13
   to 14.8 million under the wall of section 2. One run faints in Overtime's round 19 and loses a bonus of 10.9
   million, under plan-8 and plan-9 alike.
@@ -43,20 +48,21 @@ is in the repository's history.
   (docs/game.md §8.1). Runs with the whole build hold the ceiling through round 16, kill 75,000 in round 17 (median)
   and end 515 to 547 s into Overtime, most with a full HP bar: at second 535 the tide takes about 1,400 HP a second
   against a max HP of 1,500 to 2,200.
-- **Expected, not measured:** 20 million is round 21 or 22 at the ceiling. That asks for a max HP of 15,000 to
+- **Expected, not measured:** 20 million is round 21 or 22 at the ceiling, and 30 million is the ceiling held through
+  round 23 or 24 with four to five million KOs made before Overtime (ours: about two). That asks for a max HP of 15,000 to
   30,000 and for damage 16,000 to 110,000 times what is enough at second 480. A leaderboard Mewtwo did it with 96
   minutes (ours: 60), level 6,293 (ours: 2,558), 313 items, max HP 19,650. What is carried into Overtime decides,
   and it is made in the fifty minutes before.
 - **A zone left in its first minutes** (plan-7 and plan-8): the rule "leave a cleared zone under 40 % HP" counted
   from the moment the guardian fell, and fired when the guardian itself had emptied the bar, ten minutes before the
   final swarm. 8 of 30 runs of plan-8 on seeds 1–30 (10 of 100 on the second development set) lost a zone that
-  way, and with it the zone's machine and often the change of vitamins; those 8 score a median of 6.8 million.
+  way, and with it the zone's machine and often the change of vitamins; those 8 reach a median of 6.8 million.
   plan-9 counts the HP bar only once the final swarm has begun, and on seeds 1–30 no run loses a zone.
 
 ## 3. What was learned on the way
 
-**What a score follows** (probes that multiplied one stat of the build from the first second; never a result):
-luck ×3 gave ×2.8 of the score, experience ×5 gave ×2.4, Pokédollars ×5 gave ×1.8, damage ×10 gave ×1.5; armor ×3
+**What the ranked KOs follow** (probes that multiplied one stat of the build from the first second; never a result):
+luck ×3 gave ×2.8 of the ranked KOs, experience ×5 gave ×2.4, Pokédollars ×5 gave ×1.8, damage ×10 gave ×1.5; armor ×3
 and healing ×5 gave nothing. The direction in `values.ts` is those weights.
 
 **Things that were tried and were worse or no better:**
@@ -68,11 +74,11 @@ and healing ×5 gave nothing. The direction in `values.ts` is those weights.
   without it), or under 75 % HP or on half a bar lost in four seconds (cashing under 30 % HP alone was ×1.13,
   better on 29 of 30, with no bonus lost).
 - The five farm vitamins for the whole run, without the change before the final stage: more levels (2,586 for
-  1,570), harder enemies, the same score.
+  1,570), harder enemies, the same ranked KOs.
 - Fusing every pair of moves at the cap: ×0.74. The slots it freed filled with borrowed moves that did no damage.
   What works is one fusion and links, with every move chosen (plan-8).
 - A reinforcement-learning manager on top of the player (PPO over the player's proposals). Two runs of 500,000
-  decisions each changed none of the player's choices. At about 1,000 episodes a day, each with a score noise of
+  decisions each changed none of the player's choices. At about 1,000 episodes a day, each with a noise of
   ±75 %, the signal was too weak, and the gains here came from facts about the game that reading its code gives in
   minutes. It was removed on 2026-11-28.
 
@@ -82,7 +88,7 @@ takes another way.
 
 ## 4. How results are measured
 
-- **A score is noisy.** Its standard deviation is 0.7 to 0.8 of its mean. The median of 30 runs of the same player
+- **A run's ranked KOs are noisy.** Their standard deviation is 0.7 to 0.8 of their mean. The median of 30 runs of the same player
   lies within ±30 % (95 %), of 100 runs within ±15 %.
 - **A seed does not pair runs once play differs anywhere:** the same seed under two plans gives two unrelated runs.
   "Seed by seed" figures here are the geometric mean of the per-seed ratios with a bootstrap interval over the

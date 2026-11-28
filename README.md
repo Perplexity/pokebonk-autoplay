@@ -4,8 +4,10 @@ A rule-based player for PokéBonk (a free browser fan game), and the offline env
 the game runs **without a browser**, inside Node, as a deterministic environment: the same seed gives the same run.
 The player plays whole runs in it, and every change to the player is measured over fixed seeds before it is kept.
 
-**The goal:** Mewtwo, forest, tier 2, Ranked rules, game build `mwsewi0r` (0.10.26). Score = KOs plus the Overtime
-bonus when it is cashed. Success is one run of 20 million or more in a single evaluation of 50 held-out seeds.
+**The goal:** the top of the game's KO leaderboard, where the best runs stand at 30 to 32 million KOs. A run's
+**ranked KOs** are what that leaderboard shows: its own KOs plus the Overtime bonus when Overtime is cashed (the
+game's "score" is another, larger number, and is not used here). Measured for Mewtwo, forest, tier 2, Ranked rules,
+game build `mwsewi0r` (0.10.26), on 50 held-out seeds; 20 million is a waypoint.
 
 **Offline by design.** Nothing here contacts the live game: no real account, no leaderboard, no other player. Every
 game process refuses network connections. `./mirror` holds a copy of someone else's game for running it on your own
@@ -13,12 +15,12 @@ machine; it is git-ignored and must not be published.
 
 ## Where it stands
 
-No run has reached 20 million. The best is 15.0 million.
+The best run stands at 15.0 million ranked KOs: half of what the top of the leaderboard reaches.
 
-| Plan | What it added | Seeds | Median | p90 | Best |
+| Plan | What it added | Seeds | Median ranked KOs | p90 | Best |
 |---|---|---|---|---|---|
 | plan-3 | errands, seals, the final swarm fought by the portal | 100 development | 1,465,290 | 4,158,466 | 8,031,427 |
-| plan-5 | items valued by what the score follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
+| plan-5 | items valued by what the KO count follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
 | plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
 | plan-8 | the leaderboard build: one fusion, two linked pairs, Encore | 100 second development | 13,803,730 | 14,467,683 | 15,039,733 |
@@ -45,7 +47,7 @@ src/fidelity, src/cdp            the same episode in a real local Chrome, to che
 
 - **The plan is data** (`src/player/plan.ts`): every threshold, the vitamins by phase, and a build per Pokémon. A
   rule never names a Pokémon, a map or a tier.
-- **A change is measured.** One run's score is noisy (its standard deviation is about three quarters of its mean),
+- **A change is measured.** One run's ranked KOs are noisy (the standard deviation is about three quarters of the mean),
   so a change is judged on a whole batch: 1–30 are tuning seeds, 3000001–3000100 check a change once, and
   900001–900050 are held out.
 - **A kept change is a new plan version**; the one before leaves the code and its figures stay in `docs/results.md`.

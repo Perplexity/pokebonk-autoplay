@@ -103,7 +103,7 @@ The loop, whoever states the change (a new strategy seen on the leaderboard, a g
    node scripts/baseline-report.ts --label=my-change
    ```
    Report median, mean, p90 and best, and look at what the runs did (time in each zone, the build at the end, the
-   rounds of Overtime), not only at the score.
+   rounds of Overtime), not only at the ranked KOs.
 6. **Check once** on seeds nothing was chosen on (docs/results.md names the current set), then a pull request.
 
 Rules of the loop:
@@ -112,7 +112,7 @@ Rules of the loop:
   replaced in `plan.ts` and its figures kept in docs/results.md. A change to code that must not alter play (a
   refactor) is shown by a replay: the same seeds give the same episodes, decision for decision
   (`scripts/compare-batches.ts`).
-- **One run says nothing.** A score's standard deviation is about three quarters of its mean, and two runs of the
+- **One run says nothing.** The standard deviation of a run's ranked KOs is about three quarters of their mean, and two runs of the
   same seed stop being comparable once play differs anywhere.
 - **Do not edit `src/` while a batch runs** from the same checkout: every episode starts a fresh process that loads
   the source as it is then. A second working copy (`git worktree`) is how to keep working.
