@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Batches</title>
+<style>
+  :root {
+    --panel: #eef1ea; --panel-2: #e2e7dd; --ink: #14211d; --muted: #5c6b64; --rule: #cfd6ca;
+    --you: #ffc93c; --this: #2a78d6; --other: #d9730d; --good: #23794c; --bad: #b83a22; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --panel: #111d1a; --panel-2: #182824; --ink: #e7ede6; --muted: #91a199; --rule: #263933; --this: #5aa2f0; --other: #f0a04b; --good: #58c48a; --bad: #f08a72; --warn: #e3b860; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--panel); color: var(--ink); font: 14px/1.45 ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  main { max-width: 1180px; margin: 0 auto; padding: 22px 16px 60px; }
+  [hidden] { display: none !important; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 0; font-weight: 700; }
+  h2 { font-size: 15px; margin: 26px 0 8px; font-weight: 700; }
+  .sub { color: var(--muted); margin: 4px 0 0; }
+  a { color: inherit; }
+  .top { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; margin-bottom: 14px; }
+  .top > div:first-child { margin-right: auto; min-width: 0; }
+  input[type="search"], select { font: inherit; color: var(--ink); background: var(--panel-2); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; max-width: 100%; }
+  input[type="search"] { width: 240px; }
+  input:focus-visible, select:focus-visible, a:focus-visible, th button:focus-visible, tr:focus-visible { outline: 2px solid var(--you); outline-offset: 2px; }
+  .wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-top: 1px solid var(--rule); }
+  thead th { border-top: 0; color: var(--muted); font-weight: 600; background: var(--panel-2); position: sticky; top: 0; }
+  th.l, td.l { text-align: left; }
+  td.name { white-space: normal; min-width: 200px; max-width: 330px; overflow-wrap: anywhere; }
+  td small { display: block; color: var(--muted); }
+  tbody tr.go { cursor: pointer; }
+  tbody tr.go:hover { background: var(--panel-2); }
+  th button { font: inherit; color: inherit; font-weight: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  th button[aria-sort]::after { content: " ↓"; } th button[aria-sort="ascending"]::after { content: " ↑"; }
+  .state { display: inline-flex; align-items: center; gap: 6px; }
+  .state i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  .state.running i { background: var(--you); box-shadow: 0 0 0 3px color-mix(in srgb, var(--you) 30%, transparent); }
+  .state.completed i { background: var(--good); } .state.failed i, .state.stale i { background: var(--bad); }
+  .bar { height: 5px; width: 120px; border-radius: 3px; background: var(--panel-2); overflow: hidden; margin: 4px 0 0 auto; }
+  td.l .bar { margin-left: 0; }
+  .bar > div { height: 100%; background: var(--you); border-radius: 3px; }
+  .note { color: var(--warn); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 16px; }
+  .tile { background: var(--panel-2); border-radius: 12px; padding: 10px 14px; }
+  .tile span { color: var(--muted); display: block; }
+  .tile b { font-size: 22px; line-height: 1.25; font-weight: 700; }
+  .tile small { color: var(--muted); display: block; min-height: 1.45em; }
+  .facts { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; color: var(--muted); }
+  .facts b { color: var(--ink); font-weight: 600; }
+  code { font: 12.5px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--panel-2); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+  #plot { position: relative; margin-top: 4px; padding-top: 30px; overflow-x: auto; }
+  #plot svg { display: block; width: 100%; min-width: 620px; height: auto; }
+  #plot text { fill: var(--muted); font-size: 12px; }
+  #plot .row { fill: var(--ink); font-weight: 600; }
+  #tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--panel); border-radius: 8px; padding: 5px 9px; font-size: 12.5px; white-space: nowrap; transform: translate(-50%, -130%); z-index: 2; }
+  .versus { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 22px; }
+  #verdict { margin: 10px 0 0; max-width: 78ch; }
+  .up { color: var(--good); } .down { color: var(--bad); }
+  .empty { color: var(--muted); padding: 22px 12px; text-align: left; }
+  @media (max-width: 700px) { input[type="search"] { width: 100%; } .top { align-items: stretch; } }
+</style>
+</head>
+<body>
+<main>
+  <!-- Every batch -->
+  <div id="list">
+    <div class="top">
+      <div><h1>Batches</h1><p class="sub" id="where">Reading the database…</p></div>
+      <input type="search" id="filter" placeholder="Filter by label" aria-label="Filter batches by label">
+    </div>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>#</th><th class="l">Batch</th><th class="l">State</th><th>Runs</th><th>Median</th><th>Mean</th><th>p90</th><th>Best</th><th>Started</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="sub">Every figure is ranked KOs: a run's own KOs plus its Overtime bonus when cashed. The goal is 30 to 32 million.</p>
+  </div>
+
+  <!-- One batch -->
+  <div id="one" hidden>
+    <p class="sub"><a href="#/">← All batches</a></p>
+    <div class="top">
+      <div><h1 id="title"></h1><p class="sub" id="status"></p></div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="versus">
+      <label for="against">Compare with</label>
+      <select id="against"><option value="">no other batch</option></select>
+    </div>
+    <p id="verdict" hidden></p>
+    <div id="plot" aria-label="Ranked KOs of every run, one dot a run"><div id="tip" hidden></div></div>
+    <p class="sub" id="plotNote">One dot a run; the upright line is the median.</p>
+    <h2 id="runsTitle">Runs</h2>
+    <div class="wrap">
+      <table>
+        <thead><tr id="head"></tr></thead>
+        <tbody id="runs"></tbody>
+      </table>
+    </div>
+    <p class="sub" id="waiting"></p>
+  </div>
+</main>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const el = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
+// Whole numbers; a half goes to the even neighbour, as in docs/results.md (a median of an even count ends in .5).
+const whole = (v) => { const f = Math.floor(v); return v - f === 0.5 ? f + (f % 2) : Math.round(v); };
+const n0 = (v) => (v == null || Number.isNaN(v) ? '–' : whole(v).toLocaleString('en-US'));
+const signed = (v) => (v == null || Number.isNaN(v) ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + whole(Math.abs(v)).toLocaleString('en-US'));
+const millions = (v) => (v == null || Number.isNaN(v) ? '–' : (v / 1e6).toFixed(2) + ' M');
+const span = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m < 1 ? 'under a minute' : m < 90 ? `${m} min` : m < 2880 ? `${(m / 60).toFixed(1)} h` : `${Math.round(m / 1440)} days`; };
+const when = (iso) => { const d = new Date(iso), t = new Date(); const day = d.toDateString() === t.toDateString() ? 'today' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); return `${day} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`; };
+const get = async (path) => { const r = await fetch(path, { cache: 'no-store' }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`); return r.json(); };
+
+// A batch marked running whose newest run (or whose start, with no run yet) is older than this has probably been
+// stopped: the runner writes a batch's end only when it ends by itself. Longer than the runner's limit for one run (90 min).
+const STALE_MS = 100 * 60000;
+function stateOf(b, now) {
+  if (b.status !== 'running') return { cls: b.status, text: b.status === 'completed' ? 'Finished' : b.status === 'failed' ? `Failed, ${b.played} of ${b.planned} played` : `Stopped, ${b.played} of ${b.planned} played`, note: '' };
+  const last = Date.parse(b.lastRunAt || b.startedAt), quiet = now - last;
+  if (quiet > STALE_MS) return { cls: 'stale', text: 'Marked running', note: `no run finished for ${span(quiet)}: probably stopped` };
+  const left = Math.max(0, b.planned - b.played);
+  const eta = b.played && b.runSeconds && b.workers ? `about ${span(left * b.runSeconds * 1000 / Math.min(b.workers, Math.max(1, left)))} left` : `first runs still playing, started ${span(now - Date.parse(b.startedAt))} ago`;
+  return { cls: 'running', text: `Playing, ${b.played} of ${b.planned}`, note: eta, share: b.planned ? b.played / b.planned : 0 };
+}
+function stateCell(b, now) {
+  const s = stateOf(b, now), td = el('td', null, 'l'), line = el('span', null, `state ${s.cls}`);
+  line.append(el('i'), el('span', s.text)); td.append(line);
+  if (s.share != null) { const bar = el('div', null, 'bar'), fill = el('div'); fill.style.width = `${Math.round(s.share * 100)}%`; bar.append(fill); td.append(bar); }
+  if (s.note) td.append(el('small', s.note, s.cls === 'stale' ? 'note' : ''));
+  return td;
+}
+
+// ---------------------------------------------------------------- every batch
+let all = [], serverNow = Date.now();
+function drawList() {
+  const q = $('filter').value.trim().toLowerCase(), rows = $('rows');
+  const shown = all.filter((b) => !q || b.label.toLowerCase().includes(q) || String(b.id) === q);
+  rows.replaceChildren();
+  for (const b of shown) {
+    const tr = el('tr', null, 'go'); tr.tabIndex = 0;
+    const open = () => { location.hash = `#/batch/${b.id}`; };
+    tr.addEventListener('click', open); tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') open(); });
+    const name = el('td', null, 'l name'); name.append(el('span', b.label), el('small', b.policy.split('+')[0] + (b.preset ? ` · ${b.preset}` : '')));
+    const s = b.stats;
+    tr.append(el('td', String(b.id)), name, stateCell(b, serverNow), el('td', `${b.played} / ${b.planned || b.played}`), el('td', millions(s?.median)), el('td', millions(s?.mean)), el('td', millions(s?.p90)), el('td', millions(s?.best)), el('td', when(b.startedAt)));
+    rows.append(tr);
+  }
+  if (!shown.length) { const tr = el('tr'), td = el('td', all.length ? 'No batch matches that filter.' : 'No batch yet. Play one with: node scripts/run-episodes.ts --policy=player --episodes=30 --seed=1 --workers=10', 'empty'); td.colSpan = 9; tr.append(td); rows.append(tr); }
+}
+async function loadList() {
+  const d = await get('/api/batches');
+  all = d.batches; serverNow = Date.parse(d.now);
+  const playing = all.filter((b) => stateOf(b, serverNow).cls === 'running').length;
+  $('where').textContent = `${all.length} batches · ${playing ? `${playing} playing now` : 'none playing now'} · updated ${new Date(d.now).toLocaleTimeString('en-GB')}`;
+  drawList();
+}
+$('filter').addEventListener('input', drawList);
+
+// ---------------------------------------------------------------- one batch
+let one = null, cmp = null, sortKey = 'seed', sortUp = true;
+const COLUMNS = [['seed', 'Seed'], ['rankedKos', 'Ranked KOs'], ['other', 'Other batch'], ['diff', 'Difference'], ['kills', 'Own KOs'], ['bonus', 'Overtime bonus'], ['round', 'Round'], ['level', 'Level'], ['minutes', 'Minutes'], ['end', 'Ended']];
+function drawRuns() {
+  const other = cmp ? new Map(cmp.pairs.map((p) => [p.seed, p.b])) : null;
+  const cols = COLUMNS.filter(([k]) => other || (k !== 'other' && k !== 'diff'));
+  const rows = one.runs.map((r) => ({ ...r, other: other?.get(r.seed) ?? null, diff: other?.has(r.seed) ? r.rankedKos - other.get(r.seed) : null }));
+  rows.sort((x, y) => { const a = x[sortKey], b = y[sortKey]; const c = a == null ? 1 : b == null ? -1 : typeof a === 'string' ? a.localeCompare(b) : a - b; return sortUp ? c : -c; });
+  $('head').replaceChildren(...cols.map(([k, name]) => {
+    const th = el('th', null, k === 'end' ? 'l' : ''), btn = el('button', name);
+    if (k === sortKey) btn.setAttribute('aria-sort', sortUp ? 'ascending' : 'descending');
+    btn.addEventListener('click', () => { sortUp = k === sortKey ? !sortUp : k === 'seed' || k === 'end'; sortKey = k; drawRuns(); });
+    th.append(btn); return th;
+  }));
+  $('runs').replaceChildren(...rows.map((r) => {
+    const tr = el('tr');
+    for (const [k] of cols) {
+      const v = r[k];
+      const td = k === 'end' ? el('td', r.invalid ? `${v} (invalid: counts as 0)` : v, 'l') : k === 'diff' ? el('td', v == null ? '–' : signed(v), v > 0 ? 'up' : v < 0 ? 'down' : '') : k === 'minutes' ? el('td', v.toFixed(1)) : k === 'seed' || k === 'round' ? el('td', String(v)) : el('td', n0(v));
+      tr.append(td);
+    }
+    return tr;
+  }));
+  if (!rows.length) { const tr = el('tr'), td = el('td', 'No run of this batch has finished yet.', 'empty'); td.colSpan = cols.length; tr.append(td); $('runs').append(tr); }
+}
+
+// One dot a run along an axis of ranked KOs; a second row for the batch it is compared with. A tick marks each median.
+function drawPlot() {
+  const host = $('plot'), tip = $('tip');
+  host.querySelector('svg')?.remove();
+  const series = [{ name: `Batch ${one.id}`, color: 'var(--this)', runs: one.runs.map((r) => ({ seed: r.seed, v: r.rankedKos })), median: one.stats?.median }];
+  if (cmp) series.push({ name: `Batch ${cmp.b}`, color: 'var(--other)', runs: cmp.pairs.map((p) => ({ seed: p.seed, v: p.b })), median: cmp.statsB?.median });
+  const top = Math.max(1, ...series.flatMap((s) => s.runs.map((r) => r.v)));
+  if (!one.runs.length) return;
+  const step = top > 8e6 ? 5e6 : top > 2e6 ? 1e6 : top > 4e5 ? 2e5 : Math.max(1, Math.pow(10, Math.floor(Math.log10(top)))), max = Math.ceil(top / step) * step;
+  const W = 1100, left = 96, right = 16, rowH = 46, H = series.length * rowH + 30, x = (v) => left + (W - left - right) * v / max;
+  const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg');
+  const add = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.append(e); return e; };
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('role', 'img');
+  for (let v = 0; v <= max + 1; v += step) {
+    add('line', { x1: x(v), x2: x(v), y1: 4, y2: H - 24, stroke: 'var(--rule)', 'stroke-width': 1 });
+    add('text', { x: x(v), y: H - 8, 'text-anchor': 'middle' }, max >= 2e6 ? `${v / 1e6} M` : v.toLocaleString('en-US'));
+  }
+  series.forEach((s, i) => {
+    const y = 8 + i * rowH + rowH / 2;
+    add('text', { x: 0, y: y + 4, class: 'row' }, s.name);
+    // Dots that share a place are spread up and down a little, by seed, so that a pile shows as a pile.
+    for (const r of s.runs) {
+      const c = add('circle', { cx: x(r.v), cy: y + ((r.seed * 7) % 11 - 5) * 2.4, r: 5, fill: s.color, stroke: 'var(--panel)', 'stroke-width': 2, tabindex: 0 });
+      const show = () => { const box = host.getBoundingClientRect(), p = c.getBoundingClientRect(); tip.textContent = `${s.name} · seed ${r.seed} · ${n0(r.v)}`; tip.style.left = `${p.left + p.width / 2 - box.left + host.scrollLeft}px`; tip.style.top = `${p.top - box.top}px`; tip.hidden = false; };
+      c.addEventListener('pointerenter', show); c.addEventListener('focus', show);
+      c.addEventListener('pointerleave', () => { tip.hidden = true; }); c.addEventListener('blur', () => { tip.hidden = true; });
+    }
+    if (s.median != null) { add('line', { x1: x(s.median), x2: x(s.median), y1: y - 19, y2: y + 19, stroke: 'var(--panel)', 'stroke-width': 6 }); add('line', { x1: x(s.median), x2: x(s.median), y1: y - 19, y2: y + 19, stroke: 'var(--ink)', 'stroke-width': 2 }); }
+  });
+  host.append(svg);
+}
+
+function drawOne() {
+  const b = one, s = b.stats, st = stateOf(b, serverNow);
+  document.title = `Batch ${b.id} · ${b.label}`;
+  $('title').textContent = b.label;
+  $('status').textContent = `Batch ${b.id} · ${st.text}${st.note ? ` · ${st.note}` : ''} · started ${when(b.startedAt)}${b.finishedAt ? `, ended ${when(b.finishedAt)}` : ''}`;
+  const facts = $('facts'), fact = (name, value, code) => { const d = el('span'); d.append(`${name} `, code ? el('code', value) : el('b', value)); facts.append(d); };
+  facts.replaceChildren();
+  fact('Player', b.policy);
+  if (b.setup.species != null) fact('Pokémon', `#${b.setup.species}`);
+  if (b.setup.map) fact('Map', `${b.setup.map}, tier ${b.setup.tier}`);
+  if (b.setup.archive || b.setup.buildPlan) fact('Account', [b.setup.archive, b.setup.buildPlan].filter(Boolean).join(' · '));
+  if (b.setup.game) fact('Game', b.setup.game);
+  if (b.errors) fact('Errors', String(b.errors));
+  fact('Plan keys replaced', b.setup.plan ? JSON.stringify(b.setup.plan) : 'none: the plan as it is', true);
+  const c = cmp, tile = (name, v, base) => { const t = el('div', null, 'tile'); t.append(el('span', name), el('b', millions(v))); const d = base == null || v == null ? null : v - base; const sm = el('small', d == null ? n0(v) : `${signed(d)} against batch ${c.b}`, d > 0 ? 'up' : d < 0 ? 'down' : ''); t.append(sm); return t; };
+  const mine = c?.statsA ?? s, base = c?.statsB;
+  $('tiles').replaceChildren(tile('Median', mine?.median, base?.median), tile('Mean', mine?.mean, base?.mean), tile('p90', mine?.p90, base?.p90), tile('Best', mine?.best, base?.best), tile('Worst', mine?.worst, base?.worst));
+  const v = $('verdict');
+  v.hidden = !c;
+  if (c) v.textContent = c.seeds ? `On the ${c.seeds} seeds both batches played, this one is higher on ${c.higher}, lower on ${c.lower} and the same on ${c.same}. Mean difference ${signed(c.meanDifference)}, median difference ${signed(c.medianDifference)}. The figures above are over those seeds. One run is noisy: this sums up two batches and is not a test.` : 'The two batches have no seed in common.';
+  $('runsTitle').textContent = `Runs (${b.played} of ${b.planned || b.played})`;
+  $('waiting').textContent = b.waiting.length && b.status === 'running' ? `Still to finish: seeds ${b.waiting.join(', ')}` : b.waiting.length ? `Never played: seeds ${b.waiting.join(', ')}` : '';
+  drawPlot(); drawRuns();
+}
+async function loadOne(id, against) {
+  const [d, list] = await Promise.all([get(`/api/batch?id=${id}`), get('/api/batches')]);
+  one = d.batch; serverNow = Date.parse(d.now); all = list.batches;
+  cmp = against ? await get(`/api/compare?a=${id}&b=${against}`).catch(() => null) : null;
+  const sel = $('against'), keep = against ? String(against) : '';
+  sel.replaceChildren(el('option', 'no other batch'));
+  sel.firstChild.value = '';
+  for (const b of all) if (b.id !== one.id && b.played) { const o = el('option', `${b.id} · ${b.label} (${b.played} runs)`); o.value = String(b.id); sel.append(o); }
+  sel.value = keep;
+  drawOne();
+}
+$('against').addEventListener('change', () => { location.hash = `#/batch/${one.id}${$('against').value ? `/vs/${$('against').value}` : ''}`; });
+
+// ---------------------------------------------------------------- which view, and refreshing it
+let route = null;
+function fail(e) { $('where').textContent = `The database could not be read: ${e.message}`; if (route?.id) $('status').textContent = `This batch could not be read: ${e.message}`; }
+async function refresh() {
+  try { if (route.id) await loadOne(route.id, route.vs); else await loadList(); } catch (e) { fail(e); }
+}
+function go() {
+  const m = /^#\/batch\/(\d+)(?:\/vs\/(\d+))?$/.exec(location.hash);
+  const next = m ? { id: Number(m[1]), vs: m[2] ? Number(m[2]) : null } : {};
+  if (next.id !== route?.id) { sortKey = 'seed'; sortUp = true; window.scrollTo(0, 0); }
+  route = next;
+  $('list').hidden = !!route.id; $('one').hidden = !route.id;
+  if (!route.id) document.title = 'Batches';
+  refresh();
+}
+window.addEventListener('hashchange', go);
+go();
+// While a batch is playing the figures move: read again every ten seconds, and not while the tab is hidden.
+setInterval(() => { if (!document.hidden) refresh(); }, 10000);
+</script>
+</body>
+</html>
