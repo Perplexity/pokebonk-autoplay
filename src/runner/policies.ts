@@ -25,7 +25,7 @@ interface PolicySpec {
 const SPECS: Record<string, PolicySpec> = {
   random: { version: '1', sources: ['environment/policies.ts'], make: () => randomPolicy() },
   idle: { version: '1', sources: ['environment/policies.ts'], make: () => idlePolicy() },
-  player: { version: PLAYER_VERSION, sources: ['player', 'player/brain'], make: (env, o) => playerPolicy({ planRoute: (x, z) => env.planRoute(x, z), plan: o.plan as Record<string, unknown> | undefined }) },
+  player: { version: PLAYER_VERSION, sources: ['player', 'player/brain'], make: (env, o) => playerPolicy({ planRoute: (x, z) => env.planRoute(x, z), build: () => env.getMetadata().game.build, plan: o.plan as Record<string, unknown> | undefined }) },
 };
 
 export const POLICY_NAMES = Object.keys(SPECS);

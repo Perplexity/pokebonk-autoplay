@@ -32,6 +32,7 @@ let obs = await env.reset({ seed });
 const events: string[] = [];
 const policy = playerPolicy({
   planRoute: (x, z) => env.planRoute(x, z),
+  build: env.getMetadata().game.build,
   plan: args.has('plan') ? JSON.parse(args.get('plan')!) : undefined,
   onEvent: (e) => { if (e.t >= from && (args.has('levelups') || !/^choice:levelup/.test(e.what))) events.push(`${Math.round(e.t)}s ${e.what}: ${e.detail}`); },
 });

@@ -59,7 +59,8 @@ A number that changed changes what the plan should do.
 
 ## 5. The player
 
-1. `src/player/policy.ts` names the build whose data export it reads. Point it at the new one.
+1. The runner hands the player the running game's build, and the player reads that build's data export. Tests and
+   `DEFAULT_BUILD` in `src/player/policy.ts` still name the old one: point them at the new one.
 2. Check every build in `plan.builds` against the new export: a move that was renamed or removed is an error at
    start-up (`kit.ts`), a move whose numbers changed is not.
 3. Play the current plan on the tuning seeds. **Results of two builds are not comparable**: this batch is the new

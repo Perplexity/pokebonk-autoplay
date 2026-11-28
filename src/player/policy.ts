@@ -32,10 +32,16 @@ import type { Kit, Knowledge } from './values.ts';
  */
 export const PLAYER_VERSION = '3';
 const SERVICE_DIALOGS = new Set(['shop', 'ditto', 'trade', 'dojo', 'slots', 'forget', 'fusion']);
-const BUILD = 'mwsewi0r';
+/** The game build whose data export the player reads when the caller names none. */
+export const DEFAULT_BUILD = 'mwsewi0r';
 
 export interface PlayerOptions {
   planRoute?: (x: number, z: number) => Nav | null;
+  /**
+   * The running game's build, or how to ask for it: its data export is read (data/game-knowledge/<build>/) when the
+   * first observation arrives. Default: the pinned build.
+   */
+  build?: string | (() => string);
   /** Keys of the plan to replace (plan.ts). */
   plan?: Record<string, unknown>;
   onEvent?: (e: { t: number; what: string; detail: string }) => void;
@@ -202,7 +208,7 @@ export function directiveFor(s: Snapshot, ot: Pick<RunState['overtime'], 'live' 
   return { holdPortal: true, leash: { x: portal.x, z: portal.z, r: plan.leash } };
 }
 
-let cached: Knowledge | null = null;
+const cached = new Map<string, Knowledge>();
 
 /** What the player would do in one play tick: the snapshot the brain sees (with the planned route), its tuning and the plan's order. */
 export interface Advice { snap: Snapshot; tuning: Tuning; directive: Directive }
@@ -239,18 +245,23 @@ export interface PlayerAdvisor {
 export function playerAdvisor(options: PlayerOptions = {}): PlayerAdvisor {
   const plan = planWith(options.plan);
   const base: Tuning = { ...DEFAULT_TUNING, ...plan.tuning, wakeLevel: [...plan.wakeLevel], wakeAfterSec: plan.wakeAfterSec[0], visitKinds: [...(plan.tuning.visitKinds ?? DEFAULT_TUNING.visitKinds)] };
-  const knowledge = (cached ??= loadValuationKnowledge(BUILD));
+  let known: Knowledge | null = null;
+  const know = (): Knowledge => {
+    if (!known) { const id = typeof options.build === 'function' ? options.build() : options.build ?? DEFAULT_BUILD; known = cached.get(id) ?? loadValuationKnowledge(id); cached.set(id, known); }
+    return known;
+  };
   let mem: Memory = newMemory(), build: Build | null = null, kit: Kit | null = null;
   let life: Lifecycle = newLife();
   let nav: Nav | null = null, navAt = -Infinity, navGoal: { x: number; z: number } | null = null, intent = '', note = '';
   const emit = (t: number, what: string, detail: string) => options.onEvent?.({ t, what, detail });
-  const ctxOf = (species: number): ChooserContext => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge, kit: (kit ??= kitOf(knowledge, species)), memo: life.memo });
+  const ctxOf = (species: number): ChooserContext => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge: know(), kit: (kit ??= kitOf(know(), species)), memo: life.memo });
   return {
-    plan, knowledge, baseTuning: base,
+    plan, baseTuning: base,
+    get knowledge() { return know(); },
     get state() { return { intent, note, plan: plan.version }; },
     get life() { return life; },
     get skip() { return mem.skip; },
-    kit: (species) => (kit ??= kitOf(knowledge, species)),
+    kit: (species) => (kit ??= kitOf(know(), species)),
     context: ctxOf,
     reset() { mem = newMemory(); build = null; kit = null; nav = null; navAt = -Infinity; navGoal = null; intent = ''; note = ''; life = newLife(); },
     choose(obs) { return choose(obs, ctxOf(obs.snapshot.player.species)); },
@@ -262,10 +273,10 @@ export function playerAdvisor(options: PlayerOptions = {}): PlayerAdvisor {
       if (d.kind === 'slots' && (d.context.last as { prize?: string } | null)?.prize === 'gengar') life.gengar++;
       // A banished move does not come back; a lesson answered either way is gone for the zone (turned down,
       // it offers the same moves again); Hypno left, and a machine left unused, are not walked to again as things are.
-      if (d.kind === 'levelup' && 'extra' in action && action.extra === 'banish') { const o = d.options[Number((action as { target?: number }).target)]; const key = o?.data.kind === 'newMove' ? knowledge.movesById.get(Number(o.data.id))?.key : undefined; if (key) life.memo.banished.add(key); }
+      if (d.kind === 'levelup' && 'extra' in action && action.extra === 'banish') { const o = d.options[Number((action as { target?: number }).target)]; const key = o?.data.kind === 'newMove' ? know().movesById.get(Number(o.data.id))?.key : undefined; if (key) life.memo.banished.add(key); }
       if (d.kind === 'lesson' || (d.kind === 'forget' && d.context.lessonReady === false)) life.memo.lessonZone = s.stage;
       if (plan.builds[s.player.species]) {
-        if (d.kind === 'forget' && 'extra' in action && action.extra === 'leave') life.hypnoLeft = kitSignature(kitOfObservation(obs, { plan, knowledge }), life, s.stage);
+        if (d.kind === 'forget' && 'extra' in action && action.extra === 'leave') life.hypnoLeft = kitSignature(kitOfObservation(obs, { plan, knowledge: know() }), life, s.stage);
         if (d.kind === 'fusion' && 'extra' in action && action.extra === 'leave') { const q = s.points.filter((x) => x.kind === 'bill' && !x.used).sort((a, b) => a.d - b.d)[0]; if (q) life.skip.add(pointKey(q)); }
       }
       emit(s.t, `choice:${d.kind}`, reason);
@@ -281,7 +292,7 @@ export function playerAdvisor(options: PlayerOptions = {}): PlayerAdvisor {
       const st = obs.state;
       if (life.revives !== null && st.build.revives < life.revives) life.revivedAt = s.t;
       life.revives = st.build.revives;
-      const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, knowledge, life.gengar), ...(plan.builds[s.player.species] ? { kit: kitOfObservation(obs, { plan, knowledge }) } : {}) };
+      const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, know(), life.gengar), ...(plan.builds[s.player.species] ? { kit: kitOfObservation(obs, { plan, knowledge: know() }) } : {}) };
       return { snap, tuning, directive: directiveFor(s, st.overtime, life, plan, st.zone.finalSwarm, mem.skip, world) };
     },
     peek(advice) { return decide(advice.snap, mem, advice.tuning, advice.directive); },
