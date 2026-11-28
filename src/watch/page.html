@@ -246,7 +246,7 @@ on('control', controls);
 on('frame', (f) => { frame = f; dirty = true; status(f); });
 on('build', build);
 on('log', log);
-on('end', (s) => { const o = $('over'); o.hidden = false; o.replaceChildren(Object.assign(document.createElement('b'), { textContent: n(s.score) }), `Run over: ${s.cause}. ${n(s.kills)} KOs${s.bonus ? ` and an Overtime bonus of ${n(s.bonus)} after round ${s.round}` : ''}, level ${n(s.level)}, ${clock(s.time)}.`); });
+on('end', (s) => { const o = $('over'); o.hidden = false; o.replaceChildren(Object.assign(document.createElement('b'), { textContent: n(s.score) }), `ranked KOs: ${n(s.kills)} of its own${s.bonus ? ` and an Overtime bonus of ${n(s.bonus)} after round ${s.round}` : ''}. Run over (${s.cause}) at level ${n(s.level)}, ${clock(s.time)}.`); });
 on('fault', (text) => { const o = $('over'); o.hidden = false; o.textContent = `The game stopped: ${text}. Start the watch again.`; });
 es.onerror = () => { if (!frame) $('run').textContent = 'No watch is running: start one with npm run watch -- --seed=1'; };
 $('scale').textContent = `Grid 10 m · view ${view} m`;
