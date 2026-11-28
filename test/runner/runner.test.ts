@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { DEFAULT_BATCH, runBatch, validateConfig } from '../../src/runner/pool.ts';
 import type { BatchConfig } from '../../src/runner/pool.ts';
 import { policyVersion } from '../../src/runner/policies.ts';
@@ -128,4 +130,28 @@ test('end to end: an episode that throws and a worker that hangs are recorded as
   assert.ok(Number(hung.worker_id) > 0);
   assert.deepEqual(store.episodes(res.batchId!).map((r) => r.seed), [60, 62, 64]);
   store.close();
+});
+
+test('end to end: a batch that is killed (SIGTERM) ends as interrupted in the database, not as running for ever', async () => {
+  const path = join(dir, 'killed.sqlite');
+  const script = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'run-episodes.ts');
+  const child = spawn(process.execPath, [script, '--policy=random', '--episodes=2', '--seed=60', '--workers=1', '--max-time=600', `--db=${path}`, '--label=killed', '--quiet'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let out = '', err = '';
+  child.stderr.on('data', (c: Buffer) => { err += c.toString('utf8'); });
+  // The batch row exists once the runner names it; the worker is then still loading the game.
+  await new Promise<void>((ok, bad) => {
+    child.stdout.on('data', (c: Buffer) => { out += c.toString('utf8'); if (/batch \d+/.test(out)) ok(); });
+    child.on('exit', (code) => bad(new Error(`the runner stopped before it was killed (exit ${code}): ${err}`)));
+    setTimeout(() => bad(new Error(`the runner did not start: ${out}${err}`)), 60000).unref();
+  });
+  const exited = new Promise<number | null>((ok) => child.on('exit', (code) => ok(code)));
+  child.kill('SIGTERM');
+  assert.equal(await exited, 130, err);
+  assert.match(err, /interrupted \(SIGTERM\)/);
+  const store = open('killed.sqlite');
+  const batch = store.db.prepare('SELECT status, finished_at, episodes_done FROM batches').all() as { status: string; finished_at: string | null; episodes_done: number }[];
+  assert.equal(batch.length, 1);
+  assert.equal(batch[0].status, 'interrupted');
+  assert.ok(batch[0].finished_at, 'the end of the batch was written');
+  assert.equal(batch[0].episodes_done, 0);
 });

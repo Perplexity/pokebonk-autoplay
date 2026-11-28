@@ -32,7 +32,8 @@
  *   --quiet                            no line per episode
  *
  * Exit code: 0 when every episode was played and stored, 1 when anything failed (errors are in the `errors` table and
- * on stderr), 2 for a bad command line, 130 when interrupted.
+ * on stderr), 2 for a bad command line, 130 when interrupted (Ctrl+C, `kill` or a closed terminal: the batch is then
+ * stored as `interrupted` with the episodes it had finished).
  */
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -93,7 +94,9 @@ const line = (e: EpisodeRecord): string =>
   `${pad(e.seed, 6)}  ${pad(e.species, 7)}  ${e.map.padEnd(9)}  ${pad(e.tier, 4)}  ${pad(e.gameTime.toFixed(1), 9)}  ${pad(e.kills, 6)}  ${pad(e.level, 5)}  ${pad(e.zone, 4)}  ${pad(e.guardiansDefeated, 5)}  ${e.endCause.padEnd(34).slice(0, 34)}  ${pad(e.steps, 6)}  ${pad(e.wallSeconds.toFixed(1), 7)}  ${pad((e.simSteps / e.wallSeconds).toFixed(0), 7)}  ${pad(`${e.worker.id}/${e.worker.episode}`, 6)}  ${pad(e.worker.rssMB, 5)}`;
 
 const interrupt = new AbortController();
-process.on('SIGINT', () => { process.stderr.write('\ninterrupted: stopping the workers\n'); interrupt.abort(); });
+// Ctrl+C, `kill` and a closed terminal all end the batch the same way: the workers are stopped and the batch is
+// written as `interrupted`. Without this a killed batch stayed `running` in the database for ever.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, () => { process.stderr.write(`\ninterrupted (${signal}): stopping the workers\n`); interrupt.abort(); });
 
 let code = 0;
 try {
