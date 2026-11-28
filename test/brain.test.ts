@@ -4,7 +4,6 @@ import { EF, E_X, E_Z } from '../src/bot/snapshot.ts';
 import type { Snapshot } from '../src/bot/snapshot.ts';
 import { assess, decide, kitRange, liveBoss, newMemory, pickFocus } from '../src/bot/brain/movement.ts';
 import { adaptTuning, DEFAULT_TUNING, resolveTuning } from '../src/bot/brain/tuning.ts';
-import { keysFor } from '../src/bot/session.ts';
 import { enemy, quiet, recorded, vary } from './helpers.ts';
 
 const T = DEFAULT_TUNING;
@@ -246,17 +245,6 @@ test('assess counts what is close', () => {
   const sit = assess(s);
   assert.deepEqual([sit.n3, sit.n8, sit.n15], [1, 2, 3]);
   assert.ok(!sit.surrounded);
-});
-
-test('keys: a world direction becomes WASD relative to the camera', () => {
-  assert.deepEqual(keysFor(null, 0), []);
-  assert.deepEqual(keysFor({ x: 0, z: -1 }, 0), ['KeyW']);
-  assert.deepEqual(keysFor({ x: 0, z: 1 }, 0), ['KeyS']);
-  assert.deepEqual(keysFor({ x: 1, z: 0 }, 0), ['KeyD']);
-  assert.deepEqual(keysFor({ x: -1, z: 0 }, 0), ['KeyA']);
-  assert.deepEqual(keysFor({ x: Math.SQRT1_2, z: -Math.SQRT1_2 }, 0).sort(), ['KeyD', 'KeyW']);
-  // Camera turned a quarter: "up" now points along -x.
-  assert.deepEqual(keysFor({ x: -1, z: 0 }, Math.PI / 2), ['KeyW']);
 });
 
 test('chargers: the dash lane is left sideways, not outrun', () => {

@@ -8,12 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "start": "node src/main.ts",
-    "dry-run": "node src/main.ts --dry-run",
-    "sandbox": "node src/main.ts --sandbox-only",
-    "browser": "node src/main.ts --manual",
     "mirror": "node src/sandbox/mirror-cli.ts",
-    "sim-poc": "node scripts/sim-poc.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "run-episodes": "node scripts/run-episodes.ts",
