@@ -49,7 +49,7 @@ export class EpisodeStore {
     if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
     const db = new DatabaseSync(path);
     try {
-      // WAL: a reader (the trainer, a notebook) does not block the runner and is not blocked by it.
+      // WAL: a reader (a report, a notebook) does not block the runner and is not blocked by it.
       db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 10000;');
       migrate(db, options.migrations ?? loadMigrations());
     } catch (e) { db.close(); throw e; }

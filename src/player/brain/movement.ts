@@ -15,7 +15,7 @@ export interface Action {
   jump: boolean;
   ult: boolean;
   interact: boolean;
-  /** What the bot is trying to do, for the log and the dashboard. */
+  /** What the player is trying to do, for the log and the watch page. */
   intent: string;
   /** Why, in a few words. */
   note: string;

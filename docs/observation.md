@@ -13,7 +13,7 @@ answered (docs/environment.md §4).
 ## The state (`observation.state`, schema 2)
 
 The raw snapshot (docs/snapshot.md) is the surroundings: enemies, shots, hazards, map points. It carries no build. `extractState(run)`
-adds the rest. `src/bot/extract.ts` is unchanged.
+adds the rest; the snapshot's own extractor is `src/observations/extract.ts`.
 
 | Group | Fields |
 |---|---|
@@ -48,6 +48,6 @@ timer.
 
 **Read-only.** The extractor reads fields and calls only members that compute a value from fields (listed at the top
 of `state.ts`, in `getMetadata().instrumentation`, and in docs/environment.md §6). The test
-`test/observations/episode.test.ts` plays the same seed twice, the second time calling the extractor, the encoder
-and the mask five extra times per step, and compares a digest over every step that includes the number of
+`test/observations/state.test.ts` plays the same seed twice, the second time calling the extractor five
+extra times at every step, and compares a digest over every step that includes the number of
 `Math.random` draws and the whole state: identical.

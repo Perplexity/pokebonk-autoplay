@@ -200,7 +200,7 @@ export interface StepInfo {
 
 export interface StepResult {
   observation: Observation;
-  /** Always 0 in Stage 1: rewards are defined with the trainer. */
+  /** Always 0: nothing defines a reward. */
   reward: number;
   /** The run is over (fainted, or its real end: the portal out of the sanctuary, overtime collapsed, …). */
   terminated: boolean;

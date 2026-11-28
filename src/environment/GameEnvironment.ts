@@ -45,7 +45,7 @@ const turn = (): Promise<void> => new Promise<void>((r) => real.setImmediate(r))
 const MAX_ANSWER_TURNS = 2000;
 
 /**
- * World direction → movement keys for a camera yaw. Same rule as `keysFor` in src/bot/session.ts: the game moves
+ * World direction → movement keys for a camera yaw. The game moves
  * "up" along (-sin yaw, -cos yaw).
  */
 export function keysForMove(move: { x: number; z: number } | null, camYaw: number): string[] {
@@ -64,7 +64,7 @@ const WAITING_STATES = new Set(['transition', 'evolving', 'cinematic', 'capturin
 const MAX_WAIT_STEPS = 60 * 120;
 
 function deepFreeze<T>(v: T): T {
-  // Typed arrays (the optional numeric encoding) cannot be frozen; they are fresh buffers nothing else holds.
+  // Typed arrays cannot be frozen; they are fresh buffers nothing else holds.
   if (v && typeof v === 'object' && !ArrayBuffer.isView(v) && !Object.isFrozen(v)) {
     Object.freeze(v);
     for (const k of Object.keys(v as object)) deepFreeze((v as Record<string, unknown>)[k]);
@@ -689,8 +689,8 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   }
 
   /**
-   * Read-only figures of the moment that the snapshot and the state do not carry (the manager's observation,
-   * src/hybrid): the overheal held, what is left of the lifesteal budget, the reference HP the Overtime tide is a
+   * Read-only figures of the moment that the snapshot and the state do not carry (no rule of the player
+   * reads them today): the overheal held, what is left of the lifesteal budget, the reference HP the Overtime tide is a
    * share of, the spawn multiplier as the game computes it (difficulty × enemy amount × the tier's amount, clamped to
    * 1–3), and the roars Rhydon has made in this zone. Fields are read; nothing is called or written.
    */

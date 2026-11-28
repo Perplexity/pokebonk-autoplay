@@ -10,6 +10,11 @@
  * the same environment (policy version, policy options, build, bundle, shims, preset, rules, rates, species, map,
  * tier, time cap); otherwise the comparison is refused.
  *
+ *   --refactor   the replay of a refactor: the two batches were played by different code that must play the same.
+ *                The policy's name, version and options and the hash of the environment's own source files
+ *                (`shim_hash`) may then differ, and are printed; the game's build and bundle, the schemas, the
+ *                preset, the rules and the rates may not. Every episode column and decision row is still compared.
+ *
  * Exit code: 0 identical, 1 different (the differences are printed), 2 not comparable or bad arguments.
  */
 import { resolve } from 'node:path';
@@ -26,13 +31,17 @@ if (!args.has('a') || !args.has('b')) stop('needs --a=<batch id> --b=<batch id>'
 export const NOT_COMPARED = ['id', 'batch_id', 'wall_seconds', 'reset_seconds', 'worker_id', 'worker_pid', 'worker_episode', 'worker_rss_mb', 'started_at', 'finished_at'];
 const SAME_SETUP = ['policy_name', 'policy_version', 'game_build', 'bundle_sha256', 'shim_hash', 'observation_schema', 'action_schema', 'decision_schema', 'snapshot_schema', 'profile_preset', 'ranked', 'hz', 'action_repeat'];
 const SAME_CONFIG = ['species', 'map', 'tier', 'ranked', 'maxGameTime', 'policyOptions'];
+/** What names this repository's code. With --refactor these may differ: that the two play the same is the question. */
+const CODE = ['policy_name', 'policy_version', 'policyOptions', 'shim_hash'];
 
 const store = EpisodeStore.open(args.has('db') ? resolve(args.get('db')!) : DEFAULT_DATABASE);
 let code = 0;
 try {
   const [a, b] = [Number(args.get('a')), Number(args.get('b'))].map((id) => store.batch(id) ?? stop(`no batch ${id} in ${store.path}`));
   const cfgA = JSON.parse(String(a.config_json)) as Row, cfgB = JSON.parse(String(b.config_json)) as Row;
-  const setup = [...SAME_SETUP.filter((k) => a[k] !== b[k]).map((k) => `${k}: ${a[k]} / ${b[k]}`), ...SAME_CONFIG.filter((k) => JSON.stringify(cfgA[k] ?? null) !== JSON.stringify(cfgB[k] ?? null)).map((k) => `config.${k}: ${JSON.stringify(cfgA[k])} / ${JSON.stringify(cfgB[k])}`)];
+  const refactor = args.has('refactor'), code_ = (k: string): boolean => refactor && CODE.includes(k);
+  const differs = [...SAME_SETUP.filter((k) => a[k] !== b[k]).map((k) => [k, `${k}: ${a[k]} / ${b[k]}`]), ...SAME_CONFIG.filter((k) => JSON.stringify(cfgA[k] ?? null) !== JSON.stringify(cfgB[k] ?? null)).map((k) => [k, `config.${k}: ${JSON.stringify(cfgA[k])} / ${JSON.stringify(cfgB[k])}`])];
+  const setup = differs.filter(([k]) => !code_(k)).map(([, line]) => line);
   if (setup.length) stop(`batches ${a.id} and ${b.id} were not played the same way, so they cannot be expected to agree:\n  ${setup.join('\n  ')}`);
 
   const epsA = new Map(store.episodes(Number(a.id)).map((r) => [Number(r.seed), r])), epsB = new Map(store.episodes(Number(b.id)).map((r) => [Number(r.seed), r]));
@@ -40,6 +49,7 @@ try {
   if (!seeds.length) stop(`batches ${a.id} and ${b.id} have no seed in common`);
   const only = (x: Map<number, Row>, y: Map<number, Row>) => [...x.keys()].filter((s) => !y.has(s));
   say(`batch ${a.id} (${cfgA.workers} worker(s), ${epsA.size} episodes) against batch ${b.id} (${cfgB.workers} worker(s), ${epsB.size} episodes): ${a.policy_name} ${a.policy_version}, preset ${a.profile_preset}, build ${a.game_build}`);
+  if (refactor) for (const [k, line] of differs) if (code_(k)) say(`different code, as --refactor allows: ${line}`);
   say(`${seeds.length} seed(s) in common${only(epsA, epsB).length ? `; only in ${a.id}: ${only(epsA, epsB).join(',')}` : ''}${only(epsB, epsA).length ? `; only in ${b.id}: ${only(epsB, epsA).join(',')}` : ''}`);
 
   let different = 0, columns = 0, decisions = 0, simSteps = 0;

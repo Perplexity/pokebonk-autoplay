@@ -50,7 +50,7 @@ for (const g of groups) {
     const rows = store.episodes(b.id) as unknown as EpisodeRow[];
     const cfg = JSON.parse(b.config_json) as Row;
     const s = summarize(rows);
-    // The seeds the batch was given; a batch written by other code (a trainer's evaluator) may not list them: then the seeds it has.
+    // The seeds the batch was given; a batch written by other code may not list them: then the seeds it has.
     const list: number[] = Array.isArray(cfg.seeds) && cfg.seeds.length ? cfg.seeds : rows.map((r) => r.seed);
     const seeds = list.length ? `${list[0]}–${list[list.length - 1]}` : '?';
     const setup = `#${cfg.species ?? '?'} ${cfg.map ?? '?'} t${cfg.tier ?? '?'}${cfg.maxGameTime ? ` ≤${cfg.maxGameTime}s` : ''}${cfg.policyOptions && Object.keys(cfg.policyOptions).length ? ' +options' : ''}`;

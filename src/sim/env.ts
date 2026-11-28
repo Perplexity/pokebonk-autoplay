@@ -289,7 +289,7 @@ export class Sim {
     (btn as any)?.click();
   }
 
-  /** The existing observation extractor (src/bot/extract.ts), run in-process against the live run object. */
+  /** The snapshot extractor (src/observations/extract.ts), run in-process against the live run object. */
   snapshot(): any { return extractSnapshot.call(this.run); }
 
   /** null while the episode goes on, else why it ended. */

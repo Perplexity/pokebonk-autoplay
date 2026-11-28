@@ -34,7 +34,7 @@ await env.close();
   that nothing in it is, or can reach, a live game object.
 - **Actions.** Play: `{ type: 'play', move, jump?, dash?, ultimate?, interact?, form?, incense?, fuse? }` with `move` one of
   `none, n, ne, e, se, s, sw, w, nw` (or its index 0–8), world-relative (−z is north), turned into W/A/S/D with the camera yaw
-  by the same rule as `keysFor` in `src/bot/session.ts`. The seven buttons act on the key-down edge: they are pressed for the
+  by `keysForMove` (`src/environment/GameEnvironment.ts`). The seven buttons act on the key-down edge: they are pressed for the
   first simulation step of the decision and released. `form` is the Max form key (F), `incense` opens a rift (C), `fuse`
   opens a fused rift (X). Choice: `{ type: 'choice', option: i }` or
   `{ type: 'choice', extra: 'refresh' | 'skip' | 'banish' | 'banishKit' | 'sell' | 'decline' | 'leave' | 'reroll', target?: i }`.

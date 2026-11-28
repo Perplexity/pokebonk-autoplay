@@ -3,7 +3,7 @@ import { MOVES } from '../environment/types.ts';
 import type { Move, PlayAction, PlayMask } from '../environment/types.ts';
 
 /**
- * The brain (src/bot/brain/movement.ts) decides a free heading on the ground and four buttons; the environment takes
+ * The brain (src/player/brain/movement.ts) decides a free heading on the ground and four buttons; the environment takes
  * one of eight world directions and the same four buttons, each allowed only while the mask says so.
  */
 

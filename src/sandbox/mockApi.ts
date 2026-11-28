@@ -54,7 +54,7 @@ export const mutationOfDay = (now = Date.now()) => {
 export class MockApi {
   private store: Store;
   private routes: { method: string; pattern: string; re: RegExp; keys: string[]; h: Handler; doc: string }[] = [];
-  /** Listeners for the dashboard / session manager (run started, finished...). */
+  /** Listeners for whoever runs the game (run started, finished...). */
   onEvent: (ev: { type: string; run?: RunRecord; entry?: JournalEntry }) => void = () => {};
   /** Species id → evolution family id, when the mirrored data files are available. */
   family: (species: number) => number = (s) => s;

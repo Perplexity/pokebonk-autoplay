@@ -51,7 +51,7 @@ To change the schema: add `003_….sql` (never edit an applied file), update thi
 | `profile_preset` | TEXT NULL | The account preset the episodes were played on, as `getMetadata().profile.preset` reports it (e.g. `unlocked-v3`; docs/game.md §6). Player stats depend on it: compare results only within one preset (the report script enforces it, see "Reports"). The preset's content as the game confirmed it is in `metadata_json` under `profile.summary`. |
 | `ranked` | INTEGER NULL | 1 = Ranked rules, 0 = Classic. |
 | `hz`, `action_repeat` | INTEGER | Simulation steps per game second, and per decision. |
-| `reward_version` | TEXT NULL | Version of the reward function. NULL in Stage 1: no reward is defined yet. |
+| `reward_version` | TEXT NULL | Version of the reward function. Always NULL: nothing defines a reward. |
 | `host_json` | TEXT | `platform`, `release`, `arch`, `cpu`, `logicalCpus`, `totalMemoryMB`, `freeMemoryMB` (at batch start), `node`. |
 | `metadata_json` | TEXT NULL | The whole `getMetadata()` of the batch's first worker: instrumentation points, shims, profile summary, season, offline guard, dialogs handled. Every later worker must agree with it on build, hashes, schemas and preset, or an error of kind `metadata-mismatch` is recorded. |
 | `episodes_planned` | INTEGER | Number of seeds handed to the batch. |
@@ -70,7 +70,7 @@ To change the schema: add `003_….sql` (never edit an applied file), update thi
 | `seed` | INTEGER | Episode seed (0 … 2³²−1). |
 | `species`, `final_species` | INTEGER | Pokédex number the run started with, and at its end (evolution). |
 | `map`, `tier`, `ranked` | TEXT, INTEGER, INTEGER | Map id, difficulty tier 0–2, Ranked (1) or Classic (0). |
-| `end_cause` | TEXT | The environment's cause of end: `died`, `won (victory)`, `won (victory), overtime cashed`, `won (victory), overtime lost`, `truncated: game time reached the cap of N s`, `idle: no KO for N s of game time` (the rule against going without a KO), `idle: no KO and no movement for N s of game time` (the rule against standing still; such a run is invalid and scores 0, docs/training.md §3; stored with `truncated` = 1). |
+| `end_cause` | TEXT | The environment's cause of end: `died`, `won (victory)`, `won (victory), overtime cashed`, `won (victory), overtime lost`, `truncated: game time reached the cap of N s`, `idle: no KO for N s of game time` (the rule against going without a KO), `idle: no KO and no movement for N s of game time` (the rule against standing still; such a run is invalid and counts as 0 ranked KOs; stored with `truncated` = 1). |
 | `end_how` | TEXT NULL | The game's own `end.how` (`died`, `won`, …; docs/game.md §1.6). NULL when truncated: the run never closed. |
 | `terminated`, `truncated` | INTEGER | Exactly one is 1. |
 | `victory` | INTEGER | The game's `victory`: the map was cleared (legendary beaten or direct path taken). It says nothing about overtime. |
@@ -156,4 +156,7 @@ disagree on the preset (or build, hashes, schemas) gets a `metadata-mismatch` ro
 column of `episodes` except the ones that say where and how fast it was played (`id`, `batch_id`, `wall_seconds`,
 `reset_seconds`, `worker_id`, `worker_pid`, `worker_episode`, `worker_rss_mb`, `started_at`, `finished_at`) and every
 decision row. It refuses batches that were not played the same way (policy version and options, build, hashes, preset,
-rules, rates, species, map, tier, time cap). Exit code 0 = identical, 1 = different, 2 = not comparable.
+rules, rates, species, map, tier, time cap). Exit code 0 = identical, 1 = different, 2 = not comparable. With
+`--refactor` the two batches may have been played by different code of this repository (policy name, version and
+options, and the hash of the environment's source files, which are printed): that is the replay of a refactor. The
+game's build and bundle, the schemas, the preset and the rules must still match.

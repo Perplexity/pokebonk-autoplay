@@ -14,7 +14,7 @@
  *   --workers=K (default 1)            --species=<dex>  --map=<id>  --tier=0..2  --classic
  *   --max-time=<game seconds, 0 = none>   --action-repeat=3   --hz=60
  *   --max-idle=<game seconds>          end an episode as invalid after this long without a KO and without movement
- *   --archive=empty|loose|balanced|narrow|balanced-2|stack-2   account preset unlocked-v4 with that item archive (default: unlocked-v3)
+ *   --archive=stack-2          account preset unlocked-v4 with that item archive (src/player/values.ts; default: unlocked-v3)
  *   --build-plan=kit-1         account preset unlocked-v5: the account's build plan for the species (favourite moves, moves switched off)
  *                              With --policy=player both default to the plan's own account (src/player/plan.ts); `none` plays without.
  *   --max-ko-gap=<game seconds>        end an episode as invalid after this long without a KO (boss fights do not count)

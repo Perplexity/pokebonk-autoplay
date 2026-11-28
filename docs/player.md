@@ -111,7 +111,7 @@ Rules of the loop:
 - **A new version, not an edit.** A change that is kept becomes a new plan version (`plan-10`, …) with the old one
   replaced in `plan.ts` and its figures kept in docs/results.md. A change to code that must not alter play (a
   refactor) is shown by a replay: the same seeds give the same episodes, decision for decision
-  (`scripts/compare-batches.ts`).
+  (`node scripts/compare-batches.ts --a=<before> --b=<after> --refactor`).
 - **One run says nothing.** The standard deviation of a run's ranked KOs is about three quarters of their mean, and two runs of the
   same seed stop being comparable once play differs anywhere.
 - **Do not edit `src/` while a batch runs** from the same checkout: every episode starts a fresh process that loads
