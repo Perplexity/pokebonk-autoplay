@@ -24,7 +24,7 @@ The best run stands at 15.0 million ranked KOs: half of what the top of the lead
 | plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
 | plan-8 | the leaderboard build: one fusion, two linked pairs, Encore | 100 second development | 13,803,730 | 14,467,683 | 15,039,733 |
-| plan-9 | a cleared zone is no longer left before its final swarm | 1–30 (tuning) | 14,067,070 | 14,510,817 | 14,792,507 |
+| plan-9 | a cleared zone is no longer left before its final swarm | 100 second development | 13,884,013 | 14,560,342 | 15,039,733 |
 
 `docs/results.md` has every figure, what was tried and was worse, and what ends a run today: from Overtime's
 minute 8 the game makes enemy HP grow ×48 a minute and the tide ×4, and the player arrives there with about a

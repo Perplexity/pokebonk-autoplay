@@ -28,16 +28,24 @@ is in the repository's history.
 | plan-8 | the build: one fusion, two linked pairs, Encore; the account's build plan | 1–30 [89] | 13,854,144 | 11,875,904 | 14,414,348 | 14,539,765 |
 | | | 100 second development [92, 95] | 13,803,730 | 12,888,057 | 14,467,683 | 15,039,733 |
 | plan-9 | a cleared zone is left on low HP only once its final swarm has begun | 1–30 [96] | 14,067,070 | 13,632,461 | 14,510,817 | 14,792,507 |
+| | | 100 second development [98] | 13,884,013 | 13,525,227 | 14,560,342 | 15,039,733 |
 
 - plan-8 against plan-7 on the second development set, seed by seed: ×1.19 (95 %: 1.06 to 1.32), better on 87 of
   100; on seeds 1–30 ×1.13 (0.87 to 1.53), better on 23 of 30. 85 of the 100 runs end with the whole build, every
   linked pair at level 10; they kill at the Overtime ceiling through round 16 (plan-7: round 14), and one run in 89
   still does in round 17. Three of the 100 bring no bonus (two fainted in zone 2, one in Overtime).
-- plan-9 against plan-8 on seeds 1–30: 21 runs are the same run, decision for decision; the other 9 are all
-  better (7 of them were runs under 10.5 million and reach 12.8 to 14.7 million). 29 of 30 end with the whole
-  build, and no zone is left before its final swarm. The best run barely moves: the runs now sit in a band of 13
-  to 14.8 million under the wall of section 2. One run faints in Overtime's round 19 and loses a bonus of 10.9
-  million, under plan-8 and plan-9 alike.
+- plan-9 against plan-8 on the second development set, played once: 90 of 100 runs have the same ranked KOs, 10
+  are higher (by 2.0 to 12.3 million) and none is lower; seed by seed ×1.08 (95 %: 1.03 to 1.14). The 10 are
+  exactly the runs that left zone 2 or 3 in its first minutes under plan-8. 94 of 100 end with the whole build
+  (plan-8: 85). Two runs bring no bonus, the same two as under plan-8: they faint in zone 2.
+- On seeds 1–30: 21 runs are the same, the other 9 are all higher (7 of them were runs under 10.5 million and
+  reach 12.8 to 14.7 million). 29 of 30 end with the whole build. One run faints in Overtime's round 19 and loses
+  a bonus of 10.9 million, under plan-8 and plan-9 alike.
+- No zone is left before its final swarm on either set. The best run does not move (15.04 million for both
+  plans on the second development set): the runs sit in a band of 13 to 15 million under the wall of section 2.
+- The second development set was played by this repository's present code (`src/player`). That code replays
+  plan-9 on seeds 1–30 identically to the code before the cleanup: 30 of 30, every episode and every decision
+  [96, 97].
 - p90 is interpolated between the two nearest runs.
 - plans 1, 2 and 4 were steps on the way to plan-3 and plan-5 and were never the best plan.
 - The held-out seeds have not been played since plan-6.
@@ -57,7 +65,7 @@ is in the repository's history.
   from the moment the guardian fell, and fired when the guardian itself had emptied the bar, ten minutes before the
   final swarm. 8 of 30 runs of plan-8 on seeds 1–30 (10 of 100 on the second development set) lost a zone that
   way, and with it the zone's machine and often the change of vitamins; those 8 reach a median of 6.8 million.
-  plan-9 counts the HP bar only once the final swarm has begun, and on seeds 1–30 no run loses a zone.
+  plan-9 counts the HP bar only once the final swarm has begun, and no run loses a zone that way on either set.
 
 ## 3. What was learned on the way
 
@@ -108,6 +116,8 @@ takes another way.
 
 ## 5. Not known
 
+- Why two runs in 100 faint in zone 2 (seeds 3000004 and 3000018, under plan-8 and plan-9 alike), and why seed 13
+  faints in Overtime's round 19 with its bonus.
 - What plan-8's settings would be if any had been varied: the build, the favourites and the order of the machine's
   uses were set once.
 - Why one run in ten never changes its vitamins when no zone was lost.
