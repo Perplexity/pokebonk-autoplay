@@ -415,17 +415,22 @@ rocks. Nothing comes back after use in a standard run (it does in Survival).
     Repel +8 % (at most 3). The player ends with 10, 10, 3, 5 and 3: +624 %, a factor of 7.24 **[P]** (every
     cashed run of batches 97, 100 and 101 looked at). The saved leaderboard Mewtwo holds 10, 10, 3 and 5: 7.0.
   - Vitamins **[C]**: Exp. Candy +10 % a level, the Cursed Incense +6 % a level: +192 % at level 12 each, while held.
-  - Blessings **[C]**: one of about twenty stats, drawn evenly; experience is +15 % times the rarity's factor
-    (1, 1.2, 1.45, 1.75, 2.1: 15 to 32 %). A blessing dialog cannot be refreshed.
+  - Blessings **[C]**: each offer is one of about twenty stats, drawn evenly, at a rarity drawn by luck;
+    experience is +15 % times the rarity's factor (1, 1.2, 1.45, 1.75, 2.1: 15 to 32 %). A blessing dialog has
+    no refresh **[P]** (637 dialogs of batch 101: none offered one).
   - The account **[C]**: the Lab's Study +5 % a level (6 levels), a shiny perk +4 %.
   - **[P]** A run of the player with its final vitamins and no experience blessing ends with 12.58: 7.24 × 1.738.
-    Blessings then add as if 25 % were already in their group (one `+26 %` gives ×1.21, not ×1.26): what that
-    25 % is was **not identified**.
+    Blessings then add as if 25 % were already in their group (one `+26 %` gives ×1.21, not ×1.26). A Greed
+    altar puts exactly that in the group (experience and Pokédollars +25 %, difficulty ×1.2) and so does the
+    Lucky Egg run boost **[C]**; which of the two these runs carry was **not checked**.
   - The leaderboard Mewtwo ends with 43.73 and no experience vitamin or relic: 7.0 × 6.25. If its account factors
     are ours, its run's own group and its support Alphas together are worth ×3.6 for our ×1 to ×1.6. **How it got
     there is not known**; the two sources below are what the player does not use.
 - **The dojo's prize is chosen [C].** Three trials are offered, one per belt; the prize is a blessing of a stat the
-  player picks, at the third, fourth or fifth rarity by belt: experience +22 %, +26 % or +32 %. One dojo a zone.
+  player picks, at the third, fourth or fifth rarity by belt: experience +22 %, +26 % or +32 %. A trial won also
+  gives an Incense. One dojo a zone. The fossil ruins offer an "ancestral" blessing at 1.5 times a legendary
+  one's size, or a recruit, for a share of max HP; what the challenge altars, the nest and the Porygon altar
+  give was **not read**.
 - **Support Alphas [C] [P].** An Alpha that falls stays down for 8 s at 1 % HP; a Friend Ball thrown from within
   9 m recruits it (chance 0.45 to 0.8 by species, +0.2 a try, certain with a Master Ball). A recruit gives its
   first type's blessing for the run (psychic: experience +8 %; dragon: damage +5 %; steel: area +8 %; water:
@@ -434,7 +439,7 @@ rocks. Nothing comes back after use in a standard run (it does in Survival).
   with an SS Ticket; a Friend Ball item is damage ×1.06 for each recruit. The leaderboard build holds 2 Poké
   Dolls, an SS Ticket and 2 Friend Balls; the player's item pool has none of them.
   - One run of the player watched (plan-9, seed 1): 9 Alphas fell, 13 to 27 m from the player, of nine species
-    and seven first types (not only the map's). A ball could be thrown at 2 of them and both were recruited; the
+    and six first types (fire, water, bug, electric, ground, grass: not only the map's). A ball could be thrown at 2 of them and both were recruited; the
     other 7 died where they lay. The team was never full.
 - **The kill ceiling [P]** (two runs with rifts on, seeds 1 and 15, sampled every ten seconds). In a final swarm
   the player kills 18,100 to 18,300 enemies every ten seconds, flat: the game's spawn rate, not the build. In
