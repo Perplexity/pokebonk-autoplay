@@ -72,6 +72,13 @@ woken on arrival and a zone is ten minutes of errands and eight of final swarm.
 - **The collapse.** A zone is left at its second 1060, before the collapse; leaderboard runs stay far longer.
 - **Max HP.** Runs enter Overtime with 1,500 to 2,200 max HP; what ends them there is the tide at a whole bar a
   second, at about Overtime's second 535.
+- **One direction for the whole run.** Items are valued for farming (luck, experience, Pokédollars) to the last
+  second. A leaderboard build holds ten Assault Vests, five Choice Specs, ten Big Roots and five Binding Bands;
+  all are in the player's item pool and its runs end with none (docs/game.md §8.1). Vitamins change by phase;
+  items do not yet.
+- **Where the levels are made.** One run looked at (plan-9, seed 20): 1,070 levels in zone 1's final swarm, 660 in
+  zone 2's, 260 in zone 3's, 110 in the thirty minutes before the swarms and 28 in Overtime. Zone 3's swarm is
+  left at second 1060, 140 s before its collapse begins.
 - **One Pokémon has a build.** The rules are general; only Mewtwo's data is written and measured.
 - **The wake by level** (999) is an accident of older, weaker builds that today's builds trip in zone 1. It is kept
   because every measurement includes it; it should become a choice.
