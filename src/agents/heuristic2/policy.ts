@@ -52,12 +52,14 @@ export interface Lifecycle2 {
   gengar: number;
   /** Revives held when last seen; run time a revive was last spent; run time the current zone was cleared and Overtime began. */
   revives: number | null; revivedAt: number; clearedAt: number | null; otAt: number | null;
+  /** plan-9. Run time the current zone's final swarm was first seen. */
+  swarmAt: number | null;
   /** plan-3. Run time the walk to this zone's Rhydon totem was first ordered ahead of the wake. */
   roarSince: number | null;
   /** plan-8. Moves banished and the zone whose lesson is gone (chooser.ts, `KitMemo`); the moves held when Hypno was last left (he is not visited again for the kit until they change). */
   memo: KitMemo; hypnoLeft: string | null;
 }
-export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, roarSince: null, memo: { banished: new Set(), lessonZone: 0 }, hypnoLeft: null });
+export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, swarmAt: null, roarSince: null, memo: { banished: new Set(), lessonZone: 0 }, hypnoLeft: null });
 
 /** What Hypno could change for the kit: the moves held, by slot, and whether this zone's lesson is still to be had. */
 export const kitSignature = (kit: KitState, life: Pick<Lifecycle2, 'memo'>, stage: number): string => `${kit.held.map((m) => `${m.slot}:${m.key}`).join(',')}|${life.memo.lessonZone === stage ? 'no lesson' : 'lesson'}`;
@@ -195,7 +197,7 @@ export function lootGoal(s: Snapshot, hp: number, swarm: boolean, skip: string[]
 export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live' | 'over' | 'direct' | 'round'> & { drain?: number }, life: Lifecycle2, plan: Plan, swarm = false, skip: string[] = [], world?: World): Directive {
   const hp = s.player.maxHp > 0 ? s.player.hp / s.player.maxHp : 0;
   if (ot.over) return {};
-  if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; life.roarSince = null; life.hypnoLeft = null; }
+  if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; life.swarmAt = null; life.roarSince = null; life.hypnoLeft = null; }
   if (s.stageCleared) life.clearedAt ??= s.t;
   if (ot.live || ot.direct) life.otAt ??= s.t;
   if (!(ot.live || ot.direct)) {
@@ -233,10 +235,14 @@ export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live'
     // The guardian has fallen: its prizes first, then the zone is farmed on through its final swarm while the HP bar
     // stays high, and left through the portal when it does not, or when the clock says so.
     const by = plan.leaveBySec[Math.min(plan.leaveBySec.length - 1, s.stage - 1)];
-    if (hp < plan.leaveHp || s.stageTime >= by || (s.stageTime >= limit && lowestHp(life, s.t, plan.stayWindow) < plan.stayHp)
+    // plan-9: the HP bar and a spent revive count only once the final swarm is on. Until then a cleared zone is an
+    // ordinary one, and a bar the guardian emptied is the brain's to refill.
+    if (swarm) life.swarmAt ??= s.t;
+    const counts = !plan.leaveInSwarm || swarm, since = plan.leaveInSwarm ? Math.max(life.clearedAt ?? Infinity, life.swarmAt ?? Infinity) : life.clearedAt ?? Infinity;
+    if ((counts && hp < plan.leaveHp) || s.stageTime >= by || (s.stageTime >= limit && lowestHp(life, s.t, plan.stayWindow) < plan.stayHp)
       || (swarm && plan.leaveHit <= 1 && heaviestHit(life, s.t, plan.stayWindow) >= plan.leaveHit)
       || (swarm && limitOf(plan.leaveThreat, plan.leaveThreatRevive, life) > 0 && hordeHit(s) >= limitOf(plan.leaveThreat, plan.leaveThreatRevive, life))
-      || (plan.reviveLeaves && life.revivedAt >= (life.clearedAt ?? Infinity))) life.leaving.add(s.stage);
+      || (plan.reviveLeaves && life.revivedAt >= since)) life.leaving.add(s.stage);
     const errand = errandFor(s, world, hp, swarm || life.leaving.has(s.stage), life, plan, skip);
     if (life.leaving.has(s.stage)) return errand ? { holdPortal: true, goto: errand } : {};
     if (errand) return { holdPortal: true, goto: errand };

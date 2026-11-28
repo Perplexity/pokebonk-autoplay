@@ -176,6 +176,17 @@ export interface Plan {
    * not one.
    */
   kit: string[]; kitFuse: string[];
+
+  // ---- added with plan-9 ----
+  /**
+   * The HP bar (`leaveHp`) and a spent Max Revive (`reviveLeaves`) make the run leave a cleared zone only once the
+   * zone's final swarm has begun (the game starts it at the zone's second 600, whether the guardian has fallen or
+   * not). Without this (plans 1 to 8) they count from the moment the guardian falls: a run whose HP bar the guardian
+   * itself had emptied took the portal that second, ten minutes of the zone, its final swarm, its machine and its
+   * Hypno unused (seed 28 under plan-8: zone 2 left after 107 s with 2 HP of 386, the last four hits the guardian's).
+   * 9 zones of 90 under plan-8 on seeds 1 to 30 and 6 of 90 under plan-7 were left before their second 300.
+   */
+  leaveInSwarm: boolean;
 }
 
 export const PLAN_V1: Plan = {
@@ -204,6 +215,7 @@ export const PLAN_V1: Plan = {
   fuseNeeds: '',
   vitaminsFarm: [], vitaminsFinal: [], swapZone: 3, swapAtSec: 720, vitaminsRiskLevel: 0,
   kit: [], kitFuse: [],
+  leaveInSwarm: false,
 };
 
 /**
@@ -287,11 +299,19 @@ export const PLAN_V8: Plan = {
   errands: [...PLAN_V7.errands, 'bill'],
 };
 
-export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6, 'plan-7': PLAN_V7, 'plan-8': PLAN_V8 };
+/**
+ * plan-9 (NOT the default): plan-8, and a cleared zone is left on the HP bar or a spent revive only once its final
+ * swarm has begun (`leaveInSwarm`). Measured (docs/phase-3-report.md, part 8): on the 100 check seeds, played once,
+ * 90 runs are plan-8's own, 10 are higher and none lower; median 13.88 million against 13.80, mean 13.53 against
+ * 12.89, p90 14.56 against 14.47, best 15.04 for both. Seeds 1-30: median 14.07 against 13.85, mean 13.63 against 11.88.
+ */
+export const PLAN_V9: Plan = { ...PLAN_V8, version: 'plan-9', leaveInSwarm: true };
+
+export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6, 'plan-7': PLAN_V7, 'plan-8': PLAN_V8, 'plan-9': PLAN_V9 };
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). The key `base` names the plan to start from
- * ('plan-1' … 'plan-8'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
+ * ('plan-1' … 'plan-9'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
  */
 export function planWith(over: Record<string, unknown> | undefined, from?: Plan): Plan {
   const name = over?.base;

@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import type { Snapshot } from '../../src/bot/snapshot.ts';
 import { choose2, scoreLevelUp2, vitaminPhase, worthNow } from '../../src/agents/heuristic2/chooser.ts';
 import type { Chooser2Context } from '../../src/agents/heuristic2/chooser.ts';
-import { PLAN_V1, PLAN_V2, PLAN_V3, PLAN_V5, PLAN_V6, PLAN_V7, planWith } from '../../src/agents/heuristic2/plan.ts';
+import { PLAN_V1, PLAN_V2, PLAN_V3, PLAN_V5, PLAN_V6, PLAN_V7, PLAN_V8, PLAN_V9, PLANS, planWith } from '../../src/agents/heuristic2/plan.ts';
 import { directiveFor2, errandFor, heaviestHit, hordeHit, hpLost, lootGoal, lowestHp, newLife, spawnEstimate } from '../../src/agents/heuristic2/policy.ts';
 import type { World } from '../../src/agents/heuristic2/policy.ts';
 import { ARCHIVES, ARCHIVE_NAMES, archiveOf, DIRECTION_V1, DIRECTION_V2, DIRECTIONS, itemArchive, itemWorth, kitOf, loadValuationKnowledge, textMultiplier, vitaminWorth } from '../../src/agents/heuristic2/values.ts';
@@ -161,7 +161,7 @@ test('the plan: unknown keys are refused, tuning is merged', () => {
   assert.deepEqual(planWith({ base: 'plan-2' }), PLAN_V2);
   assert.equal(planWith({ base: 'plan-1' }).version, 'plan-1');
   assert.deepEqual(planWith({ base: 'plan-1' }), PLAN_V1);
-  assert.throws(() => planWith({ base: 'plan-9' }), /no plan "plan-9"/);
+  assert.throws(() => planWith({ base: 'plan-99' }), /no plan "plan-99"/);
   const q = planWith({ sealMax: [1, 1, 1, 1] });
   q.sealMax[0] = 9; q.errands.push('x');
   assert.deepEqual([PLAN_V2.sealMax[0], PLAN_V2.errands.includes('x')], [3, false], 'an overridden plan never writes into the default');
@@ -282,6 +282,43 @@ test('plan-2 run plan: the altar through the horde, prizes before the portal, st
   // The tide alone does not cash in plan-2 (it did in plan-1 at 6 % of max HP a second).
   assert.ok(directiveFor2(snap({ stage: 4, points: [portal], t: 104 }), { ...live, round: 11, drain: 60 }, newLife(), P, false, [], w).leash);
   assert.equal(directiveFor2(snap({ stage: 4, points: [portal], t: 104 }), { ...live, round: 11, drain: 60 }, newLife(), planWith({ cashDrain: 0.06 }), false, [], w).goto?.kind, 'cash');
+});
+
+test('plan-9: a cleared zone is left on the HP bar or a spent revive only once its final swarm has begun', () => {
+  const ot = { live: false, over: false, direct: false, round: 0 }, w = world({ gold: 500 });
+  assert.deepEqual([PLAN_V9.version, PLAN_V9.leaveInSwarm], ['plan-9', true]);
+  assert.deepEqual({ ...PLAN_V9, version: '', leaveInSwarm: false }, { ...PLAN_V8, version: '' }, 'plan-8 and nothing else');
+  for (const [name, p] of Object.entries(PLANS)) if (name !== 'plan-9') assert.equal(p.leaveInSwarm, false, `${name} leaves as it did`);
+  assert.deepEqual(planWith({ base: 'plan-9' }), PLAN_V9);
+  const dir = (plan: typeof PLAN_V9, s: Record<string, unknown>, l = newLife(), swarm = false) => directiveFor2(snap(s), ot, l, plan, swarm, [], w);
+  const hurt = { ...snap({}).player, hp: 2 }, portal = point('portal', 10);
+  // The guardian has just fallen, 86 s into the zone, and it left 2 HP of 200 (seed 28, zone 2).
+  const fallen = { stage: 2, stageCleared: true, bossSpawned: true, stageTime: 86, t: 993, player: hurt, points: [portal] };
+  assert.deepEqual(dir(PLAN_V8, fallen), {}, 'plan-8 takes the portal that second');
+  const l = newLife();
+  assert.ok(dir(PLAN_V9, fallen, l).holdPortal, 'plan-9 keeps the portal closed: the zone is not over');
+  assert.ok(dir(PLAN_V9, { ...fallen, stageTime: 400, t: 1307 }, l).holdPortal, 'and still, for as long as there is no swarm');
+  assert.equal(l.leaving.size, 0);
+  // In the swarm the HP bar counts as it always did.
+  assert.deepEqual(dir(PLAN_V9, { ...fallen, stageTime: 640, t: 1547 }, l, true), {}, 'in the swarm under 40 %: through the portal');
+  assert.ok(dir(PLAN_V9, { ...fallen, stageTime: 640, t: 1547, player: snap({}).player }, newLife(), true).holdPortal, 'in the swarm with a full bar: it stays');
+  assert.deepEqual(dir(PLAN_V9, { ...fallen, stageTime: PLAN_V9.leaveBySec[1], t: 1967, player: snap({}).player }, newLife(), true), {}, 'the clock is unchanged');
+  // A revive spent after the guardian fell but before the swarm does not end the stay, in the swarm it does.
+  const full = { ...fallen, player: snap({}).player };
+  const early = newLife(); dir(PLAN_V9, full, early); early.revivedAt = 1000;
+  assert.ok(dir(PLAN_V9, { ...full, stageTime: 300, t: 1207 }, early).holdPortal, 'a revive before the swarm');
+  assert.ok(dir(PLAN_V9, { ...full, stageTime: 610, t: 1517 }, early, true).holdPortal, 'and the swarm then begins: that revive is not held against it');
+  early.revivedAt = 1530;
+  assert.deepEqual(dir(PLAN_V9, { ...full, stageTime: 630, t: 1537 }, early, true), {}, 'a revive spent in the swarm: through the portal');
+  const old = newLife(); dir(PLAN_V8, full, old); old.revivedAt = 1000;
+  assert.deepEqual(dir(PLAN_V8, { ...full, stageTime: 300, t: 1207 }, old), {}, 'plan-8 left on a revive before the swarm');
+  // The swarm can begin while the guardian still stands: what counts is then the moment it falls.
+  const late = newLife(); late.revivedAt = 1520;
+  assert.ok(dir(PLAN_V9, { ...full, stageTime: 650, t: 1557 }, late, true).holdPortal, 'a revive spent on the guardian, in the swarm, before it fell');
+  // A new zone starts afresh.
+  assert.equal(late.swarmAt, 1557);
+  dir(PLAN_V9, { stage: 3, stageTime: 1, t: 1600 }, late);
+  assert.equal(late.swarmAt, null);
 });
 
 test('plan-3: Rhydon roars three times before the guardian is woken, however far the totem is', () => {
