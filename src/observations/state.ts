@@ -1,8 +1,7 @@
 /**
- * Read-only state extraction for learning: the parts of a run the raw snapshot (src/bot/extract.ts) does not carry.
- * The snapshot was built for a hand-written bot and has the surroundings; this has the build, the economy, the
- * progression clocks, the guardian / seal / overtime state, a histogram of ALL live enemies and the cumulative counters
- * rewards will be computed from.
+ * Read-only state extraction: the parts of a run the raw snapshot (src/observations/extract.ts) does not carry.
+ * The snapshot has the surroundings; this has the build, the economy, the progression clocks,
+ * the guardian / seal / overtime state, a histogram of ALL live enemies and the run's cumulative counters.
  *
  * STRICTLY READ-ONLY. `extractState` reads fields of the game's live run object and calls only these members of it,
  * every one of which computes a value from fields without writing anything (their sources were read; the test
@@ -143,7 +142,7 @@ export interface Counters {
   pointsUsed: number;
   /**
    * Uses of the map: `pointsUsed` + shop purchases + slot-machine spins + Hypno's lessons + rifts cleared + Max forms
-   * used. A sum of the counters above, kept as one figure for the reward (docs/training.md).
+   * used. A sum of the counters above, kept as one figure.
    */
   mapUse: number;
 }
@@ -313,7 +312,7 @@ function dojoState(run: any): RunState['dojo'] {
   };
 }
 
-/** Copy the learning-relevant state out of the game's live run object. Reads only (see the list at the top). */
+/** Copy the state out of the game's live run object. Reads only (see the list at the top). */
 export function extractState(run: any, extras: StateExtras = { pointsUsed: {}, slotPrice: 0, shopSold: 0 }): RunState {
   const p = run.player, st = run.stats ?? {}, E = run.enemies, ot = run.overtime, seals = run.seals, B = run.boss, U = run.ult;
   const attackSpeed = n(p.stats?.attackSpeed) || 1;

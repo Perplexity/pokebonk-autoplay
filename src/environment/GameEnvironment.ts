@@ -7,18 +7,15 @@ import { Sim } from '../sim/env.ts';
 import { real } from '../sim/clock.ts';
 import { localRankedSeason } from '../sandbox/mockApi.ts';
 import type { RunRecord } from '../sandbox/store.ts';
-import { extractSnapshot } from '../bot/extract.ts';
-import type { Nav, Snapshot } from '../bot/snapshot.ts';
-import { ACTION_ENCODING_VERSION, actionLayout, encodeMask } from '../actions/codec.ts';
-import { loadKnowledge } from '../knowledge/load.ts';
-import { OBS_ENCODING_VERSION, ObservationEncoder } from '../observations/encode.ts';
+import { extractSnapshot } from '../observations/extract.ts';
+import type { Nav, Snapshot } from '../observations/snapshot.ts';
 import { STATE_SCHEMA, extractState } from '../observations/state.ts';
 import { DialogCapture, HANDLED_METHODS, HANDLER_WRITES, REFUSED_METHODS, resolveBuildNames } from './dialogs.ts';
 import type { BuildNames } from './dialogs.ts';
 import { resolveGameFns } from './gamefns.ts';
 import type { GameFns } from './gamefns.ts';
-import { BUILD_PLAN_NAMES, buildPlanOf } from '../agents/heuristic2/kit.ts';
-import { ARCHIVE_NAMES, archiveOf, kitOf, loadValuationKnowledge } from '../agents/heuristic2/values.ts';
+import { BUILD_PLAN_NAMES, buildPlanOf } from '../player/kit.ts';
+import { ARCHIVE_NAMES, archiveOf, kitOf, loadValuationKnowledge } from '../player/values.ts';
 import { UNLOCKED_PRESET, playableMaps, readRegistries, unlockedProfile, verifyUnlocked } from './profile.ts';
 import type { Registries, UnlockCheck } from './profile.ts';
 import { ACTION_SCHEMA, DECISION_SCHEMA, InvalidActionError, MOVES, MOVE_VECTORS, OBSERVATION_SCHEMA, PLAY_BUTTONS, UnknownSituationError } from './types.ts';
@@ -48,7 +45,7 @@ const turn = (): Promise<void> => new Promise<void>((r) => real.setImmediate(r))
 const MAX_ANSWER_TURNS = 2000;
 
 /**
- * World direction → movement keys for a camera yaw. Same rule as `keysFor` in src/bot/session.ts: the game moves
+ * World direction → movement keys for a camera yaw. The game moves
  * "up" along (-sin yaw, -cos yaw).
  */
 export function keysForMove(move: { x: number; z: number } | null, camYaw: number): string[] {
@@ -67,7 +64,7 @@ const WAITING_STATES = new Set(['transition', 'evolving', 'cinematic', 'capturin
 const MAX_WAIT_STEPS = 60 * 120;
 
 function deepFreeze<T>(v: T): T {
-  // Typed arrays (the optional numeric encoding) cannot be frozen; they are fresh buffers nothing else holds.
+  // Typed arrays cannot be frozen; they are fresh buffers nothing else holds.
   if (v && typeof v === 'object' && !ArrayBuffer.isView(v) && !Object.isFrozen(v)) {
     Object.freeze(v);
     for (const k of Object.keys(v as object)) deepFreeze((v as Record<string, unknown>)[k]);
@@ -139,7 +136,7 @@ export function findHuntSpecies(loaded: string[]): number[] {
 /** `maxKoGapGameTime` in the sanctuary outside Overtime: this many times the allowance (see koGapTooLong). */
 const SANCTUARY_KO_GAP_FACTOR = 4;
 
-type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; koGapGraceGameTime: number; dataDir?: string; archive?: string; buildPlan?: string; apiTarget?: string; encode: boolean };
+type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; koGapGraceGameTime: number; dataDir?: string; archive?: string; buildPlan?: string; apiTarget?: string };
 
 export class HeadlessGameEnvironment implements GameEnvironment {
   readonly options: Resolved;
@@ -165,9 +162,6 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   private governorEverCut = false;
   private bundleSha = '';
   private closed = false;
-  /** With `encode: true`: the observation encoder of the running build, and the play action of the previous step. */
-  private encoder: ObservationEncoder | null = null;
-  private previousPlay: PlayAction | null = null;
   /** The last sign of activity, for `maxIdleGameTime`: the run clock, the KOs and the place at that moment. */
   private activity = { time: 0, kills: 0, x: 0, z: 0 };
   /** The last KO (or the last moment a boss was alive), for `maxKoGapGameTime`: the run clock and the KOs then. */
@@ -187,7 +181,6 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       hz: options.hz ?? 60, actionRepeat: options.actionRepeat ?? 3, invalidAction: options.invalidAction ?? 'throw',
       maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, maxKoGapGameTime: options.maxKoGapGameTime ?? 0, koGapGraceGameTime: options.koGapGraceGameTime ?? 0, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
       ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', archive: options.archive, buildPlan: options.buildPlan, verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
-      encode: !!options.encode,
     };
     if (!Number.isInteger(this.options.actionRepeat) || this.options.actionRepeat < 1) throw new Error('actionRepeat must be a positive integer');
     if (!(this.options.maxIdleGameTime >= 0) || !(this.options.idleRadius > 0)) throw new Error('maxIdleGameTime must be 0 (no rule) or a positive number of game seconds, and idleRadius a positive number of metres');
@@ -319,10 +312,6 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     this.bundleSha = sha.digest('hex');
 
     this.instrumentation.push('read-only: observation.state and info.counters (src/observations/state.ts) read fields of the live run object and call these members of it, none of which writes: interactables.chestCost(), seals.kept, swarmSecs, collapseHp(), tideHealK(), nextBossSpecies(), overtime.offered / roundLeft / bonus / drainHp / healK / mult(round), ult.ready, meta.runGain("healed")');
-    if (this.options.encode) {
-      // The numeric encoding works from the exported knowledge of exactly this build (data/game-knowledge/<build>/); it reads nothing from the game.
-      this.encoder = new ObservationEncoder(loadKnowledge(this.buildId()));
-    }
     this.timing.bootMs = real.performanceNow() - t0;
   }
 
@@ -429,7 +418,6 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     this.lastSeed = seed;
     this.episode = { seed, index: this.episode.index + 1, steps: 0, simSteps: 0, species: cfg.species, map: cfg.biome, tier: cfg.tier, ranked: 'competitive' in cfg, done: false, truncated: false, endCause: '', end: null };
     this.held.clear();
-    this.previousPlay = null;
     this.activity = { time: 0, kills: 0, x: Number(run.player?.pos?.x) || 0, z: Number(run.player?.pos?.z) || 0 };
     this.lastKo = { time: 0, kills: 0, overtime: false };
     this.droppedDialogs = [];
@@ -526,8 +514,6 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     } else {
       const run = this.run, input = this.app.input;
       const m = typeof action.move === 'number' ? action.move : MOVES.indexOf(action.move);
-      this.previousPlay = { type: 'play', move: m };
-      for (const b of PLAY_BUTTONS) this.previousPlay[b] = !!action[b];
       this.hold(keysForMove(MOVE_VECTORS[MOVES[m]], run.camYaw));
       // The buttons act on the key-down edge: pressed for the first simulation step only.
       const taps = PLAY_BUTTONS.filter((b) => action[b]).map((b) => KEY[b]) as string[];
@@ -605,7 +591,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       return false;
     }
     // The sanctuary has no wild Pokémon at all: the walk to the shrine and the rest before Overtime (45 s at most in
-    // the heuristic baseline) are stretches without a KO in every complete run. Four times the allowance there.
+    // an early version of the player) are stretches without a KO in every complete run. Four times the allowance there.
     const allowance = this.options.maxKoGapGameTime * (run.sanctuary && !run.overtime?.live ? SANCTUARY_KO_GAP_FACTOR : 1);
     this.koGapAllowance = allowance;
     return run.time - this.lastKo.time >= allowance;
@@ -656,7 +642,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (phase === 'choice') return this.dialogs!.pending!.mask();
     const run = this.run;
     const can = (f: () => unknown): boolean => { try { return !!f(); } catch { return false; } };
-    // The game's own conditions, in the order its input code checks them (docs/game-mechanics.md §5).
+    // The game's own conditions, in the order its input code checks them (docs/game.md §5).
     const near = run.interactables?.nearest ?? null;
     const interact = run.state === 'play' && (
       can(() => run.rifts.nearEntrance()) ||
@@ -665,7 +651,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       phase: 'play', move: MOVES.map(() => true), jump: true, dash: true,
       ultimate: run.state === 'play' && !!run.ult?.ready && !(run.ult?.active > 0),
       interact,
-      // The game's own conditions for the F, C and X keys (docs/game-mechanics.md §5).
+      // The game's own conditions for the F, C and X keys (docs/game.md §5).
       form: run.state === 'play' && can(() => run.forms.ready),
       incense: run.state === 'play' && can(() => run.rifts.incenseOn && run.rifts.useBlock(false) === null),
       fuse: run.state === 'play' && can(() => run.rifts.incenseOn && run.rifts.fuseOn && run.rifts.useBlock(true) === null),
@@ -681,16 +667,8 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       snapshot, decision: pending ? structuredClone(pending.decision) : null, mask: structuredClone(this.mask()),
       state: extractState(this.run, { pointsUsed: this.pointsUsed, slotPrice: this.fns!.slotCost(this.run), shopSold: this.dialogs!.shopSold }),
     }) as Observation;
-    if (!this.encoder) return observation;
-    // The numeric form is computed from the frozen observation alone (plus the previous play action), never from the game.
-    const { float, int } = this.encoder.encode(observation, this.previousPlay);
-    return Object.freeze({ ...observation, encoded: Object.freeze({ version: OBS_ENCODING_VERSION, layoutHash: this.encoder.layout.hash, float, int, mask: encodeMask(observation) }) }) as Observation;
+    return observation;
   }
-
-  /** With `encode: true`: the layout descriptor of `observation.encoded` (the contract Python slices the buffers by). */
-  get observationLayout(): ObservationEncoder['layout'] | null { return this.encoder?.layout ?? null; }
-  /** With `encode: true`: keys the encoder met that its vocabulary allows to be unknown (they encode as 0), with counts. */
-  get encoderUnknown(): Record<string, number> { return Object.fromEntries(this.encoder?.unknown ?? []); }
 
   getObservation(): Observation {
     if (!this.sim || !this.run || this.episode.index === 0) throw new Error('call reset() before getObservation()');
@@ -698,9 +676,9 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   }
 
   /**
-   * Read-only helper for scripted policies (src/agents/heuristic): the next waypoint of a route from the player to the
+   * Read-only helper for the player (src/player): the next waypoint of a route from the player to the
    * world point (x, z), planned by the snapshot extractor's own A* over the game's height map and prop colliders
-   * (`Snapshot.nav`, docs/SNAPSHOT.md). Reads terrain, changes nothing, draws no random number. null when no route
+   * (`Snapshot.nav`, docs/snapshot.md). Reads terrain, changes nothing, draws no random number. null when no route
    * could be planned.
    */
   planRoute(x: number, z: number): Nav | null {
@@ -711,8 +689,8 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   }
 
   /**
-   * Read-only figures of the moment that the snapshot and the state do not carry (the manager's observation,
-   * src/hybrid): the overheal held, what is left of the lifesteal budget, the reference HP the Overtime tide is a
+   * Read-only figures of the moment that the snapshot and the state do not carry (no rule of the player
+   * reads them today): the overheal held, what is left of the lifesteal budget, the reference HP the Overtime tide is a
    * share of, the spawn multiplier as the game computes it (difficulty × enemy amount × the tier's amount, clamped to
    * 1–3), and the roars Rhydon has made in this zone. Fields are read; nothing is called or written.
    */
@@ -799,19 +777,13 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     sh.update(dom);
     const cap = run?.fpsCap || 0;
     const build = this.buildId();
-    const act = actionLayout(), obsLayout = this.encoder?.layout ?? null;
     return {
-      encoding: {
-        state: STATE_SCHEMA,
-        action: { version: ACTION_ENCODING_VERSION, hash: act.hash, nvec: act.nvec, maskSize: act.maskSize },
-        observation: obsLayout ? { version: obsLayout.version, layoutHash: obsLayout.hash, floatSize: obsLayout.floatSize, intSize: obsLayout.intSize, vocabSha256: obsLayout.knowledge.vocabSha256 } : null,
-      },
       game: {
         build, version: this.registries?.releases.find((r) => r.build === build)?.version ?? null, clientHeader: sim.net.log.client, bundleSha256: this.bundleSha,
         chunks: sim.loader.loaded.length, identifiers: sim.loader.ids,
       },
       sim: { hz: this.options.hz, dt: 1 / this.options.hz, actionRepeat: this.options.actionRepeat, decisionsPerSecond: this.options.hz / this.options.actionRepeat, render: false },
-      schema: { observation: OBSERVATION_SCHEMA, action: ACTION_SCHEMA, decision: DECISION_SCHEMA, snapshot: 1 },
+      schema: { observation: OBSERVATION_SCHEMA, action: ACTION_SCHEMA, decision: DECISION_SCHEMA, snapshot: 1, state: STATE_SCHEMA },
       instrumentation: [...sim.instrumentation, ...this.instrumentation],
       shimHash: sh.digest('hex'),
       shims: [...shims.map((f) => `src/sim/${f}`), dom],

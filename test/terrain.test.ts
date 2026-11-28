@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { decide, newMemory } from '../src/bot/brain/movement.ts';
-import { DEFAULT_TUNING as T } from '../src/bot/brain/tuning.ts';
-import type { Snapshot } from '../src/bot/snapshot.ts';
+import { decide, newMemory } from '../src/player/brain/movement.ts';
+import { DEFAULT_TUNING as T } from '../src/player/brain/tuning.ts';
+import type { Snapshot } from '../src/observations/snapshot.ts';
 import { quiet, recorded, vary } from './helpers.ts';
 
 const base = recorded('farm-zone1').snap;

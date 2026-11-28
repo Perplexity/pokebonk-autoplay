@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildFor, GENERIC } from '../src/bot/brain/builds.ts';
-import { pickGeneric, pickLevelUp, readOffer, scoreOffer } from '../src/bot/brain/choices.ts';
-import { DEFAULT_TUNING as T } from '../src/bot/brain/tuning.ts';
-import type { UiModal, UiOption } from '../src/bot/snapshot.ts';
+import { buildFor, GENERIC } from '../src/player/brain/builds.ts';
+import { pickGeneric, pickLevelUp, readOffer, scoreOffer } from '../src/player/brain/choices.ts';
+import { DEFAULT_TUNING as T } from '../src/player/brain/tuning.ts';
+import type { UiModal, UiOption } from '../src/observations/snapshot.ts';
 import { modals, quiet, recorded, vary } from './helpers.ts';
 
 const base = quiet(recorded('farm-zone1').snap);

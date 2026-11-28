@@ -3,10 +3,8 @@ import { join } from 'node:path';
 import type { HeadlessGameEnvironment } from '../environment/GameEnvironment.ts';
 import { playableMaps } from '../environment/profile.ts';
 import type { LeagueMember, Registries } from '../environment/profile.ts';
-import { interactableKinds, playerLimits, readKnowledgeRegistries } from './registries.ts';
+import { playerLimits, readKnowledgeRegistries } from './registries.ts';
 import type { DexSpecies, KnowledgeRegistries, MoveDef, MovePlan } from './registries.ts';
-import { DECISION_KINDS, EXTRA_ACTIONS, OFFER_KINDS, VOCAB_VERSION, makeTable } from './vocab.ts';
-import type { VocabTable } from './vocab.ts';
 
 /**
  * Game-knowledge export: the running game's own tables written as versioned JSON (docs/game-knowledge.md).
@@ -23,7 +21,7 @@ export interface KnowledgeHeader {
   /** Game build the data was read from, and the version its release list gives it. */
   build: string;
   gameVersion: string | null;
-  /** Version of the export format (KNOWLEDGE_VERSION, or VOCAB_VERSION for the vocabulary). */
+  /** Version of the export format (KNOWLEDGE_VERSION). */
   version: number;
   /** sha256 over the bytes of every chunk the game had loaded, in load order (same value as getMetadata().game.bundleSha256). */
   bundleSha256: string;
@@ -41,7 +39,6 @@ export interface Knowledge {
   species: { header: KnowledgeHeader; species: SpeciesEntry[]; /** Every species of the reference data (enemies, evolved forms): number, key, name, types, family. */ pokedex: { id: number; key: string; name: string; types: string[]; family: number; legendary: boolean }[] };
   moves: { header: KnowledgeHeader; levelUp: Record<string, unknown>; archetypes: Record<string, unknown>; moves: MoveEntry[]; fusions: Record<string, unknown>[] };
   items: { header: KnowledgeHeader; [section: string]: unknown };
-  vocab: { header: KnowledgeHeader; tables: Record<string, VocabTable> };
 }
 
 export interface SpeciesEntry {
@@ -131,7 +128,6 @@ export async function buildKnowledge(env: HeadlessGameEnvironment, options: Buil
   const push = (m: Map<number, number[]>, k: number, v: number) => { const a = m.get(k); if (a) { if (!a.includes(v)) a.push(v); } else m.set(k, [v]); };
   let MoveClass: (new (def: MoveDef) => { def: MoveDef; level: number; mods: Record<string, number> }) | null = null;
   let limits: { maxMoveLevel: number; maxVitaminLevel: number } | null = null;
-  let kinds: string[] = [];
   const signature = new Map<number, string>();
   for (const f of K.fusions) if (f.kind === 'signature' && typeof f.member === 'number') signature.set(f.member, f.key);
 
@@ -146,7 +142,6 @@ export async function buildKnowledge(env: HeadlessGameEnvironment, options: Buil
       MoveClass = held.constructor;
       const names = playerLimits(Object.getPrototypeOf(p));
       limits = { maxMoveLevel: p[names.maxMoveLevel], maxVitaminLevel: p[names.maxVitaminLevel] };
-      kinds = interactableKinds(run.interactables);
     }
     // Every move definition, as the game gives it in this member's run.
     for (const id of dex.moves.keys()) {
@@ -310,42 +305,6 @@ export async function buildKnowledge(env: HeadlessGameEnvironment, options: Buil
     maps: reg.maps.map((mp) => { const x = mp as unknown as Record<string, unknown>; return { key: mp.id, name: mp.name, playable: playableMaps(reg).some((q) => q.id === mp.id), types: dataOf(x.types ?? []), lateTypes: dataOf(x.late ?? []), weather: dataOf(x.weather ?? []), guardians: dataOf(x.guardians ?? x.bosses ?? []), legendaries: dataOf(x.legendaries ?? []), hasSanctuary: !!x.sanctuary }; }).sort((a, b) => (a.key < b.key ? -1 : 1)),
   };
 
-  // ---- vocabulary ----
-  const flagNames = (t: Record<string, number | string>): string[] => Object.keys(t).filter((k) => typeof t[k] === 'number' && Number.isInteger(Math.log2(t[k] as number)));
-  const entity: string[] = [
-    ...moves.map((mv) => `move:${mv.key}`), ...fusions.map((f) => `move:${f.key}`), ...items.vitamins.map((v) => `vitamin:${v.key}`), ...items.heldItems.map((i) => `item:${i.key}`),
-    ...items.relics.map((r) => `relic:${r.key}`), ...items.seals.map((s) => `seal:${s.key}`), ...items.overtimeOfferings.map((o) => `offering:${o.key}`),
-    ...dex.pokemon.map((s) => `species:${s.id}`), ...Object.keys(K.stats).map((s) => `stat:${s}`),
-  ];
-  const tables: Record<string, VocabTable> = {
-    species: makeTable(dex.pokemon.map((s) => s.id)),
-    type: makeTable(dex.types.types),
-    role: makeTable(new Set(reg.league.map((m) => m.role))),
-    rank: makeTable(new Set(reg.league.map((m) => m.rank))),
-    passive: makeTable(Object.keys(K.passives)),
-    move: makeTable([...moves.map((mv) => mv.key), ...fusions.map((f) => f.key)]),
-    archetype: makeTable(new Set([...Object.keys(K.archetypes), ...[...K.fusionDefs.values()].map((d) => d.arch)])),
-    moveClass: makeTable(new Set(moves.map((mv) => mv.class))),
-    status: makeTable(Object.keys(K.statuses)),
-    stat: makeTable(Object.keys(K.stats)),
-    vitamin: makeTable(items.vitamins.map((v) => v.key)),
-    item: makeTable(items.heldItems.map((i) => i.key)),
-    relic: makeTable(items.relics.map((r) => r.key)),
-    runBoost: makeTable(items.runBoosts.map((b) => b.key)),
-    seal: makeTable(K.seals),
-    overtimeOffering: makeTable(K.overtimeOfferings),
-    offerKind: makeTable(OFFER_KINDS),
-    decisionKind: makeTable(DECISION_KINDS),
-    extraAction: makeTable(EXTRA_ACTIONS),
-    enemyFlag: Object.fromEntries(flagNames(K.enemyFlags).sort((a, b) => (K.enemyFlags[a] as number) - (K.enemyFlags[b] as number)).map((name) => [name, Math.log2(K.enemyFlags[name] as number) + 1])),
-    projectileFlag: Object.fromEntries(flagNames(K.projectileFlags).sort((a, b) => (K.projectileFlags[a] as number) - (K.projectileFlags[b] as number)).map((name) => [name, Math.log2(K.projectileFlags[name] as number) + 1])),
-    map: makeTable(reg.maps.map((mp) => mp.id)),
-    weather: makeTable(Object.keys(K.weather)),
-    interactable: makeTable(kinds),
-    rarity: Object.fromEntries(K.rarityNames.map((name, i) => [name, i + 1])),
-    entity: makeTable(entity),
-  };
-
   const header = (dataset: string, version: number, source: Record<string, string>, gaps: string[]): KnowledgeHeader => ({
     dataset, build: md.game.build, gameVersion: md.game.version, version, bundleSha256: md.game.bundleSha256, language, profile: md.profile.preset, source, gaps,
   });
@@ -402,28 +361,12 @@ export async function buildKnowledge(env: HeadlessGameEnvironment, options: Buil
       }, [
         'held items: effects beyond mods are code; desc is the game\'s own text. maxStack is null where the table has no "max" (the game\'s code then uses its default limit)',
         'held items: prices in the in-run shop are computed when a stock is drawn and are not in a table',
-        'seals and overtime offerings: only the keys are data (effects are code; see docs/game-mechanics.md §1 and §3). Numbers the offerings use are in "overtime"',
+        'seals and overtime offerings: only the keys are data (effects are code; see docs/game.md §1 and §3). Numbers the offerings use are in "overtime"',
         'blessings (altars, totems, dojo prizes) are generated per offer as { label, mods, rarity }; there is no table of blessing keys',
         'relic passives: text and the numbers in "values"; the logic is code',
         'pickup kinds are numbers in the game with no table of names',
       ]),
       ...items,
-    },
-    vocab: {
-      header: header('vocab', VOCAB_VERSION, {
-        'species, type': `the reference data (${src('dex')}): every species of the Pokédex, not only League members, because enemies and evolutions use the same numbers`,
-        'role, rank, passive, move, archetype, moveClass, vitamin, item, relic, runBoost, seal, overtimeOffering, stat, status, weather, map, rarity': 'the keys of the tables exported in species.json, moves.json and items.json',
-        'offerKind, decisionKind, extraAction': 'src/knowledge/vocab.ts and src/environment/types.ts (the environment\'s own names)',
-        'enemyFlag, projectileFlag': `${src('enemyFlags', 'projectileFlags')}: the value is the bit position + 1`,
-        interactable: 'the kind names the game\'s map-point class compares against in its own source',
-        entity: 'one table over move:, vitamin:, item:, relic:, seal:, offering:, species: and stat: keys, for embeddings shared between the build and the offers of a dialog',
-      }, [
-        'interactable kinds: the game has no table; the list is what its map-point class compares a kind against in its code, so a kind created elsewhere would map to 0, and a few names in it belong to scenery of the same class (arch, fairy, grove, meadow)',
-        'role and rarity keys are the game\'s display names in the export language (the League table has no language-independent role key): an export in another language gives other keys',
-        'offer kinds: the four kinds of the standard mode\'s level-up generator',
-        'blessings and trades have no keys of their own: a blessing is encoded through the stat it changes (stat:<key>)',
-      ]),
-      tables,
     },
   };
 }
@@ -434,7 +377,7 @@ export const serialize = (dataset: unknown): string => JSON.stringify(dataset, n
 export function writeKnowledge(dir: string, k: Knowledge): Record<string, { path: string; bytes: number }> {
   mkdirSync(dir, { recursive: true });
   const out: Record<string, { path: string; bytes: number }> = {};
-  for (const name of ['species', 'moves', 'items', 'vocab'] as const) {
+  for (const name of ['species', 'moves', 'items'] as const) {
     const path = join(dir, `${name}.json`);
     const text = serialize(k[name]);
     writeFileSync(path, text);
@@ -444,6 +387,6 @@ export function writeKnowledge(dir: string, k: Knowledge): Record<string, { path
 }
 
 /** Read an exported dataset back. */
-export function readDataset<T>(dir: string, name: 'species' | 'moves' | 'items' | 'vocab'): T {
+export function readDataset<T>(dir: string, name: 'species' | 'moves' | 'items'): T {
   return JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8')) as T;
 }

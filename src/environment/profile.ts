@@ -41,7 +41,7 @@ import { ORIGIN } from '../sim/net.ts';
  * What it deliberately leaves at the fresh-account value: Stardust (0), run history, counters, quests, cosmetics
  * (including the titles friendship levels award and the shiny skins) and the consumable bag (run boosts). (The
  * Pokédex `seen` list is not set here either: the game fills it itself, for every species of an unlocked family,
- * when it adopts the profile.) See docs/game-mechanics.md §6.
+ * when it adopts the profile.) See docs/game.md §6.
  */
 
 /** Version of the unlocked preset: reported by `getMetadata().profile.preset`; store it with recorded episodes. */

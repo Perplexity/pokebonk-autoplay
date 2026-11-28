@@ -1,126 +1,98 @@
 # pokebonk-autoplay
 
-An offline practice environment for PokéBonk (a free browser fan game, three.js/WebGL) and an AI player for it. A
-local copy of the game runs **without a browser**, inside Node, as a deterministic environment. A rule-based player
-(the *heuristic*) plays whole runs in it, every change to that player is measured over fixed seeds, and a learned
-*manager* on top of it is trained with PyTorch.
+A rule-based player for PokéBonk (a free browser fan game), and the offline environment it plays in. A local copy of
+the game runs **without a browser**, inside Node, as a deterministic environment: the same seed gives the same run.
+The player plays whole runs in it, and every change to the player is measured over fixed seeds before it is kept.
 
-**The goal:** Mewtwo, forest, tier 2, Ranked rules, game build `mwsewi0r` (0.10.26). Score = KOs plus the Overtime
-bonus when it is cashed. Success is one run of 20 million or more in a single evaluation of the 50 held-out seeds.
+**The goal:** the top of the game's KO leaderboard, where the best runs stand at 30 to 32 million KOs. A run's
+**ranked KOs** are what that leaderboard shows: its own KOs plus the Overtime bonus when Overtime is cashed (the
+game's "score" is another, larger number, and is not used here). Measured for Mewtwo, forest, tier 2, Ranked rules,
+game build `mwsewi0r` (0.10.26), on 50 held-out seeds; 20 million is a waypoint.
 
-**Offline by design.** Nothing here contacts the live game: no real account, no leaderboard, no other player. The
-game processes and the trainer each refuse network connections in their own process and talk over pipes. `./mirror`
-holds a copy of someone else's game for running it on your own machine; it is git-ignored and must not be published.
+**Offline by design.** Nothing here contacts the live game: no real account, no leaderboard, no other player. Every
+game process refuses network connections. `./mirror` holds a copy of someone else's game for running it on your own
+machine; it is git-ignored and must not be published.
 
 ## Where it stands
 
-Median, 90th percentile and best score of the heuristic's plans, one episode per game process, no learning:
+The best run stands at 15.0 million ranked KOs: half of what the top of the leaderboard reaches.
 
-| Plan | What it adds | Seeds | Median | p90 | Best |
+| Plan | What it added | Seeds | Median ranked KOs | p90 | Best |
 |---|---|---|---|---|---|
-| plan-3 (the default) | the phase 1 heuristic | 100 development | 1,465,290 | 4,158,466 | 8,031,427 |
-| | | 50 held-out | 1,528,620 | 4,034,675 | 9,052,797 |
-| | | 49 held-out (without 900038) | 1,509,296 | 3,952,685 | 6,323,615 |
-| plan-5 | items valued by what the score follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
-| plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 development | 7,430,752 | 9,221,229 | 10,899,768 |
-| | | 50 held-out | 7,780,684 | 9,619,558 | 10,299,849 |
-| | | 49 held-out (without 900038) | 7,896,712 | 9,621,454 | 10,299,849 |
-| | | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
+| plan-3 | errands, seals, the final swarm fought by the portal | 100 development | 1,465,290 | 4,158,466 | 8,031,427 |
+| plan-5 | items valued by what the KO count follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
+| plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
-| plan-8 | the leaderboard build: one fusion, two linked pairs, Encore; the account's build plan | 100 second development | 13,803,730 | 14,467,683 | 15,039,733 |
-| plan-9 | a cleared zone is left on low HP only once its final swarm has begun | 100 second development | 13,884,013 | 14,560,342 | 15,039,733 |
+| plan-8 | the leaderboard build: one fusion, two linked pairs, Encore | 100 second development | 13,803,730 | 14,467,683 | 15,039,733 |
+| plan-9 | a cleared zone is no longer left before its final swarm | 100 second development | 13,884,013 | 14,560,342 | 15,039,733 |
 
-No run has reached 20 million. `docs/phase-3-report.md` has every measurement, including what failed: the first
-PPO runs on top of plan-3 changed none of its choices, and what limits a run today is how long its build keeps
-killing at the spawn ceiling in Overtime.
+`docs/results.md` has every figure, what was tried and was worse, and what ends a run today: from Overtime's
+minute 8 the game makes enemy HP grow ×48 a minute and the tide ×4, and the player arrives there with about a
+tenth of the max HP of a leaderboard run.
 
 ## How it is built
 
 ```
 the game (mirror/, unmodified)
-   └─ src/sim, src/environment     the headless environment: one game per process, reset(seed), step(action)
-        ├─ src/bot/brain           movement: 16 headings scored every decision (dodging, terrain, goals)
-        ├─ src/agents/heuristic2   the heuristic: a run plan (plan.ts), dialog answers (chooser.ts), item values (values.ts)
-        ├─ src/hybrid              skills and the manager's view: the heuristic proposes, a model may override
-        └─ src/runner, src/ipc     many episodes in parallel into SQLite; the pipe bridge to Python
-python/pokebonk_rl                 PPO for the manager, copying the heuristic first, rewards, evaluation, model registry
+   └─ src/sim, src/environment   the headless environment: one game per process, reset(seed), step(action)
+        ├─ src/observations      what the player sees: the surroundings (snapshot) and the run (state)
+        ├─ src/player            the player: the plan, a Pokémon's build, dialog answers, the run's lifecycle
+        │    └─ brain/           movement and fighting: sixteen headings scored at every decision
+        ├─ src/runner            many episodes in parallel, each in its own process
+        └─ src/storage           every episode and every answered dialog, in SQLite
+src/knowledge                    the game's own tables (Pokémon, moves, items) exported as JSON
+src/sandbox                      the tool that makes the local copy; the local stand-in for the game's service
+src/fidelity, src/cdp            the same episode in a real local Chrome, to check the headless environment
 ```
 
-- **A plan is data.** `plan-1` to `plan-9` live in `src/agents/heuristic2/plan.ts`; an old plan is never edited, a
-  new one is added and measured. The same holds for rewards (`configs/reward-v*.yaml`), item archives and
-  observation and action layouts: new versions only, old ones kept.
-- **Seeds.** 1–30 are for tuning. A change that wins there is checked once on development seeds nothing was
-  chosen on: 2000001–2000100 for plans up to plan-6 (one setting of plan-7 was chosen on them, so for plan-7 and
-  later they count as tuning seeds) and 3000001–3000100 since. 900001–900050 are held out and are never tuned on;
-  seed 900038 is spent (a stall was diagnosed on it), so held-out results are also given without it.
-- **One run's score is noisy** (its standard deviation is about three quarters of its mean), so nothing is
-  concluded from a few runs. Reports give median, mean, p90 and best over a whole batch.
+- **The plan is data** (`src/player/plan.ts`): every threshold, the vitamins by phase, and a build per Pokémon. A
+  rule never names a Pokémon, a map or a tier.
+- **A change is measured.** One run's ranked KOs are noisy (the standard deviation is about three quarters of the mean),
+  so a change is judged on a whole batch: 1–30 are tuning seeds, 3000001–3000100 check a change once, and
+  900001–900050 are held out.
+- **A kept change is a new plan version**; the one before leaves the code and its figures stay in `docs/results.md`.
 
 ## Run it
 
-Needs Node.js 24 or newer and Python 3.13. TypeScript runs directly: there is no build step.
+Needs Node.js 24 or newer. TypeScript runs directly: there is no build step.
 
 ```sh
 npm install
-npm run mirror                                        # once: the local copy of the game's public static files
-npm run export:knowledge && npm run export:encoding   # once per game build: data tables and buffer layouts
+npm run mirror -- --deep && node scripts/mirror-sprites.ts   # once: the local copy of the game's public files
+npm run export:knowledge                                     # once per game build: the game's data tables
 
-# The heuristic over fixed seeds, into data/pokebonk.sqlite
-node scripts/run-episodes.ts --policy=heuristic2 --episodes=30 --seed=1 --workers=10 \
-  --species=150 --map=forest --tier=2 --max-time=7200 --archive=balanced --label=my-batch
-# A named plan, with the item archive it was measured on
-node scripts/run-episodes.ts --policy=heuristic2 --policy-options='{"plan":{"base":"plan-6"}}' \
-  --episodes=30 --seed=1 --workers=10 --species=150 --map=forest --tier=2 --max-time=7200 --archive=stack-2 --label=my-plan-6
+# The player over fixed seeds, into data/pokebonk.sqlite (about an hour on a laptop)
+node scripts/run-episodes.ts --policy=player --episodes=30 --seed=1 --workers=10 --species=150 --map=forest --tier=2 \
+  --max-time=7200 --label=my-batch
+node scripts/baseline-report.ts --label=my-batch             # median, mean, p90, best, where runs ended
 
-npm test && npm run typecheck                         # 198 tests
+# One run with a readable trace: the zone's state, every intent, every answered dialog
+node scripts/trace.ts --seed=1
+
+# One key of the plan changed for a batch or a trace
+node scripts/trace.ts --seed=1 --plan='{"leaveHp":0.5}'
+
+npm test && npm run typecheck
 ```
 
-The learned manager (parked while the default plan is still improving):
-
-```sh
-python3.13 -m venv .venv && .venv/bin/python -m pip install torch && .venv/bin/python -m pip install -e '.[test]'
-.venv/bin/python -m pokebonk_rl.bc collect --config configs/manager.yaml --seeds 1000000-1000039 --out data/bc/plan3
-.venv/bin/python -m pokebonk_rl.bc fit --config configs/manager.yaml --data data/bc/plan3 --name manager-copy-01
-.venv/bin/python -m pokebonk_rl.train --config configs/manager.yaml --name my-run --set manager.init_from=manager-copy-01
-.venv/bin/python -m pokebonk_rl.evaluate --config configs/manager-evaluation.yaml --model my-run --seeds 1-30
-.venv/bin/python -m pokebonk_rl.train --resume my-run  # continue a run from its newest checkpoint
-.venv/bin/python -m pokebonk_rl.registry list          # candidate and stable models
-.venv/bin/tensorboard --logdir logs/tensorboard --host 127.0.0.1
-.venv/bin/python -m pytest python/tests                # 48 tests
-```
-
-The training dashboard (`docs/dashboard.md`):
-
-```sh
-npm run dashboard:install && npm run dashboard:build   # once: the dashboard's page
-npm run dashboard                                       # http://127.0.0.1:8090 (this machine only)
-```
-
-On Windows the Python commands are `py -3.13 -m venv .venv` and `.venv\Scripts\python -m …`, and PyTorch for an
-NVIDIA card is installed with `pip install torch --index-url https://download.pytorch.org/whl/cu128`. `device: cpu`
-is the measured choice on an Apple-silicon Mac too (914 against 249 decisions a second on its GPU). Installing the
-packages and `npm run mirror` are the only steps that download anything.
-
-Do not edit `src/` while a batch is running: every episode starts a fresh game process that loads the source as it
-is at that moment.
+`npm run mirror` and `scripts/mirror-sprites.ts` are the only commands that download anything from the game's site
+(plain static files). Do not edit `src/` while a batch is running from the same checkout: every episode starts a
+fresh game process that loads the source as it is at that moment.
 
 ## Read more
 
 | Read | For |
 |---|---|
-| `docs/phase-3-report.md` | the current work: rewards, the PPO runs, what limits a run, plans 5 to 7 |
-| `docs/phase-0-report.md` to `docs/phase-2-report.md` | Overtime and its ceiling, the heuristic's first plans, the hybrid |
-| `docs/environment.md`, `docs/fidelity.md` | the headless environment and how it was checked against the game in Chrome |
-| `docs/game-mechanics.md`, `docs/game-knowledge.md` | what the game does, as verified, and the exported game data |
-| `docs/hybrid.md`, `docs/training.md` | skills, the manager, rewards, training, evaluation, promotion |
-| `docs/baseline.md`, `docs/storage.md`, `docs/dashboard.md` | the episode runner, the database, the training dashboard |
-| `docs/browser-autopilot.md` | the older part: the sandbox host and the autopilot that plays in a real browser |
+| `docs/player.md` | how the player works, what it does not do yet, and the loop for changing it |
+| `docs/results.md` | what has been measured, what was tried and was worse, what ends a run today |
+| `docs/game.md` | what the game does, each fact marked as verified, read in its code, or unknown |
+| `docs/game-updates.md` | taking a new version of the game |
+| `docs/environment.md`, `docs/observation.md`, `docs/snapshot.md` | the headless environment and what an observation holds |
+| `docs/game-knowledge.md`, `docs/storage.md` | the exported game data; the episode database |
+| `docs/fidelity.md` | how the headless environment was checked against the game in Chrome |
 
 ## Working on it
 
-Changes go through pull requests: a branch per change, reviewed by Claude as a senior machine learning engineer and
-programmer (`.github/workflows/claude-code-review.yml`, with `REVIEW.md` as its guide). A pull request the reviewer
-calls ready is merged into `main` by the workflow; one it does not is left open with its findings.
-
-A change to how anything plays comes with a test and with a measured batch on seeds 1–30; a change meant to become
-a default is also played on the development seeds.
+Changes go through pull requests: a branch per change, reviewed by Claude (`.github/workflows/claude-code-review.yml`,
+with `REVIEW.md` as its guide). A pull request the reviewer calls ready is merged into `main` by the workflow; one it
+does not is left open with its findings. `CLAUDE.md` has the rules that always hold.

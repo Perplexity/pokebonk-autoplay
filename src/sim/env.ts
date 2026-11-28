@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { MockApi } from '../sandbox/mockApi.ts';
 import { Store } from '../sandbox/store.ts';
 import { initLogger } from '../logger.ts';
-import { extractSnapshot } from '../bot/extract.ts';
+import { extractSnapshot } from '../observations/extract.ts';
 import { VirtualClock, real } from './clock.ts';
 import { Net, ORIGIN } from './net.ts';
 import { installLoader } from './loader.ts';
@@ -289,7 +289,7 @@ export class Sim {
     (btn as any)?.click();
   }
 
-  /** The existing observation extractor (src/bot/extract.ts), run in-process against the live run object. */
+  /** The snapshot extractor (src/observations/extract.ts), run in-process against the live run object. */
   snapshot(): any { return extractSnapshot.call(this.run); }
 
   /** null while the episode goes on, else why it ended. */

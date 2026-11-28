@@ -1,7 +1,7 @@
 /**
  * Unattended episode runner over the headless environment (no browser, no network).
  *
- *   node scripts/run-episodes.ts --policy=heuristic --episodes=30 --workers=4
+ *   node scripts/run-episodes.ts --policy=player --episodes=30 --workers=10 --species=150 --map=forest --tier=2
  *   node scripts/run-episodes.ts --policy=idle --episodes=3 --seed=100 --species=25 --map=coast --tier=1
  *   node scripts/run-episodes.ts --policy=random --episodes=2 --max-time=300      safety cap on the run clock (truncated)
  *   node scripts/run-episodes.ts --policy=random --classic                        Classic instead of Ranked rules
@@ -10,12 +10,13 @@
  * result to the SQLite database (docs/storage.md). It never loads the game itself.
  *
  * Options
- *   --policy=random|idle|heuristic     --episodes=N     --seed=S (episode i plays seed S + i)     --seeds=3,7,19 (explicit)
+ *   --policy=random|idle|player        --episodes=N     --seed=S (episode i plays seed S + i)     --seeds=3,7,19 (explicit)
  *   --workers=K (default 1)            --species=<dex>  --map=<id>  --tier=0..2  --classic
  *   --max-time=<game seconds, 0 = none>   --action-repeat=3   --hz=60
  *   --max-idle=<game seconds>          end an episode as invalid after this long without a KO and without movement
- *   --archive=empty|loose|balanced|narrow|balanced-2|stack-2   account preset unlocked-v4 with that item archive (default: unlocked-v3)
+ *   --archive=stack-2          account preset unlocked-v4 with that item archive (src/player/values.ts; default: unlocked-v3)
  *   --build-plan=kit-1         account preset unlocked-v5: the account's build plan for the species (favourite moves, moves switched off)
+ *                              With --policy=player both default to the plan's own account (src/player/plan.ts); `none` plays without.
  *   --max-ko-gap=<game seconds>        end an episode as invalid after this long without a KO (boss fights do not count)
  *   --ko-gap-grace=<game seconds>      ...but not during this long at the start of a run (the opening's grace)
  *                                      (default: no such rule; training and evaluation use 30)
@@ -23,11 +24,11 @@
  *                                      is named by its seed; more: it also depends on what the process played before.
  *                                      1 = every episode in a fresh process (loads the game once per episode)
  *   --recycle-rss=1500                 … or as soon as it reports more resident memory than this (MB)
- *   --episode-timeout=1800             wall seconds for one episode before its worker is killed and the seed recorded as an error
+ *   --episode-timeout=5400             wall seconds for one episode before its worker is killed and the seed recorded as an error
  *   --db=<file>   (default data/pokebonk.sqlite)        --no-db
  *   --jsonl[=<folder>]                 also write <folder, default data/runs>/<timestamp>/episodes.jsonl and metadata.json
  *   --label=<text>                     stored with the batch
- *   --policy-options=<json>            the policy's own settings, stored with the batch (heuristic: {"tuning":{…},"heuristic":{…}})
+ *   --policy-options=<json>            the policy's own settings, stored with the batch (player: {"plan":{…}}, keys of the plan to replace)
  *   --quiet                            no line per episode
  *
  * Exit code: 0 when every episode was played and stored, 1 when anything failed (errors are in the `errors` table and
@@ -36,6 +37,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { accountOptions } from '../src/player/plan.ts';
 import { DEFAULT_BATCH, runBatch, validateConfig } from '../src/runner/pool.ts';
 import type { BatchConfig } from '../src/runner/pool.ts';
 import { summarize, summaryLines } from '../src/runner/report.ts';
@@ -60,12 +62,16 @@ const num = (k: string, d: number): number => {
   return v;
 };
 
+// The player is measured on the plan's own account: without the flags a batch plays on it, never on an unmeasured one.
+const given = { ...(args.has('archive') ? { archive: String(args.get('archive')) } : {}), ...(args.has('build-plan') ? { buildPlan: String(args.get('build-plan')) } : {}) };
+const account = (args.get('policy') ?? DEFAULT_BATCH.policy) === 'player' ? accountOptions(num('species', DEFAULT_BATCH.species), given) : given;
+
 const config: BatchConfig = {
   ...DEFAULT_BATCH,
   policy: args.get('policy') ?? DEFAULT_BATCH.policy, episodes: num('episodes', 1), seed: num('seed', 1), workers: num('workers', 1),
   ...(args.has('seeds') ? { seeds: args.get('seeds')!.split(',').map(Number) } : {}),
   species: num('species', DEFAULT_BATCH.species), map: args.get('map') ?? DEFAULT_BATCH.map, tier: num('tier', DEFAULT_BATCH.tier), ranked: !args.has('classic'),
-  maxGameTime: num('max-time', 0), ...(args.has('max-idle') ? { maxIdleGameTime: num('max-idle', 0) } : {}), ...(args.has('max-ko-gap') ? { maxKoGapGameTime: num('max-ko-gap', 0) } : {}), ...(args.has('ko-gap-grace') ? { koGapGraceGameTime: num('ko-gap-grace', 0) } : {}), ...(args.has('archive') ? { archive: String(args.get('archive')) } : {}), ...(args.has('build-plan') ? { buildPlan: String(args.get('build-plan')) } : {}), hz: num('hz', 60), actionRepeat: num('action-repeat', 3),
+  maxGameTime: num('max-time', 0), ...(args.has('max-idle') ? { maxIdleGameTime: num('max-idle', 0) } : {}), ...(args.has('max-ko-gap') ? { maxKoGapGameTime: num('max-ko-gap', 0) } : {}), ...(args.has('ko-gap-grace') ? { koGapGraceGameTime: num('ko-gap-grace', 0) } : {}), ...account, hz: num('hz', 60), actionRepeat: num('action-repeat', 3),
   recycleAfter: num('recycle-after', DEFAULT_BATCH.recycleAfter), recycleRssMB: num('recycle-rss', DEFAULT_BATCH.recycleRssMB), episodeTimeoutSec: num('episode-timeout', DEFAULT_BATCH.episodeTimeoutSec),
   label: args.get('label') ?? null,
   ...(args.has('policy-options') ? { policyOptions: JSON.parse(args.get('policy-options')!) as Record<string, unknown> } : {}),

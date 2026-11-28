@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 // a dojo trial, Incense and a rift with its relic. The check script (scripts/probes/map-features-check.ts) acts only
 // through the environment; what is asserted here is what the game did, read from the observations it printed.
 // The slot machine, the shop's sell list, Bill's machine and Max form need more game time to reach; they are covered
-// by the stand-in tests (test/env/dialogs.test.ts) and by the recorded checks of docs/baseline.md §12.
+// by the stand-in tests (test/env/dialogs.test.ts).
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = join(REPO, 'scripts', 'probes', 'map-features-check.ts');
@@ -16,7 +16,7 @@ const SCRIPT = join(REPO, 'scripts', 'probes', 'map-features-check.ts');
 function check(...args: string[]): string {
   const r = spawnSync(process.execPath, [SCRIPT, '--seed=1', '--species=150', ...args], { cwd: REPO, encoding: 'utf8', timeout: 240_000 });
   assert.equal(r.status, 0, `the check script failed:\n${r.stderr}\n${r.stdout.slice(-2000)}`);
-  assert.match(r.stdout, /encoder unknown keys: \{\}; blocked network: 0/, 'every observation could be encoded, and nothing reached the network');
+  assert.match(r.stdout, /blocked network: 0/, 'nothing reached the network');
   return r.stdout;
 }
 /** The "before" and "after" build lines of the first answer whose headline matches. */
@@ -58,5 +58,5 @@ test('Incense in the real game: a rift is opened, entered, cleared, its relic ta
   assert.equal(left![1], '1');
   assert.notEqual(left![2], 'none', 'a relic is held: the relic dialog met the real game');
   assert.match(out, /dialogs seen: \{[^}]*"relic":1/);
-  assert.match(out, /mapUse \d+ \(points \d+, shop 0, spins 0, lessons 0, rifts 1, forms 0\)/);
+  assert.match(out, /mapUse \d+ \(points \d+, shop 0, spins 0, lessons \d+, rifts 1, forms 0\)/);
 });

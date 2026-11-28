@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": false
   },
-  "include": ["src", "test", "dashboard/server", "dashboard/shared"]
+  "include": ["src", "test", "scripts"]
 }

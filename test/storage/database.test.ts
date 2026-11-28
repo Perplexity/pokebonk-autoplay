@@ -252,6 +252,15 @@ test('comparing two batches: identical episodes, a difference in one column or o
     const preset = batch({ profilePreset: 'unlocked-v3' }, [episode(5)]);
     const species = batch({}, [episode(5)], { species: 25 });
     const other = batch({}, [episode(8)]);
+    // The replay of a refactor: other code (policy name and version, the environment's source hash), the same play.
+    const moved = (eps: EpisodeRecord[], m: Partial<BatchMetadata> = {}): number => {
+      const id = store.createBatch({ ...BATCH, policyName: 'player', policyVersion: '2+def', config: { ...BATCH.config, species: 155, map: 'forest', tier: 0, ranked: true, maxGameTime: 0 } });
+      store.setBatchMetadata(id, { ...METADATA, shimHash: 'c'.repeat(64), ...m });
+      for (const e of eps) store.insertEpisode(id, e);
+      store.finishBatch(id, { status: 'completed', finishedAt: '2026-01-01T00:01:00.000Z', wallSeconds: 60 });
+      return id;
+    };
+    const refactored = moved([episode(5), episode(6)]), broke = moved([episode(5), episode(6, { kills: 1017 })]), otherGame = moved([episode(5)], { bundleSha256: 'd'.repeat(64) });
     store.close();
     const script = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'compare-batches.ts');
     const run = (x: number, y: number) => spawnSync(process.execPath, [script, `--db=${t.path}`, `--a=${x}`, `--b=${y}`], { encoding: 'utf8' });
@@ -273,5 +282,18 @@ test('comparing two batches: identical episodes, a difference in one column or o
       assert.equal(r.stdout, '');
     }
     assert.equal(run(a, 999).status, 2);
+    // Without --refactor other code is refused; with it the episodes decide, and another game is still refused.
+    const refused = run(a, refactored);
+    assert.equal(refused.status, 2);
+    assert.match(refused.stderr, /policy_name: heuristic \/ player[\s\S]*shim_hash/);
+    const re = (x: number, y: number) => spawnSync(process.execPath, [script, `--db=${t.path}`, `--a=${x}`, `--b=${y}`, '--refactor'], { encoding: 'utf8' });
+    const replay = re(a, refactored);
+    assert.equal(replay.status, 0, replay.stdout + replay.stderr);
+    assert.match(replay.stdout, /different code, as --refactor allows: policy_name: heuristic \/ player[\s\S]*identical: 2 episode\(s\)/);
+    assert.equal(re(a, broke).status, 1);
+    const og = re(a, otherGame);
+    assert.equal(og.status, 2);
+    assert.match(og.stderr, /bundle_sha256/);
+    assert.doesNotMatch(og.stderr, /policy_name/);
   } finally { t.done(); }
 });

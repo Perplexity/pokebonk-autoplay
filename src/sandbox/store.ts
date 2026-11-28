@@ -7,7 +7,7 @@ import { join } from 'node:path';
  *   data/db.json            sessions and profiles (one per local account)
  *   data/runs/<id>.json     one file per run: ticket, checkpoints, result, status
  *   data/saves/<id>.json    the game's own suspend/cloud save blob for a run (resume)
- *   data/journal.jsonl      one line per finished run: what the dashboard reads
+ *   data/journal.jsonl      one line per finished run
  */
 
 export interface Account { id: string; name: string; token: string; guest: boolean; created: number }

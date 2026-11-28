@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Enemy, Snapshot, UiModal, UiState } from '../src/bot/snapshot.ts';
+import type { Enemy, Snapshot, UiModal, UiState } from '../src/observations/snapshot.ts';
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

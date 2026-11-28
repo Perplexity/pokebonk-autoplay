@@ -49,12 +49,12 @@ export const mutationOfDay = (now = Date.now()) => {
 
 /**
  * The sandbox's stand-in for the game service. Same paths and JSON shapes the client expects, backed by local
- * files only. Routes are documented in docs/ENDPOINTS.md; keep the two in sync.
+ * files only. `list()` names every route.
  */
 export class MockApi {
   private store: Store;
   private routes: { method: string; pattern: string; re: RegExp; keys: string[]; h: Handler; doc: string }[] = [];
-  /** Listeners for the dashboard / session manager (run started, finished...). */
+  /** Listeners for whoever runs the game (run started, finished...). */
   onEvent: (ev: { type: string; run?: RunRecord; entry?: JournalEntry }) => void = () => {};
   /** Species id → evolution family id, when the mirrored data files are available. */
   family: (species: number) => number = (s) => s;
@@ -86,7 +86,7 @@ export class MockApi {
     this.routes.push({ method, pattern, re, keys, h, doc });
   }
 
-  /** Every route with its one-line description: the source of docs/ENDPOINTS.md and of the dashboard's list. */
+  /** Every route with its one-line description. */
   list() { return this.routes.map((r) => ({ method: r.method, path: r.pattern, doc: r.doc })); }
 
   private session(a: Account) { return { id: a.id, name: a.name, guest: a.guest, token: a.token }; }

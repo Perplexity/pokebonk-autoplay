@@ -46,7 +46,7 @@ Every file starts with a header:
   "source": { "<fields>": "<where they came from>" }, "gaps": ["<what is not data>"] }
 ```
 
-`version` is `KNOWLEDGE_VERSION` (`VOCAB_VERSION` for the vocabulary). `bundleSha256` is the value
+`version` is `KNOWLEDGE_VERSION`. `bundleSha256` is the value
 `getMetadata().game.bundleSha256` reports. There is no timestamp: a second export gives byte-identical files (§4).
 Names and descriptions are in the language the game loaded (`en`).
 
@@ -109,47 +109,22 @@ range is not a field of a definition.
 
 Gaps: item effects beyond `mods` are code (the description is the game's text) · in-run shop prices are computed
 when a stock is drawn · seals and overtime offerings have no data beyond their keys (their rules are in
-docs/game-mechanics.md §1 and §3) · blessings are generated per offer as `{label, mods, rarity}` and have no keys ·
+docs/game.md §1 and §3) · blessings are generated per offer as `{label, mods, rarity}` and have no keys ·
 relic passives are text plus numbers · pickup kinds are numbers without names.
-
-### vocab.json — the index of every categorical key
-
-`tables.<name>` maps a key to an integer. **Index 0 is reserved for "none / unknown"** in every table; keys are
-sorted (numeric keys numerically, others by code unit) and numbered from 1, so an index depends only on the set of
-keys. `test/knowledge/vocab.test.ts` pins the tables of this build (their hash, their sizes, sample indexes).
-
-| Table | Keys | From |
-|---|---|---|
-| `species` | 251 | every species of the reference data, by number |
-| `type`, `role`, `rank`, `passive` | 18, 136, 4, 214 | reference data; League table; passive table |
-| `move`, `archetype`, `moveClass` | 924, 26, 2 | moves.json (moves and fusions) |
-| `vitamin`, `item`, `relic`, `runBoost`, `seal`, `overtimeOffering` | 26, 142, 47, 9, 6, 6 | items.json |
-| `stat`, `status`, `weather`, `map`, `rarity` | 39, 13, 7, 14, 5 | items.json |
-| `offerKind`, `decisionKind`, `extraAction` | 4, 20, 10 | the environment's own names (`src/knowledge/vocab.ts`, `src/environment/types.ts`) |
-| `enemyFlag`, `projectileFlag` | 24, 13 | the game's flag tables; the value is the bit position + 1 |
-| `interactable` | 35 | the kinds the game's map-point class compares against in its own source |
-| `entity` | 1441 | one table over `move:`, `vitamin:`, `item:`, `relic:`, `seal:`, `offering:`, `species:` and `stat:` keys, so that one embedding serves the build and the offers of a dialog |
-
-Gaps: the game has no table of interactable kinds (a kind created elsewhere in its code would map to 0; four names
-in the list belong to scenery) · `role` and `rarity` keys are display names in the export language · blessings and
-trades have no keys (a blessing is encoded through the stat it changes).
 
 ## 3. Using it
 
-`loadKnowledge(build)` (`src/knowledge/load.ts`) reads the four files, checks they belong to one export and to the
-asked build, and gives the encoder its joins (types of a species, role of a member, key of a move id, kind of a
-stat). The environment loads it only with `encode: true`.
+The player reads the three files through `loadValuationKnowledge(build)` (`src/player/values.ts`): items and vitamins
+with their effects, moves with their class, type and archetype, and for every League member its own four moves and
+the moves a free slot can be offered. The environment generates the item archive from the same data.
 
 ## 4. Reproducibility
 
 `node scripts/export-knowledge.ts --check` repeats the export in memory and compares with the files on disk.
-Two full exports in two separate processes gave byte-identical files (sha256 in the stage report).
+Two full exports in two separate processes gave byte-identical files.
 The files contain no time, no path and no random value; lists are sorted by key or id; the per-species runs use a
 fixed seed.
 
 ## 5. When the game updates
 
-The export is tied to the build on purpose (ADR 0001 §7). A new build gets a new folder: run the export, read the
-errors (a table that no longer matches its shape stops it), re-validate `src/knowledge/registries.ts`, then compare
-the new `vocab.json` with the old one. A changed vocabulary changes the observation layout's hash
-(docs/observation.md), so a trained policy is tied to the vocabulary it was trained with.
+The export is tied to the build on purpose. A new build gets a new folder: docs/game-updates.md §2.

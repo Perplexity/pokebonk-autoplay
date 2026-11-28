@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildPlanOf } from '../../src/agents/heuristic2/kit.ts';
-import { loadValuationKnowledge } from '../../src/agents/heuristic2/values.ts';
+import { buildPlanOf } from '../../src/player/kit.ts';
+import { loadValuationKnowledge } from '../../src/player/values.ts';
 import { createEnvironment } from '../../src/environment/index.ts';
 
 test('preset unlocked-v5: the game adopts the build plan: its favourites, each with the top chance, and the moves switched off', async () => {

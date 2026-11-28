@@ -2,16 +2,14 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HEURISTIC_VERSION, heuristicPolicy } from '../agents/heuristic/index.ts';
-import { HEURISTIC2_VERSION, heuristic2Policy } from '../agents/heuristic2/policy.ts';
-import type { HeuristicOptions } from '../agents/heuristic/index.ts';
+import { PLAYER_VERSION, playerPolicy } from '../player/policy.ts';
 import type { HeadlessGameEnvironment } from '../environment/GameEnvironment.ts';
 import { idlePolicy, randomPolicy } from '../environment/policies.ts';
 import type { Policy } from '../environment/policies.ts';
 
 /**
  * The policies the runner can play, by name. A policy is built inside the worker process that owns the environment:
- * the heuristic takes the environment's read-only route planner, the others take nothing.
+ * the player takes the environment's read-only route planner, the others take nothing.
  */
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -27,13 +25,12 @@ interface PolicySpec {
 const SPECS: Record<string, PolicySpec> = {
   random: { version: '1', sources: ['environment/policies.ts'], make: () => randomPolicy() },
   idle: { version: '1', sources: ['environment/policies.ts'], make: () => idlePolicy() },
-  heuristic2: { version: HEURISTIC2_VERSION, sources: ['agents/heuristic2', 'agents/heuristic', 'bot/brain'], make: (env, o) => heuristic2Policy({ planRoute: (x, z) => env.planRoute(x, z), plan: o.plan as Record<string, unknown> | undefined }) },
-  heuristic: { version: HEURISTIC_VERSION, sources: ['agents/heuristic', 'bot/brain'], make: (env, o) => heuristicPolicy({ planRoute: (x, z) => env.planRoute(x, z), tuning: o.tuning as HeuristicOptions['tuning'], heuristic: o.heuristic as HeuristicOptions['heuristic'] }) },
+  player: { version: PLAYER_VERSION, sources: ['player', 'player/brain'], make: (env, o) => playerPolicy({ planRoute: (x, z) => env.planRoute(x, z), build: () => env.getMetadata().game.build, plan: o.plan as Record<string, unknown> | undefined }) },
 };
 
 export const POLICY_NAMES = Object.keys(SPECS);
 
-/** `options` are the policy's own settings (heuristic: `{ tuning, heuristic }` overrides; the others take none). */
+/** `options` are the policy's own settings (player: `{ plan }`, keys of the plan to replace; the others take none). */
 export function makePolicy(name: string, env: HeadlessGameEnvironment, options: Record<string, unknown> = {}): Policy {
   const spec = SPECS[name];
   if (!spec) throw new Error(`unknown policy "${name}": use one of ${POLICY_NAMES.join(', ')}`);
@@ -44,7 +41,7 @@ export function makePolicy(name: string, env: HeadlessGameEnvironment, options: 
 /** Refuse settings the policy does not have (checked by the parent before any worker starts, and again by the worker). */
 export function validatePolicyOptions(name: string, options: Record<string, unknown>): void {
   if (!SPECS[name]) throw new Error(`unknown policy "${name}": use one of ${POLICY_NAMES.join(', ')}`);
-  const known = name === 'heuristic' ? ['tuning', 'heuristic'] : name === 'heuristic2' ? ['plan'] : [];
+  const known = name === 'player' ? ['plan'] : [];
   for (const k of Object.keys(options)) {
     if (!known.includes(k)) throw new Error(`policy "${name}" has no option "${k}"${known.length ? ` (it has: ${known.join(', ')})` : ''}`);
     const v = options[k];

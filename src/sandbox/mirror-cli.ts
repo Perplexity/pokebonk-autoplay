@@ -1,5 +1,5 @@
 /**
- * `npm run mirror` — copy the game's public static files into ./mirror so the sandbox can serve them from localhost.
+ * `npm run mirror` — copy the game's public static files into ./mirror, where the headless environment reads them.
  *
  *   npm run mirror            page shell, JS/CSS chunks, data files, files named in the bundles
  *   npm run mirror -- --deep  also the per-species sprites, portraits, icons and cries

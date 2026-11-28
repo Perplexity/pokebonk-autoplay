@@ -79,10 +79,7 @@ test('metadata: build, rates, schemas, instrumentation, shims and the offline gu
   assert.match(md.game.bundleSha256, /^[0-9a-f]{64}$/);
   assert.ok(md.game.chunks > 10);
   assert.deepEqual(md.sim, { hz: 60, dt: 1 / 60, actionRepeat: 3, decisionsPerSecond: 20, render: false });
-  assert.deepEqual(md.schema, { observation: 3, action: 2, decision: 2, snapshot: 1 });
-  // Learning-side formats: the state extractor and the action codec always; the observation layout only with `encode: true`.
-  assert.deepEqual([md.encoding.state, md.encoding.action.version, md.encoding.action.nvec, md.encoding.action.maskSize, md.encoding.observation], [2, 2, [9, 2, 2, 2, 2, 2, 2, 2, 89], 112, null]);
-  assert.match(md.encoding.action.hash, /^[0-9a-f]{64}$/);
+  assert.deepEqual(md.schema, { observation: 3, action: 2, decision: 2, snapshot: 1, state: 2 });
   assert.ok(md.instrumentation.some((i) => i.includes('observation.state')), 'the state extractor is a declared instrumentation point');
   assert.ok(md.instrumentation.length >= 6);
   for (const needle of ['fetch layer', 'module load hook', 'app.launch', 'entropy', 'HUD instance']) assert.ok(md.instrumentation.some((i) => i.includes(needle)), `no instrumentation entry about "${needle}"`);
@@ -100,7 +97,6 @@ test('observations are frozen copies: nothing in them reaches or changes the gam
   let obs = await env.reset({ seed: 21 });
   assert.equal(obs.phase, 'play');
   assert.equal(obs.schema, 3);
-  assert.equal(obs.encoded, undefined, 'the numeric encoding is off by default');
   assert.ok(Object.isFrozen(obs.state) && Object.isFrozen(obs.state.build.moves) && Object.isFrozen(obs.state.counters));
   assert.deepEqual([obs.state.schema, obs.state.counters.kills, obs.state.zone.zone, obs.state.build.moves[0]?.key], [2, 0, 1, obs.snapshot.player.moves[0].key]);
   assert.deepEqual([obs.step, obs.simStep, obs.snapshot.t], [0, 0, 0]);

@@ -28,7 +28,7 @@ import type { FromWorker, ToWorker, WorkerInit } from './protocol.ts';
 
 export interface BatchConfig {
   policy: string;
-  /** The policy's own settings, stored with the batch (heuristic: `{ tuning, heuristic }` overrides). Default: none. */
+  /** The policy's own settings, stored with the batch (player: `{ plan }`, keys of the plan to replace). Default: none. */
   policyOptions?: Record<string, unknown>;
   /** Number of episodes; episode i plays seed `seed + i`. Ignored when `seeds` is given. */
   episodes: number;
@@ -67,7 +67,7 @@ export interface BatchConfig {
 
 export const DEFAULT_BATCH: BatchConfig = {
   policy: 'random', episodes: 1, seed: 1, workers: 1, species: 155, map: 'forest', tier: 0, ranked: true, maxGameTime: 0, hz: 60, actionRepeat: 3,
-  recycleAfter: 1, recycleRssMB: 1500, episodeTimeoutSec: 1800, label: null,
+  recycleAfter: 1, recycleRssMB: 1500, episodeTimeoutSec: 5400, label: null,
 };
 
 export interface BatchHooks {

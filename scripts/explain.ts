@@ -3,8 +3,8 @@
  *   node scripts/explain.ts test/fixtures/<name>.json
  */
 import { readFileSync } from 'node:fs';
-import { decide, newMemory } from '../src/bot/brain/movement.ts';
-import { DEFAULT_TUNING } from '../src/bot/brain/tuning.ts';
+import { decide, newMemory } from '../src/player/brain/movement.ts';
+import { DEFAULT_TUNING } from '../src/player/brain/tuning.ts';
 
 const { snap } = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const r = decide(snap, newMemory(), DEFAULT_TUNING);

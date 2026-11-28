@@ -9,8 +9,7 @@ import type { BatchInput, BatchMetadata, EpisodeRecord, ErrorRecord } from './re
  * Schema and conventions: docs/storage.md. Schema changes are plain SQL files in ./migrations, applied in order and
  * recorded in `schema_version`; a file written by newer code than this is refused.
  *
- * Built on Node's own `node:sqlite`, so there is no native dependency; a Python trainer reads and writes the same file
- * with the standard `sqlite3` module.
+ * Built on Node's own `node:sqlite`, so there is no native dependency.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -50,7 +49,7 @@ export class EpisodeStore {
     if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true });
     const db = new DatabaseSync(path);
     try {
-      // WAL: a reader (the trainer, a notebook) does not block the runner and is not blocked by it.
+      // WAL: a reader (a report, a notebook) does not block the runner and is not blocked by it.
       db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 10000;');
       migrate(db, options.migrations ?? loadMigrations());
     } catch (e) { db.close(); throw e; }

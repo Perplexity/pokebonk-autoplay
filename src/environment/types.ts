@@ -1,4 +1,4 @@
-import type { Snapshot } from '../bot/snapshot.ts';
+import type { Snapshot } from '../observations/snapshot.ts';
 import type { Counters, RunState } from '../observations/state.ts';
 
 /**
@@ -151,26 +151,13 @@ export interface Observation {
   step: number;
   /** Simulation steps of 1/hz s run in this episode, loading phases excluded. */
   simStep: number;
-  /** The raw state snapshot (src/bot/snapshot.ts, docs/SNAPSHOT.md). A fresh, frozen copy. */
+  /** The raw state snapshot (src/observations/snapshot.ts, docs/snapshot.md). A fresh, frozen copy. */
   snapshot: Readonly<Snapshot>;
   /** Present in the choice phase. */
   decision: Readonly<Decision> | null;
   mask: Readonly<ActionMask>;
   /** Build, economy, progression clocks, guardian / seal / overtime state, all-enemy histogram, cumulative counters (src/observations/state.ts). */
   state: Readonly<RunState>;
-  /** Only with the environment option `encode: true`: the numeric encoding (src/observations/encode.ts) and the action mask of the action codec. */
-  encoded?: EncodedObservation;
-}
-
-/** The fixed-size numeric form of an observation. The buffers are fresh per observation; slice them with the layout descriptor. */
-export interface EncodedObservation {
-  /** OBS_ENCODING_VERSION and the hash of the layout descriptor the buffers follow. */
-  version: number;
-  layoutHash: string;
-  float: Float32Array;
-  int: Int32Array;
-  /** Concatenated per-dimension action masks of src/actions/codec.ts (1 = allowed). */
-  mask: Uint8Array;
 }
 
 export interface EndOfRun {
@@ -213,7 +200,7 @@ export interface StepInfo {
 
 export interface StepResult {
   observation: Observation;
-  /** Always 0 in Stage 1: rewards are defined with the trainer. */
+  /** Always 0: nothing defines a reward. */
   reward: number;
   /** The run is over (fainted, or its real end: the portal out of the sanctuary, overtime collapsed, …). */
   terminated: boolean;
@@ -269,8 +256,8 @@ export interface GameEnvironmentOptions {
   /**
    * A grace for the opening of a run (the owner, 2026-11-25): `maxKoGapGameTime` does not run during the first this
    * many seconds of the run clock; its stretch without a KO starts at that moment at the earliest. A level-1 Pokémon
-   * that walks to the free chests first can go more than 30 s without a KO there (the second heuristic on tier 2:
-   * about one run in 25, docs/phase-2-report.md §6). `maxIdleGameTime` is not affected: standing still in the opening
+   * that walks to the free chests first can go more than 30 s without a KO there (the player on tier 2:
+   * about one run in 25). `maxIdleGameTime` is not affected: standing still in the opening
    * still ends the episode. Default 0: no grace.
    */
   koGapGraceGameTime?: number;
@@ -283,14 +270,14 @@ export interface GameEnvironmentOptions {
   profile?: 'unlocked' | 'starter';
   /**
    * Preset unlocked-v4: the item archive of the unlocked account (`profile.itemsOff`), by the name of a version in
-   * src/agents/heuristic2/values.ts (`empty`, `loose`, `balanced`, `narrow`, `balanced-2`, `stack-2`). The archived items are generated from the
+   * src/player/values.ts (`stack-2`). The archived items are generated from the
    * game's item effects for the kit of `species`, never more than the account has archive slots, and are taken out of
    * every Poké Ball and shop of the run by the game itself. Absent: unlocked-v3 (nothing archived).
    */
   archive?: string;
   /**
    * Preset unlocked-v5: the account's build plan for `species` (the game's "Plan de build"), by the name of a version
-   * in src/agents/heuristic2/kit.ts (`kit-1`): favourite moves, which the game then offers with their own chance and
+   * in src/player/kit.ts (`kit-1`): favourite moves, which the game then offers with their own chance and
    * in every lesson of Hypno, and the moves of the species' pool that are switched off. The game's own limits hold
    * (four favourites, at most 40 moves off, 12 moves of other League members left on). Absent: no build plan.
    */
@@ -301,11 +288,6 @@ export interface GameEnvironmentOptions {
   apiTarget?: string;
   /** Print the page's console warnings and errors as they happen. */
   verbose?: boolean;
-  /**
-   * Also put the numeric encoding and the action-codec mask in every observation (`observation.encoded`). Needs the
-   * game-knowledge export of the running build (data/game-knowledge/<build>/). Default: off.
-   */
-  encode?: boolean;
 }
 
 export interface GameMetadata {
@@ -323,7 +305,7 @@ export interface GameMetadata {
     identifiers: { app: string; App: string; Run: string } | null;
   };
   sim: { hz: number; dt: number; actionRepeat: number; decisionsPerSecond: number; render: boolean };
-  schema: { observation: number; action: number; decision: number; snapshot: number };
+  schema: { observation: number; action: number; decision: number; snapshot: number; state: number };
   /** Every place environment code is spliced into game code or stands in for the game service. */
   instrumentation: string[];
   /** sha256 over the source of the browser shims (src/sim/*.ts) and the DOM library version. */
@@ -342,12 +324,6 @@ export interface GameMetadata {
   governor: { low: number; high: number; liveCap: number; liveMax: number; cut: boolean; everCut: boolean } | null;
   /** `handlerWrites`: field writes the environment makes in place of a HUD click handler (src/environment/dialogs.ts). */
   dialogs: { handled: string[]; refused: string[]; handlerWrites: string[] };
-  /** Versions of the learning-side formats: the state extractor, the action codec, and (with `encode: true`) the observation layout. */
-  encoding: {
-    state: number;
-    action: { version: number; hash: string; nvec: number[]; maskSize: number };
-    observation: { version: number; layoutHash: string; floatSize: number; intSize: number; vocabSha256: string } | null;
-  };
 }
 
 export interface GameEnvironment {

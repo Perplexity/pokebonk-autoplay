@@ -58,7 +58,7 @@ export function summarize(rows: EpisodeRow[]): Summary {
 export interface Wake { zone: number; gameTime: number; level: number }
 
 /**
- * Where in the run's lifecycle an episode ended, from its row and its wakes (docs/game-mechanics.md §1): which fight it
+ * Where in the run's lifecycle an episode ended, from its row and its wakes (docs/game.md §1): which fight it
  * was lost in, or between which two steps of a zone (before the wake, after the guardian's fall) the player fainted.
  * An episode that ended in a victory or was truncated keeps its cause of end.
  */

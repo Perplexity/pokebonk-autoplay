@@ -10,7 +10,7 @@ import type { ChoiceAction, ChoiceMask, Decision, DecisionExtra, DecisionKind, D
  * option objects and callback, and exposes a copy of the options as a `Decision`. The agent's answer is passed to
  * the game's callback, exactly what the dialog's button would have done. No element is ever clicked.
  *
- * Two kinds of dialog exist (see docs/game-mechanics.md §4 for each protocol):
+ * Two kinds of dialog exist (see docs/game.md §4 for each protocol):
  *
  *   handled        the full choice is exposed
  *   refused        dialogs of other modes, the pause menu, the map: reaching one is an error with full details
