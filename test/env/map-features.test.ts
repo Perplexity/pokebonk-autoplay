@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 // a dojo trial, Incense and a rift with its relic. The check script (scripts/probes/map-features-check.ts) acts only
 // through the environment; what is asserted here is what the game did, read from the observations it printed.
 // The slot machine, the shop's sell list, Bill's machine and Max form need more game time to reach; they are covered
-// by the stand-in tests (test/env/dialogs.test.ts) and by the recorded checks of docs/baseline.md §12.
+// by the stand-in tests (test/env/dialogs.test.ts).
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = join(REPO, 'scripts', 'probes', 'map-features-check.ts');

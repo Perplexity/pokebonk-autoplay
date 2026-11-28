@@ -4,7 +4,7 @@
  * Every constant is the game's own (build mwsewi0r, 0.10.26: the table `ot` and its helper functions in the bundle's
  * assets chunk, the player's `heal` / `leech` / `hurt` / `drain`, `drops` and `payEmptyLevels`). The test
  * test/model/overtime.test.ts reads the table out of the mirrored bundle and fails if a constant here differs.
- * Checked in play with scripts/probes/overtime-ceiling-probe.ts (docs/phase-0-report.md).
+ * Checked in play by a probe that killed every body on arrival (docs/game.md §8.1).
  *
  * Pure functions, no game object: usable by the player, by a report and by a test alike.
  */

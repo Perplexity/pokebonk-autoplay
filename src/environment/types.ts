@@ -151,7 +151,7 @@ export interface Observation {
   step: number;
   /** Simulation steps of 1/hz s run in this episode, loading phases excluded. */
   simStep: number;
-  /** The raw state snapshot (src/bot/snapshot.ts, docs/SNAPSHOT.md). A fresh, frozen copy. */
+  /** The raw state snapshot (src/observations/snapshot.ts, docs/snapshot.md). A fresh, frozen copy. */
   snapshot: Readonly<Snapshot>;
   /** Present in the choice phase. */
   decision: Readonly<Decision> | null;
@@ -257,7 +257,7 @@ export interface GameEnvironmentOptions {
    * A grace for the opening of a run (the owner, 2026-11-25): `maxKoGapGameTime` does not run during the first this
    * many seconds of the run clock; its stretch without a KO starts at that moment at the earliest. A level-1 Pokémon
    * that walks to the free chests first can go more than 30 s without a KO there (the player on tier 2:
-   * about one run in 25, docs/phase-2-report.md §6). `maxIdleGameTime` is not affected: standing still in the opening
+   * about one run in 25). `maxIdleGameTime` is not affected: standing still in the opening
    * still ends the episode. Default 0: no grace.
    */
   koGapGraceGameTime?: number;

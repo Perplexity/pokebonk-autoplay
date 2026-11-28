@@ -1,22 +1,21 @@
-# Game mechanics relevant to the environment
+# The game, as far as the player and the environment need it
 
 Game build `mwsewi0r` (version 0.10.26). Facts only. Every statement carries one of:
 
 - **[V]** verified by running the game headless through the environment (`src/environment`);
-- **[V\*]** verified by running with a probe that cheats (HP rewritten every step, teleport to map points, guardian HP set
-  to 1): `scripts/probes/lifecycle-cheat-probe.ts`, and `scripts/env-measure.ts --horde` for the zone clock. The cheats were
-  only used to get to the situation; what is reported is what the game then did;
-- **[C]** read in the bundle's code, not exercised;
+- **[V\*]** verified with a probe that cheated to reach the situation (HP rewritten every step, teleport to map
+  points, a guardian's HP set to 1). The probes are no longer in the repository; what is reported is what the game
+  then did;
+- **[C]** read in the game's code (`mirror/assets/*.js`, minified), not exercised;
+- **[P]** measured in play by a probe or by stored runs of the player;
 - **[U]** unknown.
 
-Identifiers such as `showSeals` are the game's own method names. Names starting with `$` are minified and change per build.
+Identifiers such as `showSeals` are the game's own method names. Names starting with `$` are minified and change with
+every build. Sections 1 to 7 are the run's lifecycle, the dialogs and the account; section 8 is the numbers that
+decide a score. After a game update every **[C]** number in section 8 has to be read again (docs/game-updates.md).
 
-Since the heuristic baseline completes runs without any cheat (docs/baseline.md §3, §6: 4 of 30 episodes on `forest`),
-this path of §1 is also **[V]**, although its statements below still carry the **[V\*]** of the probe that found them:
-guardian altar → seals dialog → guardian → portal in zones 1–3, the sanctuary-path dialog at the portal of zone 3, the
-classic path, the legendary (Mew) woken at the shrine and beaten, the relit shrine and the overtime dialog, overtime
-rounds with a tide offering, and cashing overtime at the portal (`won`, `ot.cashed: true`). Not reached without
-cheats: the direct path, leaving the sanctuary without overtime, fainting in overtime, the zone collapse.
+The path of §1 is **[V]** end to end, although some of its statements still carry the **[V\*]** of the probe that
+first found them: the player completes it without any cheat in nearly every run.
 
 ## 1. Run lifecycle in the standard mode (Classic and Ranked)
 
@@ -272,3 +271,111 @@ the real service would return for it is **[U]**.
   process when the zone-1 guardian fell) → UUIDs are drawn from a private stream.
 - The frame-rate governor lowers the live-enemy cap below 45 measured fps. **[V]** at 60 Hz: measured 60.00, cap never cut,
   including 9 minutes at 800 live enemies.
+
+## 8. The numbers that decide a score
+
+Score = KOs + the Overtime bonus when Overtime is cashed. With today's player about three quarters of a score is the
+bonus.
+
+### 8.1 Overtime
+
+Constants of the build (**[C]**, the object the game names its Overtime settings in; **[P]** where a probe checked
+them: every stored run's bonus is reproduced exactly by the formula).
+
+| | |
+|---|---|
+| Rounds | 30 s each, 24 at most (then Overtime is cashed by itself) |
+| Round multiplier | 1.25, 1.5, 2, 2.5, 3, 4, then +1 a round; +0.1 for every seal kept (12 at most); +0.5 with the offering Pleamar |
+| Bonus | sum over rounds of KOs in the round × (multiplier − 1), rounded down |
+| A KO counts | 1 + seconds into Overtime / 45, up to 7 (the same weight multiplies what the enemy drops) |
+| Spawn rate | 30 + 0.8 a second up to 150 a second, × clamp(difficulty × enemy amount × the tier's amount, 1, 3); at most 350 bodies; what is not spawned because the cap is reached is lost |
+| Elites | every 20 s, 6 + 2 a round; each counts 1 |
+| The ceiling | every body killed on arrival at ×3 spawns: 5,269, 11,995, 21,747, 34,321, 49,820, 62,971, 72,027, 81,026, 90,084 KOs in rounds 1 to 9 and **94,500 a round from round 10** |
+| Enemy HP | ×4 a minute; **from second 480 a further ×12 a minute** (×48 a minute: ×6.9 a round) |
+| Enemy damage | ×2 a minute; from second 480 a further ×4 a minute |
+| The tide | from second 120, 0.25 % of a reference HP a second, ×2 a minute; **from second 480 ×4 a minute**. The reference HP is 400 + the run clock in seconds when Overtime starts. Overheal and shield absorb it first. The offering Dique cuts it by 30 %, Pleamar raises it by 25 % |
+| Healing | fades to half by second 225; the offering Manantial doubles it (at most back to 1) |
+| The ring | closes from second 90 to 240, to 40 % of the arena (60 % with Rompeolas) |
+| A hit | takes at most 40 % of max HP (25 % from elites and Alphas), then nothing lands for 0.45 s. Evasion is capped at 60 %; armor reduces by armor / (armor + 45) |
+
+Score of Overtime alone if cashed at the end of a round, at the ceiling (millions):
+
+| Cashed after round | Tide, % of the reference HP a second | 12 seals and Pleamar | no seals |
+|---|---|---|---|
+| 10 (5 min) | 2 | 3.67 | 2.79 |
+| 14 (7 min) | 8 | 8.29 | 6.76 |
+| 16 (8 min) | 16 | 11.16 | 9.31 |
+| 18 (9 min) | 64 | 14.41 | 12.24 |
+| 20 (10 min) | 256 | 18.04 | 15.54 |
+| 22 (11 min) | 1,024 | 22.05 | 19.23 |
+| 24 (12 min) | 4,096 | 26.43 | 23.29 |
+
+- **Berries are the main heal [C] [P].** Every KO drops a healing berry with chance 0.6 % × the power-up stat × the
+  KO's weight. A berry heals 25 % of max HP through the healing stat. A build heals as long as it kills.
+- **Training [C] [P].** A level-up with nothing left to offer heals 20 % of max HP and adds a small permanent stat
+  (one of damage, max HP, attack speed, area, crit, luck, armor). Level-ups go on in Overtime.
+- **What a 20 million run needs (expected from the above, not measured):** the ceiling held through round 21 or 22.
+  The tide at the end of those rounds asks for a max HP of roughly 15,000 to 30,000, and enemy HP there is 16,000
+  to 110,000 times what it is at second 480. A leaderboard Mewtwo (29.4 million, 96 minutes) ended at level 6,293
+  with max HP 19,650, damage ×152, special ×50.5, 313 items.
+
+### 8.2 A zone's final swarm and collapse
+
+- The final swarm begins at the zone's second 600, whether the guardian has fallen or not **[C] [V\*]**. Spawns ×6;
+  the horde's HP ×1.5 and its damage ×1.3 a minute of swarm **[C]**; enemy damage measured to double about every
+  45 s **[P]**.
+- 480 s after the swarm began (zone second 1080; 1200 in zone 3) the collapse drains a share of a reference HP
+  every second, ×2.4 a minute, and healing fades to half over four minutes **[C]**. Leaving through the portal ends
+  it. The game keeps a log of the seconds spent in a collapse and the KOs made in it.
+- The deep swarm is where the experience is: a zone played to its second 1060 gives a run of about 2,500 levels;
+  leaderboard runs (96 minutes for our 60) stay well into the collapse.
+
+### 8.3 Moves: slots, Bill's machine, Hypno, the build plan
+
+- Four move slots. A move goes to level 8; with a TM Case held to level 10, and a fusion to ★6 for ★5 **[C] [P]**.
+- **Bill's machine [C] [P]:** one in each of zones 1 to 3, none in the sanctuary; it works once. It takes two moves
+  that are both at level 8 or more and either **fuses** them (one new move in one slot) or **links** them (both
+  keep firing from one slot, each ×1.15 damage and one bonus; a linked pair gets no more upgrades). Neither a
+  fusion nor a pair goes in again. A move that only strengthens the Pokémon or sets the weather (Encore) can be
+  neither linked nor fused, except as an ingredient of the species' own fusion.
+- So a fusion, two linked pairs and one move that cannot be linked are six moves in four slots, and take all three
+  machines of a run.
+- **Level-up offers [C] [P]:** a new move is offered only with a free slot. Each move of the species' own four that
+  is not held and not banished is offered three times as often as anything else. A level-up with a free slot draws
+  a move of the species' own line with chance 35 % and one of another League member with chance 50 %.
+- **The account's build plan [C] [P]** ("Plan de build", kept in `localStorage` under
+  `pokebonk.buildPlan.<account id>`): up to four favourite moves with the Lab's Affinity at its top level, each
+  offered with a chance of 15 % when a line or League draw is made, always shown when drawn, and one in every
+  lesson of Hypno; and up to 40 moves of the pool switched off (never one of the species' own four, and 12 moves of
+  other League members stay on: the game switches moves back on, in list order, until 12 are).
+- **Hypno [C] [P]:** one in each zone. Pays for a forgotten move or vitamin (level × 8 × zone), any number of
+  times. One lesson a zone for a free slot: one favourite, one move of the species' kit, then random ones; a lesson
+  turned down keeps the same offers; forgetting a move with the lesson ready opens it at once.
+- Encore, while active: damage ×1.25, attack speed ×1.2, movement ×1.15 (6 s, cooldown 12.6 s). Perish Song curses
+  what it hits: ×1.25 damage taken for 4 s. A frozen enemy (Mist, 35 %) takes ×1.2 **[C]**.
+
+### 8.4 Map points of a zone
+
+One guardian altar, and by the game's own list **[C]**: about 5 Unown altars (fewer on a small map), Gengar's altar,
+2 challenge altars, a cursed altar, fossil ruins, Rhydon's totem, a Porygon altar, a dojo, Bill's machine, a nest,
+the shop, Ditto, Hypno, 2 Snorlax, 2 Magnemite, slot machines, free and cursed and paid Poké Balls, cages, berries,
+rocks. Nothing comes back after use in a standard run (it does in Survival).
+
+- **Unown altars [C]:** stood in until charged, 8 / 14 / 22 / 35 s by tier (common, rare, epic, gold), ×1.25 in
+  zone 2 and ×1.5 in zone 3, shorter with a Secret Key; the charge drains when the circle is left for more than
+  1.2 s. Epic and gold altars call waves of the horde while they charge; the gold one is sealed until the zone's
+  second 90 and gives two blessings of four offers, the others one of three.
+- **Blessings [C]:** each is one stat for the rest of the run, scaled by rarity (×1, 1.2, 1.45, 1.75, 2.1; the
+  rarity is drawn by luck). At the top rarity: damage ×1.25, special damage ×1.38, attack speed ×1.21, area ×1.25,
+  experience ×1.32, crit damage +0.42, +2 projectiles (from epic), max HP +42.
+- **Rhydon's totem [C] [P]:** answers three times while the guardian sleeps; each roar gives the guardian +30 % HP
+  and +12 % damage and one more Great Ball at its fall.
+- **Curses [C]:** the cursed altar ×1.15 enemies and ×1.1 difficulty, a cursed Poké Ball ×1.05, Gengar's altar
+  ×1.2; a Gengar at the slot machine ×1.05 twice.
+- **Rifts [P]** (opened with Incense): 22 to 85 s with the zone clock stopped; 1 to 3 items, a few levels and a
+  relic (one of 47, each a multiplier of 1.05 to 1.5 on one thing).
+
+### 8.5 Tier 2
+
+Enemy amount ×1.6, HP ×1.9, damage ×1.96, speed ×1.16 **[P]**. The tier's `kills` factor in the game's table is read
+by no code of the client **[C]**.

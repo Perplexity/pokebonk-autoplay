@@ -361,7 +361,7 @@ export async function buildKnowledge(env: HeadlessGameEnvironment, options: Buil
       }, [
         'held items: effects beyond mods are code; desc is the game\'s own text. maxStack is null where the table has no "max" (the game\'s code then uses its default limit)',
         'held items: prices in the in-run shop are computed when a stock is drawn and are not in a table',
-        'seals and overtime offerings: only the keys are data (effects are code; see docs/game-mechanics.md §1 and §3). Numbers the offerings use are in "overtime"',
+        'seals and overtime offerings: only the keys are data (effects are code; see docs/game.md §1 and §3). Numbers the offerings use are in "overtime"',
         'blessings (altars, totems, dojo prizes) are generated per offer as { label, mods, rarity }; there is no table of blessing keys',
         'relic passives: text and the numbers in "values"; the logic is code',
         'pickup kinds are numbers in the game with no table of names',

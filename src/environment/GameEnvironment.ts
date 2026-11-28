@@ -642,7 +642,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (phase === 'choice') return this.dialogs!.pending!.mask();
     const run = this.run;
     const can = (f: () => unknown): boolean => { try { return !!f(); } catch { return false; } };
-    // The game's own conditions, in the order its input code checks them (docs/game-mechanics.md §5).
+    // The game's own conditions, in the order its input code checks them (docs/game.md §5).
     const near = run.interactables?.nearest ?? null;
     const interact = run.state === 'play' && (
       can(() => run.rifts.nearEntrance()) ||
@@ -651,7 +651,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       phase: 'play', move: MOVES.map(() => true), jump: true, dash: true,
       ultimate: run.state === 'play' && !!run.ult?.ready && !(run.ult?.active > 0),
       interact,
-      // The game's own conditions for the F, C and X keys (docs/game-mechanics.md §5).
+      // The game's own conditions for the F, C and X keys (docs/game.md §5).
       form: run.state === 'play' && can(() => run.forms.ready),
       incense: run.state === 'play' && can(() => run.rifts.incenseOn && run.rifts.useBlock(false) === null),
       fuse: run.state === 'play' && can(() => run.rifts.incenseOn && run.rifts.fuseOn && run.rifts.useBlock(true) === null),
@@ -678,7 +678,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   /**
    * Read-only helper for the player (src/player): the next waypoint of a route from the player to the
    * world point (x, z), planned by the snapshot extractor's own A* over the game's height map and prop colliders
-   * (`Snapshot.nav`, docs/SNAPSHOT.md). Reads terrain, changes nothing, draws no random number. null when no route
+   * (`Snapshot.nav`, docs/snapshot.md). Reads terrain, changes nothing, draws no random number. null when no route
    * could be planned.
    */
   planRoute(x: number, z: number): Nav | null {

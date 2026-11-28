@@ -1,6 +1,6 @@
 /**
  * Are two stored batches the same episodes? The check behind "a result does not depend on which worker played it, in
- * which order, or how many workers there were" (docs/baseline.md §4).
+ * which order, or how many workers there were".
  *
  *   node scripts/compare-batches.ts --a=3 --b=4 [--db=<file>]
  *

@@ -1,7 +1,7 @@
 /**
  * The state snapshot: everything the strategy layer knows about a moment of a run. Plain JSON, produced ~10 times a
  * second by `extractSnapshot` (src/bot/extract.ts) and by the DOM reader (src/bot/ui.ts). The brain is a pure function
- * of snapshots, so recorded snapshots (test/fixtures) replay exactly. Field-by-field notes: docs/SNAPSHOT.md.
+ * of snapshots, so recorded snapshots (test/fixtures) replay exactly. Field-by-field notes: docs/snapshot.md.
  *
  * World axes: x and z span the ground, y is up. Distances are metres, times are seconds of the run clock.
  */

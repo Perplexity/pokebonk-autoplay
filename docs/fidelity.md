@@ -12,7 +12,7 @@ change that takes three.js' UUIDs off the game's random stream (sha256 of `src/s
 requests are
 answered from `mirror/` and by the in-process mock; the list of refused requests is empty in every run on both sides.
 
-The browser is used as a fidelity oracle only (ADR 0001, item 8). Nothing here trains or plays in a browser.
+The browser is used as a fidelity oracle only: the player never plays in it.
 
 ## 1. Answer
 
@@ -525,7 +525,7 @@ episode". **That combination was not tried here.**
 
 Two statements in other documents that the D3 finding contradicts (not edited here, they are not this report's):
 `docs/environment.md` §6 ("the game starts no sound voice, so sound code never draws from `Math.random`") and
-`docs/game-mechanics.md` §7 ("Sound code draws from `Math.random` only when a voice really starts"). No voice starts,
+`docs/game.md` §7 ("Sound code draws from `Math.random` only when a voice really starts"). No voice starts,
 but `audio.move()` draws a pitch value and the move's sound kit draws its own values before any voice would start:
 28 values at step 184 of forest seed 1, with the audio context suspended on both sides.
 
@@ -588,7 +588,7 @@ ordinary session, is shared by both sides, and is therefore **not covered**:
   seed; a browser session has one stream per page load.
 - **The profile and the account**: the unlocked preset through the game's `devUnlock`, hunt counters set from the
   seed, a fixed account id, a pinned ticket seed and id, a local ranked season from the mock. A player's profile comes
-  from the real service, which also sends ticket fields the mock does not (`wk`, `blk`; game-mechanics §2).
+  from the real service, which also sends ticket fields the mock does not (`wk`, `blk`; docs/game.md §2).
 - **No rendering between updates.** The game's renderer draws from the same `Math.random`. (One variant draws every
   step with the real renderer while the streams are put aside; it shows that drawing changes no simulation state, not
   what a session's stream looks like.)

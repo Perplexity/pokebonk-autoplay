@@ -3,7 +3,7 @@
  * text through the debugger). It only reads: it copies the numbers the strategy needs into a plain JSON object and
  * returns it. Keep it self-contained: no imports, no closures, nothing from this module's scope.
  *
- * The result is a `Snapshot` (src/bot/snapshot.ts); docs/SNAPSHOT.md documents every field.
+ * The result is a `Snapshot` (src/observations/snapshot.ts); docs/snapshot.md documents every field.
  */
 export function extractSnapshot(this: any, navX?: number, navZ?: number): unknown {
   const run = this;

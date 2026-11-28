@@ -1,7 +1,7 @@
-# The headless game environment (Stage 1)
+# The headless game environment
 
-`src/environment/` is the stable interface over the headless game process (`src/sim/`, see docs/discovery.md and ADR 0001).
-Game rules are documented in docs/game-mechanics.md. Numbers here were measured on build `mwsewi0r` (0.10.26), Node 24.22,
+`src/environment/` is the interface over the headless game process (`src/sim/`): the game's own unmodified code, loaded
+in Node under browser shims, one game per process, no browser and no network. Game rules are documented in docs/game.md. Numbers here were measured on build `mwsewi0r` (0.10.26), Node 24.22,
 one process, on the development machine.
 
 ## 1. Interface
@@ -27,14 +27,11 @@ await env.close();
   does not move. `over`: the episode ended, only `reset` is valid.
 - After the action, states in which the player cannot act (zone loading, evolution and boss cut-scenes, a Poké Ball in
   flight, fainting) are stepped through with no key held; `info.idleSteps` counts those steps.
-- **Observation** (`types.ts`): `phase`, `step`, `simStep`, the raw `snapshot` (docs/SNAPSHOT.md), the pending `decision`
+- **Observation** (`types.ts`): `phase`, `step`, `simStep`, the raw `snapshot` (docs/snapshot.md), the pending `decision`
   (kind, HUD method, options, extra actions, context), the `mask`, and `state`: build, economy, clocks, guardian / seal /
   overtime state, a histogram of all live enemies and the cumulative counters (docs/observation.md §1; the counters are
   also in `info.counters`). Everything is a deep-frozen copy made of plain objects and arrays; a test walks it and checks
   that nothing in it is, or can reach, a live game object.
-- **Numeric encoding (optional).** `createEnvironment({ encode: true })` adds `observation.encoded`: a fixed-size
-  `Float32Array` and `Int32Array` following a hashed layout descriptor, and the mask of the MultiDiscrete action codec
-  (docs/observation.md). It needs the game-knowledge export of the running build (docs/game-knowledge.md). Default: off.
 - **Actions.** Play: `{ type: 'play', move, jump?, dash?, ultimate?, interact?, form?, incense?, fuse? }` with `move` one of
   `none, n, ne, e, se, s, sw, w, nw` (or its index 0–8), world-relative (−z is north), turned into W/A/S/D with the camera yaw
   by the same rule as `keysFor` in `src/bot/session.ts`. The seven buttons act on the key-down edge: they are pressed for the
@@ -51,15 +48,13 @@ await env.close();
   sets `info.invalidAction` to the reason.
 - **`terminated`** when the game's run reaches `over` (fainted, or its real end); `info.end` then holds `how`, `victory` and
   the game's own end-of-run record. **`truncated`** only when `maxGameTime` (default: none) is reached; the open run is closed
-  at the next `reset` through the game's own Restart path. `reward` is always 0 in this stage.
-- **Standing still** (`createEnvironment({ maxIdleGameTime: 30 })`, default: no such rule; the owner's rule of
-  2026-11-24, docs/training.md §3). When the run clock advances by that many seconds with no KO and without the
+  at the next `reset` through the game's own Restart path. `reward` is always 0: nothing here defines one.
+- **Standing still** (`createEnvironment({ maxIdleGameTime: 30 })`, default: no such rule). When the run clock advances by that many seconds with no KO and without the
   player leaving a circle of `idleRadius` (3 m) around the place of the last activity, the episode ends as
   `truncated` with `info.endCause` = `idle: no KO and no movement for 30 s of game time`. The game's run stays
   open, as after the time cap, and the next `reset` closes it. Read-only: the run clock, the KO count and the
   player's position.
-- **Going without a KO** (`createEnvironment({ maxKoGapGameTime: 30 })`, default: no such rule; the same rule of the
-  owner read strictly, docs/training.md §3). When the run clock advances by that many seconds without a KO, moving
+- **Going without a KO** (`createEnvironment({ maxKoGapGameTime: 30 })`, default: no such rule). When the run clock advances by that many seconds without a KO, moving
   or not, the episode ends as `truncated` with `info.endCause` = `idle: no KO for 30 s of game time`. A moment in
   which a guardian or the legendary is alive, and the moment Overtime goes live, count as a KO does. In the
   sanctuary outside Overtime the allowance is four times as long (`idle: no KO for 120 s …`). Inside a rift neither
@@ -68,15 +63,15 @@ await env.close();
   - **The opening's grace** (`koGapGraceGameTime: 90`, default 0: none; the owner's decision of 2026-11-25). The rule
     does not run during the first that many seconds of the run clock: its stretch without a KO starts when the grace
     is over, so with 30 s and a grace of 90 s the earliest such end is at 120 s. The rule against standing still is
-    not affected. Why: docs/training.md §3 and docs/phase-2-report.md §6.
-- **Account preset unlocked-v4** (`createEnvironment({ archive: 'empty' | 'loose' | 'balanced' | 'narrow' })`, default:
-  unlocked-v3). The unlocked account with an item archive (`profile.itemsOff`), generated from the game's item effects
-  for the kit of `species` (src/agents/heuristic2/values.ts) and kept within the account's archive slots (105: the
+    not affected.
+- **Account preset unlocked-v4** (`createEnvironment({ archive: 'stack-2' })`, `--archive=stack-2`; default:
+  unlocked-v3, no archive). The unlocked account with an item archive (`profile.itemsOff`), generated from the game's item effects
+  for the kit of `species` (src/player/values.ts) and kept within the account's archive slots (105: the
   game checks the limit only in its menu). The game takes archived items out of every Poké Ball and shop of the run.
-  `getMetadata().profile.preset` reads `unlocked-v4:<version>`. docs/phase-1-report.md.
+  `getMetadata().profile.preset` reads `unlocked-v4:<archive>`.
 - **Account preset unlocked-v5** (`createEnvironment({ buildPlan: 'kit-1' })`, `--build-plan=kit-1`; default: none).
   The same account with the game's own build plan for `species` ("Plan de build"), by the name of a version in
-  src/agents/heuristic2/kit.ts:
+  src/player/kit.ts:
   - **Favourite moves** (at most four with the Lab's Affinity at its top level, which the unlocked account has). The
     game then offers each with a chance of 15 % whenever a level-up with a free slot draws a move of the species' own
     line (35 % of such level-ups) or of another League member (50 %), always shows a favourite it drew, and puts one
@@ -89,7 +84,7 @@ await env.close();
   reset point is taken, so every episode starts with it; every run is checked for the favourites and the moves off
   the game itself reports (`run.favs`, `run.movesOff`), and an episode stops with an error if they differ.
   `getMetadata().profile.preset` reads `unlocked-v5:<archive or none>:<plan>`. Without the option nothing changes:
-  no favourites, nothing switched off (test/env/preset.test.ts). docs/phase-3-report.md part 7.
+  no favourites, nothing switched off (test/env/preset.test.ts).
 - **A dialog raised while the Pokémon faints is dropped.** Seen: the item dialog of a Poké Ball opened as the last hit
   landed. The game sets the run to `dead` and finishes it 0.6 s later without waiting for an answer; the environment
   does the same instead of stopping with an error.
@@ -98,13 +93,13 @@ await env.close();
   HUD method nobody replaced, the run in `modal` without a captured dialog, the game pausing itself, a non-interactive state
   lasting more than 120 s of steps. Nothing is clicked.
 
-`scripts/run-episodes.ts` is the unattended runner: N episodes of the `random`, `idle` or `heuristic` policy on several
-worker processes, stored in SQLite (docs/baseline.md §1, docs/storage.md); `--jsonl` also writes
+`scripts/run-episodes.ts` is the unattended runner: N episodes of the `random`, `idle` or `player` policy on several
+worker processes, stored in SQLite (docs/storage.md); `--jsonl` also writes
 `data/runs/<timestamp>/episodes.jsonl` and `metadata.json`.
 
 ## 2. What makes a run "Ranked" here
 
-The client's Ranked is the run option `competitive: true` on the standard mode (docs/game-mechanics.md §2). `reset()` calls
+The client's Ranked is the run option `competitive: true` on the standard mode (docs/game.md §2). `reset()` calls
 `app.startRun({ species, biome, tier, boosts: [], mode: 'standard', competitive: true })`, the call the game's Ranked map
 screen makes, and then checks on the game's run object that mode, species, map, tier, seed and `competitive` are what was
 asked for. Around it, the local stand-in for the service (`src/sandbox/mockApi.ts`) is configured so that the client sees
@@ -117,7 +112,7 @@ what it would see in Ranked:
 | `POST /runs` request | carries `competitive: true` | sent by the game |
 | `POST /runs` reply (ticket) | `ranked: true`, `competitive: true`; `seed` and `id` pinned from the episode seed | mock + fetch layer |
 | `POST /runs/:id/finish` reply | `ranked: true` in the reply and in `record` | mock |
-| `POST /dev/unlock` | the unlocked profile (preset `unlocked-v3`, docs/game-mechanics.md §6) | `MockApi.unlockPreset`, called through the game's `meta.devUnlock()` |
+| `POST /dev/unlock` | the unlocked profile (preset `unlocked-v3`, docs/game.md §6) | `MockApi.unlockPreset`, called through the game's `meta.devUnlock()` |
 
 `reset({ ranked: false })` gives Classic (no `competitive`). The menu's Ranked gate (3 days, 20 runs) is not involved because
 no menu is used. Nothing is submitted anywhere; every request ends in the in-process mock.
@@ -180,8 +175,8 @@ the enemy arrays, then the fields of the run object):
    seed has its own roll, as successive runs of one account have. The game's profile reader caps the counter at
    1,000,000 (`k: Math.min(1e6, …)`): seeds up to that value use the seed itself, larger seeds use the seed modulo
    1,000,001 (`huntCounter` in `src/environment/GameEnvironment.ts`). Before that rule, a second reset in one
-   process on a seed above the cap was refused ("the game did not adopt the hunt counters"); it was found by the
-   first training run, whose seeds start at 1,000,000. The species list is read from the bundle
+   process on a seed above the cap was refused ("the game did not adopt the hunt counters"); it was found by a
+   run whose seeds started at 1,000,000. The species list is read from the bundle
    (`findHuntSpecies`); a build where it is not found exactly once is refused.
 2. **The game's sheet cache.** Its sprite-sheet loader keeps a process-wide cache behind a four-at-a-time queue. A sheet
    first met in a process arrived a clock tick later than a cached one. The image shim now delivers Pokémon sheets
@@ -201,7 +196,7 @@ the enemy arrays, then the fields of the run object):
    cause, not one site: it covers every lazily created three.js object. Code of the game itself that draws from
    `Math.random` only the first time something is built in a process would still show; none is known.
 
-5. **The virtual wall clock** (found 2026-11-25, when the second heuristic made runs last past minute 10 of a zone;
+5. **The virtual wall clock** (found 2026-11-25, when runs first lasted past minute 10 of a zone;
    NOT fixed inside a process). The clock the game reads as `performance.now()` keeps running from one episode to the
    next, and its absolute value changes play. Traced on tier 2, Mewtwo, seed 21, capped at 640 game seconds: a fresh
    process and a process that had only been reset once (clock 150 ms) both make 26,659 KOs; the same process with the
@@ -211,13 +206,13 @@ the enemy arrays, then the fields of the run object):
    identical until then; only `run.bornAt`, `resumedAt`, `fanfareAt`, `profAt` and the phase of the game's frame-rate
    window differ. At full length the same seed twice in one process: 1,487,778 KOs, then 1,498,866. Which code of
    the game reads the clock in a way that reaches play is **not identified**.
-   - *What is done about it*: every episode is played in a fresh process (`recycleAfter` / `recycle_after` = 1, the
-     default of the runner, the trainer, the evaluator and `bc collect` since that day). A fresh process loads the
-     game in about a second more than a reset takes; an episode of the second heuristic takes eight minutes.
+   - *What is done about it*: every episode is played in a fresh process (`recycleAfter` = 1, the default of the runner
+     since that day). A fresh process loads the
+     game in about a second more than a reset takes; an episode of the player takes about fifteen minutes.
    - *What it means for stored results*: batches played before with `recycleAfter` 8 hold real episodes, but an
-     episode that was not the first of its process is not reproduced by its seed. On tier 2 with the second heuristic,
-     16 of 30 seeds differed between two batches of the same code that only differed in the number of workers
-     (docs/phase-2-report.md). The tier-0 baselines never showed it: their episodes are short and repeat exactly.
+     episode that was not the first of its process is not reproduced by its seed. On tier 2,
+     16 of 30 seeds differed between two batches of the same code that only differed in the number of workers.
+     Short episodes on tier 0 never showed it.
    - *Not done*: setting the clock back at reset. Timestamps the game keeps outside the run would then lie in the
      future, which is a dependence on process history of its own.
 
@@ -227,7 +222,7 @@ The unit test `test/env/environment.test.ts` repeats the check inside one proces
 other resets). Not covered: maps other than forest and coast; zones 2–4 on anything but the one probe run; evolution, capture
 and rift sequences.
 
-Three of the four sources of history-dependence found on the way are documented in docs/game-mechanics.md §7. All were
+Three of the four sources of history-dependence found on the way are documented in docs/game.md §7. All were
 found by diffing `Math.random` call sites between a fresh and a reused process.
 
 ## 4. Dialogs
@@ -262,8 +257,7 @@ unknown dialog cannot open silently; it is let through only once the run is over
 | `lesson` | `showForget` | the three offers of Hypno's lesson, in the shape of level-up offers | `decline` (the lesson is kept) |
 | `fusion` | fusion machine | `fuse` and, where the game allows it, `link` for every pair of moves that is ready | `leave` |
 
-Exercised against the real game without cheats, by the baseline policies and scripted checks (the table with
-answers and effects is docs/baseline.md §7 and §12): `levelup` (take, refresh, skip, banish, banish kit), `item`,
+Exercised against the real game without cheats, by the player and scripted checks: `levelup` (take, refresh, skip, banish, banish kit), `item`,
 `itemChoice`, `blessing`, `seals` (wake without seals), `sanctuaryPath` (classic path), `leaveSanctuary` (`ot`),
 `overtimeStart`, `overtimeOffer`, `evolution`, `trade` (accept and decline), `shop` (buy, restock, sell, leave),
 `shopSell`, `ditto`, `relic`, `dojo` and `dojoPrize` (a trial taken and played), `slots` (spins with and without a
@@ -312,7 +306,7 @@ Pokédollars" method have minified names; they are found by what their source do
   endpoint").
 - Attempts are in `info.blockedNetwork` on every step and in `getMetadata().offline.blocked` (Node-level and page-level
   together). In every run so far the list is empty.
-- Above it, unchanged from Stage 0: the page's `fetch` serves files under `mirror/` and the in-process mock, and blocks the
+- Above it: the page's `fetch` serves files under `mirror/` and the in-process mock, and blocks the
   rest; WebSocket, WebRTC, XHR, EventSource and beacons are blocked.
 - Not covered: `child_process`, `worker_threads`, Node's internal bindings. It is enforcement inside the process.
 
@@ -346,8 +340,7 @@ Pokédollars" method have minified names; they are found by what their source do
     the points used in the episode (`state.pointsUsed`, `counters.pointsUsed`). The game marks a point used but keeps
     no total, and rebuilds the list for every zone.
 
-The numeric encoding (`encode: true`) and the action codec touch no game object: they are computed from the frozen
-observation and from the exported knowledge files. The knowledge export (`scripts/export-knowledge.ts`,
+The knowledge export (`scripts/export-knowledge.ts`,
 docs/game-knowledge.md) is a separate process that reads the game's tables and plays no episode.
 
 Where behaviour can differ from a browser:
@@ -368,7 +361,7 @@ Where behaviour can differ from a browser:
   per page load.
 - **Loading is instant on the virtual clock** and sprite sheets are measured from the mirrored PNGs (all 292 sheets present).
 - **Service-dependent rolls**: without `wk` / `blk` in the ticket, shiny / classic encounter rolls and level-up roll seeds
-  come from the client's own generators (docs/game-mechanics.md §2).
+  come from the client's own generators (docs/game.md §2).
 - **No progression between episodes**, by design.
 - The game's tamper probe still logs one console error per process (it fails to create an iframe) and reports
   `end.env = 66`, `end.fns = 770` in the result record.
@@ -400,20 +393,19 @@ a reset, so a fixed budget (for example every 20 episodes or above 1.2 GB) is ch
 
 ## 8. Tests
 
-`npm test` runs everything (152 tests, about 55 s). `npm run test:env` runs only the
-environment group:
+`npm test` runs everything. `npm run test:env` runs only the environment group:
 
-- `test/env/actions.test.ts`: action validation, masks, key mapping, copies, baseline policies (no game);
+- `test/env/actions.test.ts`: action validation, masks, key mapping, copies, the random and idle policies (no game);
 - `test/env/dialogs.test.ts`: every dialog's callback protocol against a stand-in HUD, unknown dialogs, build names (no game);
 - `test/env/guard.test.ts`: the offline guard, its self-test and the configuration check (no game);
 - `test/env/mock-ranked.test.ts`: the service stand-in's additions: ranked season and tickets, `/dev/unlock`, no-progression switch (no game);
-- `test/env/environment.test.ts`: **slow group, boots the real game** (about 23 s): unlocked Ranked reset, metadata,
-  read-only observations, play steps, invalid actions, level-up decisions, truncation, a real fainted run with its record,
-  in-process reset reproducibility, Classic.
+- `test/env/environment.test.ts`: **slow group, boots the real game**: unlocked Ranked reset, metadata, read-only
+  observations, play steps, invalid actions, level-up decisions, truncation, a real fainted run with its record,
+  in-process reset reproducibility, Classic;
+- `test/env/preset*.test.ts`: the item archive and the build plan as the game adopts them (boot the real game);
+- `test/env/map-features.test.ts`: Hypno, the dojo, Incense and a rift in the real game (slow).
 
-The state extractor, the encoding, the action codec and the knowledge export have their own groups
-(`test/observations`, `test/actions`, `test/knowledge`; 23 tests, one file of them boots the real game), listed in
-docs/observation.md §6.
+The state extractor and the knowledge export have their own groups (`test/observations`, `test/knowledge`).
 
 ## 9. Limitations
 
@@ -421,12 +413,11 @@ docs/observation.md §6.
   (same price and odds as single spins), and the "are you sure" second press the HUD asks for before a fusion is
   forgotten or an item is sold.
 - Which Max form a species takes (Mewtwo: Mega X, Mega Y or Dynamax) is a setting of the account, chosen in the
-  menu before a run. The environment leaves the game's default (the first one, Mega Mewtwo X); choosing it belongs to
-  the build decisions of Stage 4.
+  menu before a run. The environment leaves the game's default (the first one, Mega Mewtwo X); choosing it is not built.
 - Inputs not exposed: dismissing an ally (G), aim mode, auto-run, auto-ultimate, camera and manual aim.
 - The map-point counter (`pointsUsed`) is the environment's count, not a figure of the game.
 - Run boosts (the consumable bag) are not used; the mock's ticket always returns `boosts: []`.
-- The shiny-swap decision has not met the real game yet (docs/baseline.md §7).
+- The shiny-swap decision has not met the real game yet.
 - The memory growth above.
 - The build is pinned: registries, HUD methods, six minified names and twelve exported game functions are looked up by shape and refuse a build that does
   not match.

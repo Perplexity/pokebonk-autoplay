@@ -9,8 +9,7 @@ import type { BatchInput, BatchMetadata, EpisodeRecord, ErrorRecord } from './re
  * Schema and conventions: docs/storage.md. Schema changes are plain SQL files in ./migrations, applied in order and
  * recorded in `schema_version`; a file written by newer code than this is refused.
  *
- * Built on Node's own `node:sqlite`, so there is no native dependency; a Python trainer reads and writes the same file
- * with the standard `sqlite3` module.
+ * Built on Node's own `node:sqlite`, so there is no native dependency.
  */
 
 const HERE = dirname(fileURLToPath(import.meta.url));

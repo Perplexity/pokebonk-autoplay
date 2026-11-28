@@ -143,7 +143,7 @@ export interface Counters {
   pointsUsed: number;
   /**
    * Uses of the map: `pointsUsed` + shop purchases + slot-machine spins + Hypno's lessons + rifts cleared + Max forms
-   * used. A sum of the counters above, kept as one figure for the reward (docs/training.md).
+   * used. A sum of the counters above, kept as one figure.
    */
   mapUse: number;
 }
