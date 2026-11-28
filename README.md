@@ -43,6 +43,7 @@ the game (mirror/, unmodified)
 src/dashboard                    the batch page: the database's batches, read-only, on a local page
 src/knowledge                    the game's own tables (Pokémon, moves, items) exported as JSON
 src/sandbox                      the tool that makes the local copy; the local stand-in for the game's service
+src/watch                        the page that shows one run as it happens (npm run watch)
 src/fidelity, src/cdp            the same episode in a real local Chrome, to check the headless environment
 ```
 
@@ -75,6 +76,9 @@ node scripts/trace.ts --seed=1
 
 # One key of the plan changed for a batch or a trace
 node scripts/trace.ts --seed=1 --plan='{"leaveHp":0.5}'
+
+# Watch one run as it happens, on a page of this machine: http://127.0.0.1:8090
+npm run watch -- --seed=1            # --speed=4 plays faster; the page can pause and change speed
 
 npm test && npm run typecheck
 ```
