@@ -77,7 +77,7 @@ node scripts/trace.ts --seed=1
 # One key of the plan changed for a batch or a trace
 node scripts/trace.ts --seed=1 --plan='{"leaveHp":0.5}'
 
-# Watch one run as it happens, on a page of this machine: http://127.0.0.1:8090
+# Watch one run as it happens, on a page of this machine: http://127.0.0.1:8091
 npm run watch -- --seed=1            # --speed=4 plays faster; the page can pause and change speed
 
 npm test && npm run typecheck

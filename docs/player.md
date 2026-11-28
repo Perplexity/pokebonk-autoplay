@@ -98,7 +98,8 @@ The loop, whoever states the change (a new strategy seen on the leaderboard, a g
    answer. Or watch it: `npm run watch -- --seed=1` plays the run at real-time speed (or `--speed=4`) and shows it
    on a local page: a top-down map with the enemies, the map points and the line to where the player is heading;
    the zone, HP and level; what it intends and why; every answered dialog; its items, vitamins and stats. Watching
-   stores nothing and plays exactly as a batch does. Does it do what was meant?
+   stores nothing. The speed and a pause change what is shown and when, not what is played
+   (test/watch/game.test.ts). Does it do what was meant?
 5. **Measure on the tuning seeds** (1–30) against the current plan, same code for both:
    ```sh
    node scripts/run-episodes.ts --policy=player --policy-options='{"plan":{"leaveHp":0.5}}' --episodes=30 --seed=1 \

@@ -2,14 +2,14 @@
  * Watch one run of the player as it happens, on a local page: a top-down map, the run's state, what the player
  * intends and why, every dialog it answers, and its build. For looking at behaviour; nothing is stored.
  *
- *   node scripts/watch.ts --seed=1                  then open http://127.0.0.1:8090
+ *   node scripts/watch.ts --seed=1                  then open http://127.0.0.1:8091
  *   node scripts/watch.ts --seed=28 --speed=4 --plan='{"leaveHp":0.5}'
  *
  * Options: --seed  --species=150  --map=forest  --tier=2  --max-time=<game s, default 7200>
  *          --speed=1      game seconds per second (the page changes it and pauses)
  *          --plan=<json>  keys of the plan to replace (src/player/plan.ts)
  *          --archive, --build-plan   the account (default: the plan's own; `none` plays without)
- *          --port=8090
+ *          --port=8091    (the batch page, scripts/dashboard.ts, has 8090)
  *
  * The game runs in a process of its own, which may not open a socket: it reports over the process pipe, and this
  * process serves the page to this machine only (127.0.0.1). The page loads nothing from anywhere else.
@@ -25,7 +25,7 @@ const args = new Map<string, string>();
 for (const a of process.argv.slice(2)) { const m = /^--([\w-]+)(?:=(.*))?$/.exec(a); if (m) args.set(m[1], m[2] ?? 'true'); }
 const num = (k: string, d: number): number => (args.has(k) ? Number(args.get(k)) : d);
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const port = num('port', 8090);
+const port = num('port', 8091);
 const options = {
   seed: num('seed', 1), species: num('species', 150), map: args.get('map') ?? 'forest', tier: num('tier', 2), maxTime: num('max-time', 7200), speed: num('speed', 1),
   ...(args.has('plan') ? { plan: JSON.parse(args.get('plan')!) as Record<string, unknown> } : {}),

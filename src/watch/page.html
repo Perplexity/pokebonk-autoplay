@@ -189,6 +189,7 @@ function draw() {
   g.strokeStyle = k < .4 ? css('--hurt') : css('--hp'); g.lineWidth = 2.5 * d; g.beginPath(); g.arc(cx, cy, 10 * d, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * k); g.stroke();
 }
 
+// 600: the game starts a zone's final swarm at the zone's second 600, whether its guardian has fallen or not (docs/game.md).
 function status(f) {
   $('zone').textContent = f.ot ? `Overtime · round ${f.ot.round}` : f.rift ? `In a rift · zone ${f.zone}` : f.sanctuary ? `Sanctuary · ${clock(f.zoneT)}` : `Zone ${f.zone} · ${clock(f.zoneT)}`;
   $('phase').textContent = f.ot ? (f.ot.live ? `${f.ot.left} s left in the round · bonus ${n(f.ot.bonus)} · the tide takes ${n(f.ot.drain)} HP a second` : `Over · bonus ${n(f.ot.bonus)}`)
