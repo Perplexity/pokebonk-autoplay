@@ -17,7 +17,8 @@
     "env:measure": "node scripts/env-measure.ts",
     "test:env": "node --test \"test/env/*.test.ts\"",
     "export:knowledge": "node scripts/export-knowledge.ts",
-    "trace": "node scripts/trace.ts"
+    "trace": "node scripts/trace.ts",
+    "dashboard": "node scripts/dashboard.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",

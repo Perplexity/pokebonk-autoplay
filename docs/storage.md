@@ -140,6 +140,12 @@ environment's metadata). `--no-db` turns the database off.
 
 ## Reports
 
+`npm run dashboard` (`scripts/dashboard.ts`) serves the batches on a local page, `http://127.0.0.1:8090`: every batch
+with its state, runs played and median, mean, p90 and best ranked KOs; the runs of one batch; and one batch against
+another on the seeds both played. It opens the database read-only and refreshes while a batch is being played. A
+batch whose runner was killed stays marked `running`, because the runner writes a batch's end only when it ends by
+itself: the page says so when no run of such a batch has finished for 100 minutes.
+
 `node scripts/baseline-report.ts [--db=<file>] [--batches=1,2,3] [--label=<text>] [--preset=<name>] [--markdown] [--decisions] [--ends]`
 prints the summary of each batch: KOs, KOs with the cashed overtime bonus, game time and level (mean, median, min,
 max), zones reached, guardians beaten, legendary / overtime counts, causes of end, errors; with `--decisions` the

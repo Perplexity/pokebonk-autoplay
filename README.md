@@ -40,6 +40,7 @@ the game (mirror/, unmodified)
         │    └─ brain/           movement and fighting: sixteen headings scored at every decision
         ├─ src/runner            many episodes in parallel, each in its own process
         └─ src/storage           every episode and every answered dialog, in SQLite
+src/dashboard                    the batch page: the database's batches, read-only, on a local page
 src/knowledge                    the game's own tables (Pokémon, moves, items) exported as JSON
 src/sandbox                      the tool that makes the local copy; the local stand-in for the game's service
 src/fidelity, src/cdp            the same episode in a real local Chrome, to check the headless environment
@@ -65,6 +66,9 @@ npm run export:knowledge                                     # once per game bui
 node scripts/run-episodes.ts --policy=player --episodes=30 --seed=1 --workers=10 --species=150 --map=forest --tier=2 \
   --max-time=7200 --label=my-batch
 node scripts/baseline-report.ts --label=my-batch             # median, mean, p90, best, where runs ended
+
+# Every batch on a local page: what is playing, its figures, its runs, one batch against another
+npm run dashboard                                            # then open http://127.0.0.1:8090
 
 # One run with a readable trace: the zone's state, every intent, every answered dialog
 node scripts/trace.ts --seed=1
