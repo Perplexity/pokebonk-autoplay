@@ -29,7 +29,7 @@ test('plan-8 is plan-7 with a kit and Bill\'s machine as an errand; no plan befo
   assert.deepEqual({ ...PLAN_V8, version: '', kit: [], kitFuse: [], errands: [] }, { ...PLAN_V7, version: '', errands: [] });
   assert.deepEqual(PLAN_V8.errands, [...PLAN_V7.errands, 'bill']);
   assert.deepEqual(planWith({ base: 'plan-8' }), PLAN_V8);
-  for (const [name, p] of Object.entries(PLANS)) if (name !== 'plan-8') {
+  for (const [name, p] of Object.entries(PLANS)) if (Number(name.slice(5)) < 8) {
     assert.deepEqual([p.kit, p.kitFuse], [[], []], `${name} has no kit`);
     assert.equal(state(hold('psycho-cut:1'), { plan: p }).on, false);
   }
