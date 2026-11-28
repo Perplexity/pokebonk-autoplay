@@ -551,6 +551,19 @@ test('boxed in behind something solid, a forced goal is walked round, not waited
   const clear = vary(behind, (q) => { q.t = t0 + 6; q.terrain.free = new Array(16).fill(9); q.terrain.hop = new Array(16).fill(9); });
   const on = decide(clear, mem, T).action;
   assert.ok(on.move && on.move.z < -0.7, `straight at the portal (got ${JSON.stringify(on.move)})`);
+  // The same when it does walk, into something that reads as free and is not (held-out seed 900038): two seconds
+  // of walking without moving, then well to one side of the goal.
+  const pressed = vary(behind, (q) => { q.terrain.free = new Array(16).fill(9); q.terrain.hop = new Array(16).fill(9); });
+  let mem2 = newMemory(), turned: ReturnType<typeof decide>['action'] | null = null, at2 = 0, straight = 0;
+  for (let i = 0; i < 100 && !turned; i++) {
+    const out = decide(vary(pressed, (q) => { q.t = t0 + i * 0.05; }), mem2, T);   // the position never changes
+    mem2 = out.mem;
+    if (out.action.move && out.action.move.z < -0.7 && mem2.aroundUntil <= t0 + i * 0.05) straight++;
+    else if (out.action.move && mem2.aroundUntil > t0 + i * 0.05) { turned = out.action; at2 = i * 0.05; }
+  }
+  assert.ok(straight >= 5, `first it walks at the portal (${straight} steps), then leans to pass what is in the way`);
+  assert.ok(turned && at2 >= 2 && at2 <= 3.6, `then it goes round (after ${at2} s)`);
+  assert.ok(turned!.move!.z > -0.5 && Math.abs(turned!.move!.x) > 0.5, `well to one side (got ${JSON.stringify(turned!.move)})`);
   // An ordinary goal is still given up on, not walked round for ever, and nothing changes while the way is open.
   const open = vary(clear, (q) => { q.t = t0; });
   assert.ok(decide(open, newMemory(), T).action.move!.z < -0.7);

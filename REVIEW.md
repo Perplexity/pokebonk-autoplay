@@ -16,9 +16,12 @@ learned manager (`python/pokebonk_rl`) is trained on top. The goal is a score, m
    episodes, which batch. One run's score has a standard deviation of about three quarters of its mean, so:
    - a conclusion from a handful of runs is not a conclusion: ask for a batch;
    - a comparison needs the same seeds and the same code for both sides, or says why not;
-   - a gain found on seeds 1–30 that is meant to become a default should also be shown on the development seeds
-     (2000001–2000100);
-   - the held-out seeds (900001–900050) are never tuned on. Flag anything that chooses a setting by them.
+   - a gain found on seeds 1–30 that is meant to become a default should also be shown on development seeds that
+     nothing was chosen on: 3000001–3000100 today; 2000001–2000100 for plans up to plan-6. A setting chosen
+     because of runs on a development set makes that set a tuning set: flag a figure from it that is presented
+     as a check;
+   - the held-out seeds (900001–900050) are never tuned on. Flag anything that chooses a setting by them, a fix
+     found by looking into one of their runs included.
 3. **Machine learning practice.** Leakage between what is tuned and what is evaluated. Rewards that can be earned
    without scoring (for example by taking damage to heal it back, or by standing still). Value targets, discounting
    and normalisation that do not match what the trainer uses. A promotion rule that an equally good model would pass

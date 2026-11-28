@@ -574,6 +574,19 @@ stops at the same wall, the enemies' HP in Overtime rounds 13 to 16.
 | plan-5, `balanced` (batch 56) | development 100 | 4,821,770 | 4,622,592 | 8,287,315 | 11,201,881 | 85 | 46 | 1,071 | 52.4 | 14 |
 | **plan-6, `stack-2`** (batch 71) | development 100 | **7,430,752** | 7,087,624 | 9,221,229 | 10,899,768 | 98 | 86 | 1,613 | 54.4 | 15.5 |
 
+| plan-3, `balanced` (batch 35) | held-out 50 | 1,528,620 | 2,114,671 | 4,034,675 | 9,052,797 | 37 | 2 | 789 | 49.4 | 13 |
+| **plan-6, `stack-2`** (batch 72) | held-out 50 | **7,780,684** | 7,333,755 | 9,619,558 | 10,299,849 | 48 | 46 | 1,605 | 54.8 | 16 |
+
+- **Held-out seeds** (played once, after plan-6 was fixed; the owner's OK of 2026-11-27): seed by seed ×3.64 of
+  plan-3 (2.41 to 5.03), better on 48 of 50. No run of 20 million. 48 of 50 cash Overtime; one faints in zone 1
+  after 303 s (seed 900031, 1,976 KOs) and one plays to the time cap in the sanctuary without starting Overtime
+  (seed 900038). These batches are played by the runner with the rules against standing still off, so that run
+  counts with its 837,239 KOs in every figure above; in an evaluation of a model, where those rules are on, it would
+  end early and score 0.
+- **Without seed 900038** (spent since part 6: a stall was diagnosed on it), over the other 49 held-out seeds.
+  plan-6: median 7,896,712, mean 7,466,337, p90 9,621,454, best 10,299,849; 48 reach 1 million, 46 reach 5 million.
+  plan-3 (batch 35): median 1,509,296, mean 1,973,076, p90 3,952,685, best 6,323,615; 36 reach 1 million, 1 reaches
+  5 million. plan-3's best run of the 50 (9,052,797) was on that seed.
 - Development seeds, plan-6 against plan-3: seed by seed ×4.44 (3.69 to 5.32), better on 95 of 100. Against
   plan-5: ×2.01 (1.64 to 2.47), better on 80.
 - 99 of 100 cash Overtime; one faints before it (209,738 KOs).
@@ -601,3 +614,167 @@ stops at the same wall, the enemies' HP in Overtime rounds 13 to 16.
 - The manager is still a copy of plan-3 on `unlocked-v4:balanced`. plan-6 as its default is a new account preset for
   the model as well: a new copy and a new start model.
 - The faint before Overtime on one development seed (batch 71) and the lost Overtime of plan-5's batch 56 were not looked into.
+
+
+---
+
+# Part 6: the owner's account of a top run, and plan-7 (vitamins by phase)
+
+2026-11-27. No training, no cheat. The owner, asked how a 20 million run is played: rifts whenever possible; every
+altar on the map; the final swarms held as long as possible; fusions ("stronger than you seem to think"); and
+vitamins by phase: experience, Super Lure, Nugget and Cursed Incense through zones 1 to 3, the luck vitamin first in
+place of Calcium, and before the final stage a change to the most damage and max HP possible. Each is taken as a
+default to build and measure. This part: vitamins, a first look at rifts and at the kit, and a second stall.
+
+**In one paragraph.** With the owner's five vitamins a run reaches level 2,586 for 1,570, and scores the same: the
+enemies of Overtime are harder for them. With the change at Hypno in zone 3 to Calcium, HP Up, Ether, Stardust and
+PP Up (plan-7) the median on seeds 1–30 is 10.80 million for 7.52, the best 12.66 million; on 100 seeds
+nothing was chosen on (3000001–3000100) 11.37 million for 7.84 by the same code, the best 12.98 million, with 74
+runs of 100 over 10 million.
+
+## Measured
+
+**The five vitamins without the change** (plan-6 with Exp Candy, Cursed Incense, Super Lure, Nugget and the luck
+vitamin made the five most valued, seeds 1–30, batch 74, against plan-6 on the same seeds):
+
+| | Median | Best | Level | Experience × | Luck | Damage × | Special × | Difficulty × | KOs before Overtime |
+|---|---|---|---|---|---|---|---|---|---|
+| plan-6 (batch 73) | 7,523,221 | 10,465,062 | 1,570 | 27.4 | 828 | 26.1 | 7.1 | 3.0 | 1,188,663 |
+| with the five vitamins (batch 74) | 7,565,834 | 8,859,812 | 2,586 | 42.5 | 951 | 34.2 | 3.8 | 5.1 | 1,489,133 |
+
+- All 30 runs held all five. Seed by seed ×0.93 (0.82 to 1.04): the Overtime ceiling is lost a round earlier
+  (round 12: 78,402 KOs for 84,933). More levels, harder enemies, no Calcium.
+
+**plan-7: the five while farming, the change at Hypno from zone 3's second 720** (seeds 1–30, batch 76, against
+plan-6 played by the same code, batch 78):
+
+| | Median | Mean | p90 | Best | ≥ 5 M | Level | Minutes | Rounds |
+|---|---|---|---|---|---|---|---|---|
+| plan-6 (batch 78) | 7,523,221 | 7,702,594 | 9,944,315 | 10,465,062 | 29 | 1,570 | 55.7 | 16 |
+| **plan-7** (batch 76) | 10,796,478 | 9,993,619 | 12,372,180 | 12,657,549 | 28 | 2,265 | 57.6 | 17 |
+
+- Seed by seed ×1.27 (1.08 to 1.47), better on 24 of 30. All 30 cash Overtime.
+- In 28 of 30 runs the five final vitamins are held at the end, at level 12 (PP Up 11.5); 2 runs still hold the
+  farm five (no Hypno reached in zone 3: not looked into).
+- The build at the end: max HP 1,703 for 526, attack speed ×27 for ×12, area ×33 for ×8.6, 25 projectiles,
+  special ×9.8 for ×7.1, difficulty ×1.9 for ×3.0. The median run holds the Overtime ceiling through round 13
+  (94,039 KOs) and 91,279 in round 14; 21 of 30 play round 16, 11 round 17.
+- Hypno pays for a forgotten vitamin; no price stands in the way.
+
+**Rifts, a prototype outside `src/`** (plan-6 with a wrapper that burns Incense whenever the game allows, walks in,
+calls the waves, opens the free ball, takes relics by rarity and leaves; only through the environment; seeds 1–30,
+not in the database):
+
+- A rift takes 22 to 85 s with the zone clock stopped and gives 1 to 3 items, a few levels and a relic. A run gets
+  Incense for 11 rifts (median, at most 15) and spends 6.5 minutes in them.
+- 26 runs ended: seed by seed ×1.07 of plan-6 (0.89 to 1.29), median 8.20 million for 7.30 on the same seeds, best
+  11.57 for 10.28. At the end the 30 runs hold 52 epic and 31 legendary relics among them.
+- **4 of 30 did not end**: stuck inside a rift (two in the first, at the run's first second). The prototype's
+  fault: it walks at the rift's portal or a ball by the straight line. Not a measurement of rifts.
+- A relic is a multiplier of 1.05 to 1.5 on one thing (47 of them, read in the bundle). Rifts are worth building
+  into the heuristic; they are not the factor of two by themselves.
+
+**The kit, from stored builds and the bundle, not yet played:**
+
+- plan-6 ends with Psycho Cut, Psystrike, Prismatic Laser and Psycho Boost in 19 of 30 runs. Psycho Boost does 63 %
+  of the damage where it is held, Psystrike 33 %, Prismatic Laser 14 %, Psycho Cut 10 %.
+- Base damage: Psycho Boost 65, Perish Song 62, Future Sight 53, Trick Room 34; Psystrike 17, Psycho Cut 10,
+  Prismatic Laser 9. The leaderboard Mewtwo's kit was Trick Room, Future Sight, Perish Song, Mist, Encore and the
+  fusion of Psycho Boost and Psystrike.
+- **Why part 5's fusion arm lost** (×0.74): every pair at the cap was fused, in most runs twice, and the freed slots
+  were filled with borrowed moves that did no damage (Aura Sphere, Safeguard, Swift, Disable, Mist: 0 % each). The
+  fusion was not what was measured. Hypno pays to forget a move and gives one lesson a zone for the free slot.
+
+**A second stall, and the rule for it.** Held-out seed 900038 under plan-6 played to the time cap after the
+legendary fell: pressed against the end of a wall of roots it kept walking into it, a step that read as free, so
+the standing rule of part 4 never ran. The rule now also counts two seconds of walking that moves nothing, on the
+way to a portal in the sanctuary with no enemy within 4 m. Seed 900038 then cashes Overtime (5,843,774).
+- Two wider versions of the rule (any forced walk; any forced walk with no enemy near) changed 19 and 20 of 30
+  runs of plan-3: a tree in the way of an errand is ordinary, and the older rules deal with it. Neither is kept.
+- With the rule as kept, plan-3 replays seeds 1–30 identically to batch 32, 30 of 30 (batch 79).
+
+**plan-7 on the 100 development seeds** (batch 80; plan-6 there is batch 71, plan-3 batch 54):
+
+| | Median | Mean | p90 | Best | ≥ 1 M | ≥ 5 M | ≥ 10 M | Level | Minutes | Rounds |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plan-3 | 1,465,290 | 1,964,935 | 4,158,466 | 8,031,427 | 69 | 8 | 0 | 825 | 47.7 | 11 |
+| plan-6 | 7,430,752 | 7,087,624 | 9,221,229 | 10,899,768 | 98 | 86 | 3 | 1,613 | 54.4 | 15.5 |
+| **plan-7** | **11,508,158** | 10,421,969 | 12,647,796 | 13,131,057 | 97 | 92 | 76 | 2,322 | 58.2 | 17 |
+
+- Better than plan-6 on 90 of 100 seeds, than plan-3 on 97. No run of 20 million.
+- **3 of 100 fainted in zone 1** after 3.5 to 4.5 minutes (935 to 1,388 KOs), at level 52 to 59 with Cursed Incense
+  and Super Lure already at level 10, 12 to 14 items and a max HP of 211 to 234: every early level had gone into
+  vitamins, two of which make the horde stronger. (plan-6: 1 of 100 fainted, in zone 1's final swarm.) Seed by
+  seed the three weigh heavily: ×1.19 of plan-6 with a range of 0.83 to 1.61.
+- **A gate for it** (`vitaminsRiskLevel: 120`): until level 120 the two vitamins whose stat makes the horde bigger
+  or stronger come after any move upgrade instead of before it.
+  - **A first version of the gate was a fault of mine and is not a measurement.** It put the two at the bottom of
+    every offer until level 120. The refreshes and skips were then spent waiting for them, and when those ran out
+    the two free slots went to whatever was offered (Elixir and Poké Radar in the traced run of seed 1). Batches
+    81 (development seeds: median 8,941,097) and 82 (seeds 1–30: median 8,702,536) were played with it.
+  - With the gate as kept, the trace of seed 1 holds all five farm vitamins by the run's second 300, at level 125.
+
+**plan-7 with the gate** (batches 83 and 84; plan-7 without it is batches 80 and 76):
+
+| | Seeds | Median | Mean | p90 | Best | Worst | ≥ 1 M | ≥ 5 M | ≥ 10 M | Fainted | Level | Rounds |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| plan-7 without the gate | development 100 | 11,508,158 | 10,421,969 | 12,647,796 | 13,131,057 | 935 | 97 | 92 | 76 | 3 | 2,322 | 17 |
+| **plan-7** | development 100 | **11,469,680** | 10,896,008 | 12,545,168 | 13,363,218 | 4,592,844 | 100 | 99 | 78 | 0 | 2,404 | 17 |
+| plan-7 without the gate | 1–30 | 10,796,478 | 9,993,619 | 12,372,180 | 12,657,549 | 3,326,478 | 30 | 28 | 18 | 0 | 2,265 | 17 |
+| **plan-7** | 1–30 | 11,396,169 | 10,588,606 | 12,373,286 | 12,946,200 | 611,975 | 29 | 28 | 24 | 0 | 2,454 | 18 |
+
+- Development seeds: all 100 runs cash Overtime; none faints. Against plan-7 without the gate ×1.37 seed by seed
+  (1.04 to 1.98), which is the three early faints; the medians are the same.
+- **These 100 seeds are no longer seeds nothing was chosen on.** The gate was added because of three runs on them
+  and two versions of it were judged on them. Batch 83 is a tuned figure. The clean check is below, on a second set.
+- Against plan-6 there (batch 71): ×1.64 seed by seed (1.48 to 1.84), better on 92 of 100. Batch 71 was played
+  before the movement rule of this part and batch 83 after it: not the same code on both sides. plan-6 replays
+  seeds 1–30 identically with the rule (below), so the difference is probably nothing, but it was not measured on
+  these seeds.
+- Seeds 1–30: ×1.01 of plan-7 without the gate (0.80 to 1.23). One run scores 611,975 (not looked into).
+- No run of 20 million: the best of the 130 is 13.4 million.
+
+**The clean check: a second development set, 3000001–3000100** (played once, after plan-7 and its gate were
+fixed; nothing was chosen on it; both plans by the same code, the one this part ends with):
+
+| | Batch | Median | Mean | p90 | Best | Worst | ≥ 1 M | ≥ 5 M | ≥ 10 M | Level | Minutes | Rounds |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| plan-6 | 87 | 7,838,016 | 7,514,490 | 9,514,985 | 11,345,601 | 1,113,647 | 100 | 89 | 5 | 1,576 | 55.3 | 16 |
+| **plan-7** | 86 | **11,373,575** | 10,572,553 | 12,446,802 | 12,979,411 | 743,808 | 99 | 97 | 74 | 2,423 | 57.3 | 17 |
+
+- Seed by seed plan-7 is ×1.42 of plan-6 (1.29 to 1.56), better on 88 of 100. All 200 runs cash Overtime.
+- No run of 20 million.
+
+**The movement rule and the plans before plan-7.** With the rule as kept, plan-6 replays seeds 1–30 identically to
+batch 70, which was played before any such rule: 30 of 30 (batch 85). plan-3 likewise (batch 79 against 32), and
+plan-5 (batch 88 against 57). Plans 1, 2 and 4 were not replayed: the rule runs only on the way to a portal in the
+sanctuary after two seconds without moving and with no enemy near, the case in which a run of any plan stood
+until the time cap.
+
+**A held-out seed is spent.** The second stall was found by looking into held-out seed 900038 (batch 72) and the
+rule was checked on that seed. That is a choice made with a held-out seed. From here on a result on the held-out
+seeds is given over all 50 and over the 49 without 900038, and no claim rests on that seed.
+
+## What it means
+
+- The owner's vitamin order is worth about two fifths more than plan-6 (×1.42 seed by seed on seeds nothing was
+  chosen on), and all of it comes from the change before the final stage: the five farm vitamins without it scored
+  the same as plan-6.
+- The median run is over 11 million and 74 of 100 are over 10 million, against 5 of 100 for plan-6. The top moved
+  less: 13.0 million against 11.3. A 20 million run still needs the Overtime ceiling held four or five rounds
+  longer than plan-7 holds it (through round 13 or 14).
+- What is left of the owner's account, in the order the evidence here suggests: the kit (the heavy moves, one
+  fusion, no filler), every altar on the map, rifts built into the heuristic.
+
+## Limitations and unresolved questions
+
+- The final five vitamins (Calcium, HP Up, Ether, Stardust, PP Up) and the moment of the change (zone 3, second
+  720) were set once and not varied. The leaderboard build ended with Super Lure, Calcium, Poké Radar, HP Up and
+  Stardust.
+- Not every run changes its vitamins: at the end only final-stage vitamins are held in 28 of 30 runs of batch 76,
+  27 of 30 of batch 84, 93 of 100 of batch 83 and 87 of 100 of batch 86. Why the others do not (no Hypno in reach,
+  or the errand given up) was not looked into.
+- plan-7 was not played on the held-out seeds.
+- The gate's level (120) was set once, from three runs on the first development set, and not varied.
+- The rift prototype's stalls are the prototype's; rifts inside the heuristic are not built.
+- The manager is still a copy of plan-3.

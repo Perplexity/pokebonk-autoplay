@@ -574,11 +574,18 @@ export function decide(s: Snapshot, mem: Memory, base: Tuning, directive: Direct
   // raises three walls of roots, 10 m wide, that stay standing when it falls. The run stood right behind one with the
   // portal 10 m beyond it: every step towards the portal was blocked, standing still scored best, and it stood there
   // for the remaining 74 minutes. After two seconds of that it walks round, the other side each time.
-  const waiting = !move && !!goal.forced && !goal.ring && gd > goal.reach + 0.5;
+  // (Held-out seed 900038, plan-6: pressed against the end of such a wall the bot kept walking into it, a step that
+  // read as free: two seconds of walking that moves nothing count the same as two seconds of standing. Only on the
+  // way to a portal in the sanctuary, with no enemy within 4 m: held up by the horde or by a tree on an errand is the
+  // ordinary case of a forced walk, the rules for it are older, and with this one applied to every forced walk 19 of
+  // 30 runs of plan-3 came out differently.)
+  const far = !!goal.forced && !goal.ring && gd > goal.reach + 0.5;
+  const waiting = !move && far;
   if (!waiting || s.t < m.boxedSince) m.boxedSince = -1;
-  if (waiting && s.t >= m.aroundUntil) {
-    if (m.boxedSince < 0) m.boxedSince = s.t;
-    else if (s.t - m.boxedSince >= 2) { m.boxedSince = -1; m.detourSide = -m.detourSide; m.aroundUntil = s.t + 1.5; }
+  if (far && s.t >= m.aroundUntil) {
+    if (!!move && m.stuck >= 2 && goal.kind === 'portal' && s.stage >= 4 && !(sit.nearest < 4)) { m.stuck = 0; m.boxedSince = -1; m.detourSide = -m.detourSide; m.aroundUntil = s.t + 1.5; }
+    else if (waiting && m.boxedSince < 0) m.boxedSince = s.t;
+    else if (waiting && s.t - m.boxedSince >= 2) { m.boxedSince = -1; m.detourSide = -m.detourSide; m.aroundUntil = s.t + 1.5; }
   }
   if (waiting && s.t < m.aroundUntil) {
     // The best direction there is: standing is not one of them now.

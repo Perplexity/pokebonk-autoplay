@@ -144,6 +144,25 @@ export interface Plan {
    * an errand: the machine is walked to once the item is held and two moves are at the cap.
    */
   fuseNeeds: string;
+  /**
+   * Vitamins by phase (plan-7; both empty = by worth, as before). While the run farms, a new vitamin is taken only
+   * from `vitaminsFarm`, in that order of preference: experience, elites, Pokédollars and luck, which make the build.
+   * From zone second `swapAtSec` of zone `swapZone` on, the wanted ones are `vitaminsFinal` (damage and max HP for
+   * the sanctuary and Overtime): Hypno is visited to forget the others (he pays for them), and the level-ups of the
+   * rest of that zone's final swarm fill the freed slots. The owner, 2026-11-27: "they change their vitamins before
+   * the final stage so that they have max hp and damage possible"; "I would spend most of the run, before zone 4,
+   * using Calcium/Protein, Nugget, Super Lure, Exp Candy, and Cursed Incense", with the luck vitamin first in place of
+   * Calcium. A vitamin of the later phase is never banished in the earlier one.
+   */
+  vitaminsFarm: string[]; vitaminsFinal: string[]; swapZone: number; swapAtSec: number;
+  /**
+   * A vitamin of the plan that makes the horde bigger or stronger (its stat is one of the direction's `risk` stats:
+   * Cursed Incense, Super Lure) comes after any move upgrade until this level (0 = first, like the others).
+   * Chosen on the development seeds 2000001 to 2000100, which are tuning seeds for plan-7 since: without it 3 of
+   * those 100 runs fainted in zone 1 after 3.5 to 4.5 minutes, at level 52 to 59 with both vitamins at level 10, 12
+   * to 14 items and no move upgraded, because every early level had gone into vitamins.
+   */
+  vitaminsRiskLevel: number;
 }
 
 export const PLAN_V1: Plan = {
@@ -170,6 +189,7 @@ export const PLAN_V1: Plan = {
   cashLoss: 2, cashWindow: 5,
   roarsFirst: false, roarTimeout: 120,
   fuseNeeds: '',
+  vitaminsFarm: [], vitaminsFinal: [], swapZone: 3, swapAtSec: 720, vitaminsRiskLevel: 0,
 };
 
 /**
@@ -225,11 +245,25 @@ export const PLAN_V5: Plan = { ...PLAN_V3, version: 'plan-5', direction: DIRECTI
  */
 export const PLAN_V6: Plan = { ...PLAN_V5, version: 'plan-6', cashHp: 0.3, cashLoss: 2, leaveHp: 0.4 };
 
-export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6 };
+/**
+ * plan-7 (NOT the default): plan-6 with the owner's vitamins by phase (above), on the archive `stack-2`. On 100 seeds
+ * nothing was chosen on (3000001 to 3000100), both plans by the same code: median 11.37 million against plan-6's
+ * 7.84, p90 12.45 against 9.51, best 12.98 against 11.35; better on 88 of 100 (batches 86 and 87). The five farm
+ * vitamins without the change at Hypno scored the same as plan-6. `vitaminsRiskLevel` was chosen on seeds 2000001 to
+ * 2000100: plan-7's figures there are tuned (docs/phase-3-report.md part 6).
+ */
+export const PLAN_V7: Plan = {
+  ...PLAN_V6, version: 'plan-7',
+  vitaminsFarm: ['exp-candy', 'cursed', 'super-lure', 'nugget', 'star-piece-v'],
+  vitaminsFinal: ['calcium', 'hp-up', 'ether', 'stardust', 'pp-up'],
+  errands: [...PLAN_V6.errands, 'hypno'], vitaminsRiskLevel: 120,
+};
+
+export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6, 'plan-7': PLAN_V7 };
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). The key `base` names the plan to start from
- * ('plan-1' … 'plan-6'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
+ * ('plan-1' … 'plan-7'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
  */
 export function planWith(over: Record<string, unknown> | undefined, from?: Plan): Plan {
   const name = over?.base;
