@@ -86,6 +86,12 @@ export interface Plan {
    */
   builds: Record<number, SpeciesBuild>;
   borrowClass: string;
+  /**
+   * The account every figure of the plan was measured on (options of the environment): the item archive, and the
+   * build plan that carries the builds' favourites. The runner and the trace play on it unless told otherwise
+   * (`accountOptions`): a batch on another account is a setup nobody measured.
+   */
+  account: { archive: string; buildPlan: string };
 
   /** The brain's tuning (brain/tuning.ts), where the plan differs from its defaults. */
   tuning: Partial<Tuning>;
@@ -127,10 +133,21 @@ export const PLAN: Plan = {
     150: { fuse: ['psystrike', 'psycho-boost'], kit: ['future-sight', 'perish-song', 'trick-room', 'mist', 'encore'], favourites: ['future-sight', 'perish-song', 'trick-room', 'mist'] },
   },
   borrowClass: 'special',
+  account: { archive: 'stack-2', buildPlan: 'kit-1' },
   tuning: { lootRange: 90, visitRange: 60, lootCalm: 5, hordeSize: 140, shopGold: 60 },
 };
 
 export const PLANS: Record<string, Plan> = { [PLAN.version]: PLAN };
+
+/**
+ * The environment's account options for a run of `species` under the plan: the plan's own account, each part
+ * replaced by what is given ('none': without it). The build plan applies only to a Pokémon the plan has a build for.
+ */
+export function accountOptions(species: number, given: { archive?: string; buildPlan?: string } = {}, plan: Plan = PLAN): { archive?: string; buildPlan?: string } {
+  const archive = given.archive ?? plan.account.archive;
+  const buildPlan = given.buildPlan ?? (plan.builds[species] ? plan.account.buildPlan : 'none');
+  return { ...(archive !== 'none' ? { archive } : {}), ...(buildPlan !== 'none' ? { buildPlan } : {}) };
+}
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). Unknown keys are an error: a typo must not play

@@ -15,6 +15,7 @@ import { writeSync } from 'node:fs';
 import { createEnvironment } from '../src/environment/index.ts';
 import type { StepResult } from '../src/environment/index.ts';
 import { E_FLAGS, E_X, E_Z, EF } from '../src/observations/snapshot.ts';
+import { accountOptions } from '../src/player/plan.ts';
 import { hordeHit, playerPolicy } from '../src/player/policy.ts';
 
 const args = new Map<string, string>();
@@ -22,11 +23,10 @@ for (const a of process.argv.slice(2)) { const m = /^--([\w-]+)(?:=(.*))?$/.exec
 const num = (k: string, d: number) => (args.has(k) ? Number(args.get(k)) : d);
 const say = (s: string) => writeSync(1, s + '\n');
 const seed = num('seed', 1), from = num('from', 0), hpWindow = (args.get('hp') ?? '').split('-').map(Number);
-const archive = args.get('archive') ?? 'stack-2', buildPlan = args.get('build-plan') ?? 'kit-1';
 
 const env = createEnvironment({
   species: num('species', 150), map: args.get('map') ?? 'forest', tier: num('tier', 2), ranked: true, maxGameTime: num('max-time', 7200),
-  ...(archive !== 'none' ? { archive } : {}), ...(buildPlan !== 'none' ? { buildPlan } : {}),
+  ...accountOptions(num('species', 150), { ...(args.has('archive') ? { archive: args.get('archive')! } : {}), ...(args.has('build-plan') ? { buildPlan: args.get('build-plan')! } : {}) }),
 });
 let obs = await env.reset({ seed });
 const events: string[] = [];

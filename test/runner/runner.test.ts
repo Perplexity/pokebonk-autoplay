@@ -29,6 +29,9 @@ test('configuration is validated before anything starts', () => {
   assert.throws(() => validateConfig(config({ seeds: [3, 3] })), /duplicates/);
   assert.throws(() => validateConfig(config({ recycleAfter: 0 })), /recycle-after/);
   assert.throws(() => validateConfig(config({ episodeTimeoutSec: 0 })), /episode-timeout/);
+  // A whole run of the current plan was measured at up to 2,026 s of wall time beside eleven others: a limit of 1,800 s
+  // cut 4 of 100 runs of a batch, and not at random.
+  assert.ok(DEFAULT_BATCH.episodeTimeoutSec >= 5400);
   assert.throws(() => validateConfig(config({ policyOptions: { tuning: {} } })), /policy "random" has no option "tuning"/);
   assert.throws(() => validateConfig(config({ policy: 'player', policyOptions: { speed: 2 } })), /policy "player" has no option "speed" \(it has: plan\)/);
   assert.throws(() => validateConfig(config({ policy: 'player', policyOptions: { plan: 5 } })), /must be an object/);

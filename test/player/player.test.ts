@@ -5,10 +5,11 @@ import { test } from 'node:test';
 import type { Snapshot } from '../../src/observations/snapshot.ts';
 import { choose, scoreLevelUp, vitaminPhase, worthNow } from '../../src/player/chooser.ts';
 import type { ChooserContext } from '../../src/player/chooser.ts';
-import { PLAN, PLANS, planWith } from '../../src/player/plan.ts';
+import { accountOptions, PLAN, PLANS, planWith } from '../../src/player/plan.ts';
 import { directiveFor, errandFor, hordeHit, newLife, spawnEstimate } from '../../src/player/policy.ts';
 import type { World } from '../../src/player/policy.ts';
 import { ARCHIVE_NAMES, archiveOf, DIRECTION, itemWorth, kitOf, loadValuationKnowledge, textMultiplier, vitaminWorth } from '../../src/player/values.ts';
+import { BUILD_PLAN_NAMES } from '../../src/player/kit.ts';
 import { DEFAULT_TUNING } from '../../src/player/brain/tuning.ts';
 import { buildFor } from '../../src/player/brain/builds.ts';
 
@@ -74,6 +75,16 @@ const offer = (data: Record<string, unknown>) => ({ id: 'x', label: '', data });
 const world = (o: Partial<World> = {}): World => ({ gold: 0, ballPrice: 50, cagePrice: 30, slotPrice: 40, items: 0, spawn: 1.6, ...o });
 const point = (kind: string, d: number, o: Record<string, unknown> = {}) => ({ kind, sub: '', x: d, z: 0, r: 2, used: false, cost: 0, d, ...o });
 const OT = { live: false, over: false, direct: false, round: 0 };
+
+test('the plan names the account it was measured on; a run plays on it unless told otherwise', () => {
+  assert.deepEqual(accountOptions(150), { archive: 'stack-2', buildPlan: 'kit-1' });
+  assert.deepEqual(accountOptions(150, { buildPlan: 'none' }), { archive: 'stack-2' });
+  assert.deepEqual(accountOptions(150, { archive: 'none', buildPlan: 'none' }), {});
+  assert.deepEqual(accountOptions(150, { archive: 'balanced' }), { archive: 'balanced', buildPlan: 'kit-1' });
+  // A Pokémon the plan has no build for has no build plan either (the environment would refuse one).
+  assert.deepEqual(accountOptions(6), { archive: 'stack-2' });
+  assert.ok(ARCHIVE_NAMES.includes(PLAN.account.archive) && BUILD_PLAN_NAMES.includes(PLAN.account.buildPlan));
+});
 
 test('the plan: one current version, unknown keys refused, tuning merged, the default never written into', () => {
   assert.deepEqual(Object.keys(PLANS), ['plan-9']);

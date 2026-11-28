@@ -36,8 +36,9 @@ woken on arrival and a zone is ten minutes of errands and eight of final swarm.
   zone: the same rules build whatever a plan lists. A Pokémon without an entry plays its own four moves.
 - **The account** the runs are played on is part of the build: the item archive `stack-2` (what is taken out of the
   item pool, generated for the Pokémon's kit) and the build plan `kit-1` (the favourites, and the rest of the move
-  pool switched off as far as the game allows). Both are options of the environment (`--archive`, `--build-plan`)
-  and are checked against what the game itself reports at every reset.
+  pool switched off as far as the game allows). Both are options of the environment and are checked against what
+  the game itself reports at every reset. The plan names them (`plan.account`), and the runner and the trace play
+  on them unless told otherwise (`--archive`, `--build-plan`; `none` plays without).
 - **Vitamins by phase:** experience, the two that make the horde bigger, Pokédollars and luck while the run farms;
   from zone 3's second 720 damage and max HP, with the others forgotten at Hypno.
 - **Items** are taken, bought and copied by worth (`values.ts`): damage is the yardstick; luck, experience and
@@ -90,7 +91,7 @@ The loop, whoever states the change (a new strategy seen on the leaderboard, a g
 5. **Measure on the tuning seeds** (1–30) against the current plan, same code for both:
    ```sh
    node scripts/run-episodes.ts --policy=player --policy-options='{"plan":{"leaveHp":0.5}}' --episodes=30 --seed=1 \
-     --workers=10 --species=150 --map=forest --tier=2 --max-time=7200 --archive=stack-2 --build-plan=kit-1 --label=my-change
+     --workers=10 --species=150 --map=forest --tier=2 --max-time=7200 --label=my-change
    node scripts/baseline-report.ts --label=my-change
    ```
    Report median, mean, p90 and best, and look at what the runs did (time in each zone, the build at the end, the

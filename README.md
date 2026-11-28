@@ -13,7 +13,7 @@ machine; it is git-ignored and must not be published.
 
 ## Where it stands
 
-No run has reached 20 million. The best is 14.5 million.
+No run has reached 20 million. The best is 15.0 million.
 
 | Plan | What it added | Seeds | Median | p90 | Best |
 |---|---|---|---|---|---|
@@ -21,7 +21,8 @@ No run has reached 20 million. The best is 14.5 million.
 | plan-5 | items valued by what the score follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
 | plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
-| plan-8 | the leaderboard build: one fusion, two linked pairs, Encore | 1–30 (tuning) | 13,854,144 | 14,409,773 | 14,539,765 |
+| plan-8 | the leaderboard build: one fusion, two linked pairs, Encore | 100 second development | 13,803,730 | 14,467,683 | 15,039,733 |
+| plan-9 | a cleared zone is no longer left before its final swarm | 1–30 (tuning) | 14,067,070 | 14,510,817 | 14,792,507 |
 
 `docs/results.md` has every figure, what was tried and was worse, and what ends a run today: from Overtime's
 minute 8 the game makes enemy HP grow ×48 a minute and the tide ×4, and the player arrives there with about a
@@ -60,7 +61,7 @@ npm run export:knowledge                                     # once per game bui
 
 # The player over fixed seeds, into data/pokebonk.sqlite (about an hour on a laptop)
 node scripts/run-episodes.ts --policy=player --episodes=30 --seed=1 --workers=10 --species=150 --map=forest --tier=2 \
-  --max-time=7200 --archive=stack-2 --build-plan=kit-1 --label=my-batch
+  --max-time=7200 --label=my-batch
 node scripts/baseline-report.ts --label=my-batch             # median, mean, p90, best, where runs ended
 
 # One run with a readable trace: the zone's state, every intent, every answered dialog

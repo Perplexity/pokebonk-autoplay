@@ -2,7 +2,7 @@
 
 Game build `mwsewi0r` (0.10.26). Mewtwo, forest, tier 2, Ranked rules, one episode per game process, no cheat, no
 learning. Score = KOs + the Overtime bonus when it is cashed. The goal: one run of 20 million or more in a single
-evaluation of the 50 held-out seeds. **No run has reached 20 million; the best is 14.5 million.**
+evaluation of the 50 held-out seeds. **No run has reached 20 million; the best is 15.0 million.**
 
 The episodes behind every figure are in `data/pokebonk.sqlite` (batch numbers in brackets; docs/storage.md). The
 plans before the current one are no longer in the code: their figures are kept here, and the code that played them
@@ -19,12 +19,21 @@ is in the repository's history.
 | | | 50 held-out | 7,780,684 | | 9,619,558 | 10,299,849 |
 | | | 100 second development [87] | 7,838,016 | 7,514,490 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development [86] | 11,373,575 | 10,572,553 | 12,446,802 | 12,979,411 |
-| | | 1–30 [84] | 11,396,169 | 10,588,606 | 12,348,931 | 12,946,200 |
-| plan-8 | the build: one fusion, two linked pairs, Encore; the account's build plan | 1–30 [89] | 13,854,144 | 11,875,904 | 14,409,773 | 14,539,765 |
+| | | 1–30 [84] | 11,396,169 | 10,588,606 | 12,373,286 | 12,946,200 |
+| plan-8 | the build: one fusion, two linked pairs, Encore; the account's build plan | 1–30 [89] | 13,854,144 | 11,875,904 | 14,414,348 | 14,539,765 |
+| | | 100 second development [92, 95] | 13,803,730 | 12,888,057 | 14,467,683 | 15,039,733 |
+| plan-9 | a cleared zone is left on low HP only once its final swarm has begun | 1–30 [96] | 14,067,070 | 13,632,461 | 14,510,817 | 14,792,507 |
 
-- plan-8 against plan-7 on seeds 1–30, seed by seed: ×1.13 (95 %: 0.87 to 1.53), better on 23 of 30. 22 of 30 runs
-  end with the whole build, every linked pair at level 10; those runs kill at the Overtime ceiling through round 16
-  (plan-7: round 14). One run fainted in Overtime's round 19 and lost a bonus of 10.9 million.
+- plan-8 against plan-7 on the second development set, seed by seed: ×1.19 (95 %: 1.06 to 1.32), better on 87 of
+  100; on seeds 1–30 ×1.13 (0.87 to 1.53), better on 23 of 30. 85 of the 100 runs end with the whole build, every
+  linked pair at level 10; they kill at the Overtime ceiling through round 16 (plan-7: round 14), and one run in 89
+  still does in round 17. Three of the 100 bring no bonus (two fainted in zone 2, one in Overtime).
+- plan-9 against plan-8 on seeds 1–30: 21 runs are the same run, decision for decision; the other 9 are all
+  better (7 of them were runs under 10.5 million and score 12.8 to 14.7 million). 29 of 30 end with the whole
+  build, and no zone is left before its final swarm. The best run barely moves: the runs now sit in a band of 13
+  to 14.8 million under the wall of section 2. One run faints in Overtime's round 19 and loses a bonus of 10.9
+  million, under plan-8 and plan-9 alike.
+- p90 is interpolated between the two nearest runs.
 - plans 1, 2 and 4 were steps on the way to plan-3 and plan-5 and were never the best plan.
 - The held-out seeds have not been played since plan-6.
 
@@ -40,9 +49,9 @@ is in the repository's history.
   and it is made in the fifty minutes before.
 - **A zone left in its first minutes** (plan-7 and plan-8): the rule "leave a cleared zone under 40 % HP" counted
   from the moment the guardian fell, and fired when the guardian itself had emptied the bar, ten minutes before the
-  final swarm. 8 of 30 runs of plan-8 (5 of 30 of plan-7) lost a zone that way, and with it the zone's machine and
-  often the change of vitamins; those 8 score a median of 6.8 million. plan-9 counts the HP bar only once the final
-  swarm has begun.
+  final swarm. 8 of 30 runs of plan-8 on seeds 1–30 (10 of 100 on the second development set) lost a zone that
+  way, and with it the zone's machine and often the change of vitamins; those 8 score a median of 6.8 million.
+  plan-9 counts the HP bar only once the final swarm has begun, and on seeds 1–30 no run loses a zone.
 
 ## 3. What was learned on the way
 
@@ -83,8 +92,12 @@ takes another way.
   since. 3000001–3000100: the second development set, on which nothing has been chosen: a plan is played there
   once. 900001–900050: held out, never tuned on; seed 900038 is spent (a stall was diagnosed on it), so held-out
   results are given over all 50 and over the other 49.
-- **Speed.** A full run is 60 game minutes and about 15 minutes of wall time; ten game processes play 30 seeds in
-  under an hour on an Apple-silicon laptop.
+- **Speed.** A full run is 60 game minutes and 17 to 20 minutes of wall time with ten game processes beside it (up
+  to 34 measured); 30 seeds take about an hour on an Apple-silicon laptop and 100 about three and a half. Runs
+  with the whole build are 1.9 times as slow as plan-7's were: a profile of one run puts 65 % of the time in the
+  game's own code for moves (the build's area moves striking the horde) and about 4 % in the player. The runner
+  kills an episode after 90 minutes of wall time (`--episode-timeout`); a limit of 30 cut 4 of 100 runs of plan-8,
+  which were played again.
 - **A refactor is shown by a replay:** the same seeds give the same episodes, decision for decision.
 
 ## 5. Not known
