@@ -96,7 +96,10 @@ const line = (e: EpisodeRecord): string =>
 const interrupt = new AbortController();
 // Ctrl+C, `kill` and a closed terminal all end the batch the same way: the workers are stopped and the batch is
 // written as `interrupted`. Without this a killed batch stayed `running` in the database for ever.
-for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, () => { process.stderr.write(`\ninterrupted (${signal}): stopping the workers\n`); interrupt.abort(); });
+// Once the terminal or the pipe is gone, writing to it fails (EIO, EPIPE). Node raises that as an unhandled stream
+// error and exits before the batch's end is written, so those errors are dropped: there is no one left to tell.
+for (const stream of [process.stdout, process.stderr]) stream.on('error', () => { /* the reader is gone */ });
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.on(signal, () => { interrupt.abort(); process.stderr.write(`\ninterrupted (${signal}): stopping the workers\n`); });
 
 let code = 0;
 try {

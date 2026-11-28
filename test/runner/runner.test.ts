@@ -132,26 +132,45 @@ test('end to end: an episode that throws and a worker that hangs are recorded as
   store.close();
 });
 
-test('end to end: a batch that is killed (SIGTERM) ends as interrupted in the database, not as running for ever', async () => {
-  const path = join(dir, 'killed.sqlite');
+/** Start the runner on a database of its own and resolve once its batch row exists (the worker is then still loading the game). */
+async function startRunner(name: string): Promise<{ child: ReturnType<typeof spawn>; exited: Promise<number | null>; err: () => string }> {
   const script = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'run-episodes.ts');
-  const child = spawn(process.execPath, [script, '--policy=random', '--episodes=2', '--seed=60', '--workers=1', '--max-time=600', `--db=${path}`, '--label=killed', '--quiet'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [script, '--policy=random', '--episodes=2', '--seed=60', '--workers=1', '--max-time=600', `--db=${join(dir, name)}`, '--label=killed', '--quiet'], { stdio: ['ignore', 'pipe', 'pipe'] });
   let out = '', err = '';
-  child.stderr.on('data', (c: Buffer) => { err += c.toString('utf8'); });
-  // The batch row exists once the runner names it; the worker is then still loading the game.
+  child.stderr!.on('data', (c: Buffer) => { err += c.toString('utf8'); });
+  const exited = new Promise<number | null>((ok) => child.on('exit', (code) => ok(code)));
   await new Promise<void>((ok, bad) => {
-    child.stdout.on('data', (c: Buffer) => { out += c.toString('utf8'); if (/batch \d+/.test(out)) ok(); });
-    child.on('exit', (code) => bad(new Error(`the runner stopped before it was killed (exit ${code}): ${err}`)));
+    child.stdout!.on('data', (c: Buffer) => { out += c.toString('utf8'); if (/batch \d+/.test(out)) ok(); });
+    void exited.then((code) => bad(new Error(`the runner stopped before it was killed (exit ${code}): ${err}`)));
     setTimeout(() => bad(new Error(`the runner did not start: ${out}${err}`)), 60000).unref();
   });
-  const exited = new Promise<number | null>((ok) => child.on('exit', (code) => ok(code)));
-  child.kill('SIGTERM');
-  assert.equal(await exited, 130, err);
-  assert.match(err, /interrupted \(SIGTERM\)/);
-  const store = open('killed.sqlite');
-  const batch = store.db.prepare('SELECT status, finished_at, episodes_done FROM batches').all() as { status: string; finished_at: string | null; episodes_done: number }[];
-  assert.equal(batch.length, 1);
-  assert.equal(batch[0].status, 'interrupted');
-  assert.ok(batch[0].finished_at, 'the end of the batch was written');
-  assert.equal(batch[0].episodes_done, 0);
+  return { child, exited, err: () => err };
+}
+const onlyBatch = (name: string): { status: string; finished_at: string | null; episodes_done: number } => {
+  const rows = open(name).db.prepare('SELECT status, finished_at, episodes_done FROM batches').all() as { status: string; finished_at: string | null; episodes_done: number }[];
+  assert.equal(rows.length, 1);
+  return rows[0];
+};
+
+test('end to end: a batch that is killed (SIGTERM) ends as interrupted in the database, not as running for ever', async () => {
+  const r = await startRunner('killed.sqlite');
+  r.child.kill('SIGTERM');
+  assert.equal(await r.exited, 130, r.err());
+  assert.match(r.err(), /interrupted \(SIGTERM\)/);
+  const batch = onlyBatch('killed.sqlite');
+  assert.equal(batch.status, 'interrupted');
+  assert.ok(batch.finished_at, 'the end of the batch was written');
+  assert.equal(batch.episodes_done, 0);
+});
+
+test('end to end: a batch whose terminal is gone (its pipes closed, then SIGHUP) still ends as interrupted', async () => {
+  const r = await startRunner('hungup.sqlite');
+  // Nobody reads the runner any more: what it writes from here on fails, as it does after a terminal is closed.
+  r.child.stdout!.destroy();
+  r.child.stderr!.destroy();
+  r.child.kill('SIGHUP');
+  assert.equal(await r.exited, 130);
+  const batch = onlyBatch('hungup.sqlite');
+  assert.equal(batch.status, 'interrupted');
+  assert.ok(batch.finished_at, 'the end of the batch was written');
 });
