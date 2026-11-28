@@ -64,8 +64,15 @@ woken on arrival and a zone is ten minutes of errands and eight of final swarm.
 ## 5. What it does not do yet
 
 - **Altars.** Unown altars are stood in only when the movement code passes near one; challenge altars, the dojo,
-  fossil ruins, the Porygon altar and Power Altars are never used. Two traced runs took 7 and 8 blessings and left
-  altars unused in every zone.
+  fossil ruins, the Porygon altar, the nest and Power Altars are never used, and every trade is declined. Two
+  traced runs took 7 and 8 blessings and left altars unused in every zone. The dojo's prize is a blessing of a
+  chosen stat (docs/game.md §8.6): up to +32 % experience a zone that the player never takes.
+- **Support Alphas.** A fallen Alpha is recruited only when it happens to lie within 9 m: 2 of 9 in one run
+  watched, the team never full. Nothing walks to one, values its type, or holds the items that double a
+  recruit's bonus (docs/game.md §8.6).
+- **A crowd.** When the horde stops dying in a swarm's last minutes it gathers on the player and pushes it; the
+  player does not jump over it or use a Max form to get out, and one run in thirty with rifts on died short of
+  the portal that way.
 - **Blessings and relics are not valued.** A blessing is picked by an old text scorer and a relic is the first
   offered.
 - **Rifts** are never opened.
