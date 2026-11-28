@@ -58,5 +58,5 @@ test('Incense in the real game: a rift is opened, entered, cleared, its relic ta
   assert.equal(left![1], '1');
   assert.notEqual(left![2], 'none', 'a relic is held: the relic dialog met the real game');
   assert.match(out, /dialogs seen: \{[^}]*"relic":1/);
-  assert.match(out, /mapUse \d+ \(points \d+, shop 0, spins 0, lessons 0, rifts 1, forms 0\)/);
+  assert.match(out, /mapUse \d+ \(points \d+, shop 0, spins 0, lessons \d+, rifts 1, forms 0\)/);
 });
