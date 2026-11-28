@@ -343,8 +343,9 @@ Ranked KOs of Overtime alone (its KOs and its bonus) if cashed at the end of a r
     (the player holds none); area ×1.8.
   - Survival: healing ×12.6 (Big Root, Soothe Bell), power-ups ×4.8 (the vitamin Poké Radar: more berries),
     armor ×3.1, lifesteal 0.34 for 0.
-  - Experience ×3.5 (43.7 for 12.6) is what makes the levels. A saved Nidoking's moves dealt 1e21 to 3e22 damage
-    each over the run; the player's deal 1e15 to 4e15.
+  - Experience ×3.5 (43.7 for 12.6) is what makes the levels, and it is not items: both builds hold the same
+    experience items at their caps (§8.6). A saved Nidoking's moves dealt 1e21 to 3e22 damage each over the run;
+    the player's deal 1e15 to 4e15.
   - One round more at the ceiling after second 480 costs damage ×6.9 and the tide ×2 a round (×4 a minute).
 
 ### 8.2 A zone's final swarm and collapse
@@ -402,6 +403,52 @@ rocks. Nothing comes back after use in a standard run (it does in Survival).
   ×1.2; a Gengar at the slot machine ×1.05 twice.
 - **Rifts [P]** (opened with Incense): 22 to 85 s with the zone clock stopped; 1 to 3 items, a few levels and a
   relic (one of 47, each a multiplier of 1.05 to 1.5 on one thing).
+
+### 8.6 Experience, the kill ceiling, and what a crowd does (read and measured 2026-11-29)
+
+- **How a stat is put together [C]** (`recompute` in the player class). Ten groups of bonuses: vitamins, items,
+  the run's own (`tempMods`: altar and dojo blessings, training), the ability, buffs, support Alphas, relics, the
+  Max form and two more. Inside a group the multipliers of one stat add (`+25 %` and `+15 %` are `+40 %`); the
+  groups multiply one another. A multiplier under 1 multiplies at once.
+- **Experience, group by group.**
+  - Items **[C]**: Exp. Share +25 %, Lucky Egg +15 %, Macho Brace +50 % (at most 3), White Flute +10 % (at most 5),
+    Repel +8 % (at most 3). The player ends with 10, 10, 3, 5 and 3: +624 %, a factor of 7.24 **[P]** (every
+    cashed run of batches 97, 100 and 101 looked at). The saved leaderboard Mewtwo holds 10, 10, 3 and 5: 7.0.
+  - Vitamins **[C]**: Exp. Candy +10 % a level, the Cursed Incense +6 % a level: +192 % at level 12 each, while held.
+  - Blessings **[C]**: one of about twenty stats, drawn evenly; experience is +15 % times the rarity's factor
+    (1, 1.2, 1.45, 1.75, 2.1: 15 to 32 %). A blessing dialog cannot be refreshed.
+  - The account **[C]**: the Lab's Study +5 % a level (6 levels), a shiny perk +4 %.
+  - **[P]** A run of the player with its final vitamins and no experience blessing ends with 12.58: 7.24 × 1.738.
+    Blessings then add as if 25 % were already in their group (one `+26 %` gives ×1.21, not ×1.26): what that
+    25 % is was **not identified**.
+  - The leaderboard Mewtwo ends with 43.73 and no experience vitamin or relic: 7.0 × 6.25. If its account factors
+    are ours, its run's own group and its support Alphas together are worth ×3.6 for our ×1 to ×1.6. **How it got
+    there is not known**; the two sources below are what the player does not use.
+- **The dojo's prize is chosen [C].** Three trials are offered, one per belt; the prize is a blessing of a stat the
+  player picks, at the third, fourth or fifth rarity by belt: experience +22 %, +26 % or +32 %. One dojo a zone.
+- **Support Alphas [C] [P].** An Alpha that falls stays down for 8 s at 1 % HP; a Friend Ball thrown from within
+  9 m recruits it (chance 0.45 to 0.8 by species, +0.2 a try, certain with a Master Ball). A recruit gives its
+  first type's blessing for the run (psychic: experience +8 %; dragon: damage +5 %; steel: area +8 %; water:
+  healing +15 %; the other fourteen in the data export), times 1 + 0.1 a bond level (five levels) and times
+  1 + 0.5 a Poké Doll held (at most 2); a shiny one counts double. The team holds 3 on this account, one more
+  with an SS Ticket; a Friend Ball item is damage ×1.06 for each recruit. The leaderboard build holds 2 Poké
+  Dolls, an SS Ticket and 2 Friend Balls; the player's item pool has none of them.
+  - One run of the player watched (plan-9, seed 1): 9 Alphas fell, 13 to 27 m from the player, of nine species
+    and seven first types (not only the map's). A ball could be thrown at 2 of them and both were recruited; the
+    other 7 died where they lay. The team was never full.
+- **The kill ceiling [P]** (two runs with rifts on, seeds 1 and 15, sampled every ten seconds). In a final swarm
+  the player kills 18,100 to 18,300 enemies every ten seconds, flat: the game's spawn rate, not the build. In
+  the swarm's last one to two minutes the rate falls to 2,000 to 5,000 while the enemies alive rise from under
+  300 to about 800: the horde is no longer dying. Zone 1 reaches that point at about its second 900, zone 2 at
+  about 1,000.
+- **A crowd pushes the player [C].** Every enemy that overlaps the player moves it away, up to 5.5 m a second in
+  all, about its walking speed. The push does not reach a player above the enemies' heads (a jump) and is off
+  during a Max form. Seed 15 with rifts on **[P]**: with 160 enemies on it the player pressed towards zone 2's
+  portal, 17 m away over open ground, for 110 s and did not arrive; it died there with its revives spent.
+- **A rift by rarity [C]**: 4 to 7 waves; ordinary enemies at 0.35 to 0.8 of the zone's damage, elites and the
+  Alpha at ×1, 1.15, 1.3 and 1.5; an epic or legendary Alpha sends a ring every 9 or 7 s that hits for 1.5 hits
+  unless jumped, and a legendary one starts enraged and 20 % faster. Seed 27 with rifts on **[P]**: the sixth
+  rift, entered at full HP with no revive held, ended the run in four hits of a quarter of the 353 max HP.
 
 ### 8.5 Tier 2
 
