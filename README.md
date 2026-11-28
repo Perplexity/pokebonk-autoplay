@@ -20,9 +20,11 @@ Median, 90th percentile and best score of the heuristic's plans, one episode per
 |---|---|---|---|---|---|
 | plan-3 (the default) | the phase 1 heuristic | 100 development | 1,465,290 | 4,158,466 | 8,031,427 |
 | | | 50 held-out | 1,528,620 | 4,034,675 | 9,052,797 |
+| | | 49 held-out (without 900038) | 1,509,296 | 3,952,685 | 6,323,615 |
 | plan-5 | items valued by what the score follows (luck, experience, Pokédollars) | 100 development | 4,821,770 | 8,287,315 | 11,201,881 |
 | plan-6 | an item pool that stacks, a later cash-out, a later leave | 100 development | 7,430,752 | 9,221,229 | 10,899,768 |
 | | | 50 held-out | 7,780,684 | 9,619,558 | 10,299,849 |
+| | | 49 held-out (without 900038) | 7,896,712 | 9,621,454 | 10,299,849 |
 | | | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
 

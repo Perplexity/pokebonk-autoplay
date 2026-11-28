@@ -580,7 +580,13 @@ stops at the same wall, the enemies' HP in Overtime rounds 13 to 16.
 - **Held-out seeds** (played once, after plan-6 was fixed; the owner's OK of 2026-11-27): seed by seed ×3.64 of
   plan-3 (2.41 to 5.03), better on 48 of 50. No run of 20 million. 48 of 50 cash Overtime; one faints in zone 1
   after 303 s (seed 900031, 1,976 KOs) and one plays to the time cap in the sanctuary without starting Overtime
-  (seed 900038, 837,239 KOs): under the evaluation's rules that run scores 0.
+  (seed 900038). These batches are played by the runner with the rules against standing still off, so that run
+  counts with its 837,239 KOs in every figure above; in an evaluation of a model, where those rules are on, it would
+  end early and score 0.
+- **Without seed 900038** (spent since part 6: a stall was diagnosed on it), over the other 49 held-out seeds.
+  plan-6: median 7,896,712, mean 7,466,337, p90 9,621,454, best 10,299,849; 48 reach 1 million, 46 reach 5 million.
+  plan-3 (batch 35): median 1,509,296, mean 1,973,076, p90 3,952,685, best 6,323,615; 36 reach 1 million, 1 reaches
+  5 million. plan-3's best run of the 50 (9,052,797) was on that seed.
 - Development seeds, plan-6 against plan-3: seed by seed ×4.44 (3.69 to 5.32), better on 95 of 100. Against
   plan-5: ×2.01 (1.64 to 2.47), better on 80.
 - 99 of 100 cash Overtime; one faints before it (209,738 KOs).
@@ -740,9 +746,10 @@ fixed; nothing was chosen on it; both plans by the same code, the one this part 
 - No run of 20 million.
 
 **The movement rule and the plans before plan-7.** With the rule as kept, plan-6 replays seeds 1–30 identically to
-batch 70, which was played before any such rule: 30 of 30 (batch 85). plan-3 likewise (batch 79 against 32). Plans
-1, 2, 4 and 5 were not replayed: the rule runs only on the way to a portal in the sanctuary after two seconds
-without moving and with no enemy near, the case in which a run of any plan stood until the time cap.
+batch 70, which was played before any such rule: 30 of 30 (batch 85). plan-3 likewise (batch 79 against 32), and
+plan-5 (batch 88 against 57). Plans 1, 2 and 4 were not replayed: the rule runs only on the way to a portal in the
+sanctuary after two seconds without moving and with no enemy near, the case in which a run of any plan stood
+until the time cap.
 
 **A held-out seed is spent.** The second stall was found by looking into held-out seed 900038 (batch 72) and the
 rule was checked on that seed. That is a choice made with a held-out seed. From here on a result on the held-out
@@ -764,7 +771,9 @@ seeds is given over all 50 and over the 49 without 900038, and no claim rests on
 - The final five vitamins (Calcium, HP Up, Ether, Stardust, PP Up) and the moment of the change (zone 3, second
   720) were set once and not varied. The leaderboard build ended with Super Lure, Calcium, Poké Radar, HP Up and
   Stardust.
-- 2 of 30 runs of batch 76 never changed vitamins; whether the same happens with the gate was not counted.
+- Not every run changes its vitamins: at the end only final-stage vitamins are held in 28 of 30 runs of batch 76,
+  27 of 30 of batch 84, 93 of 100 of batch 83 and 87 of 100 of batch 86. Why the others do not (no Hypno in reach,
+  or the errand given up) was not looked into.
 - plan-7 was not played on the held-out seeds.
 - The gate's level (120) was set once, from three runs on the first development set, and not varied.
 - The rift prototype's stalls are the prototype's; rifts inside the heuristic are not built.
