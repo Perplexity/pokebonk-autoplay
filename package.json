@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local sandbox (static mirror + mock API) and an autonomous AI player for a browser survivors game. Offline only.",
+  "description": "A rule-based player for a local, headless copy of a browser survivors game. Offline only.",
   "engines": {
     "node": ">=24"
   },
@@ -22,12 +22,7 @@
     "env:determinism": "node scripts/env-determinism.ts",
     "env:measure": "node scripts/env-measure.ts",
     "test:env": "node --test \"test/env/*.test.ts\"",
-    "export:knowledge": "node scripts/export-knowledge.ts",
-    "export:encoding": "node scripts/export-encoding.ts",
-    "dashboard": "node dashboard/server/main.ts",
-    "dashboard:install": "npm --prefix dashboard install",
-    "dashboard:build": "npm --prefix dashboard run build",
-    "dashboard:dev": "npm --prefix dashboard run dev"
+    "export:knowledge": "node scripts/export-knowledge.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",

@@ -158,19 +158,6 @@ export interface Observation {
   mask: Readonly<ActionMask>;
   /** Build, economy, progression clocks, guardian / seal / overtime state, all-enemy histogram, cumulative counters (src/observations/state.ts). */
   state: Readonly<RunState>;
-  /** Only with the environment option `encode: true`: the numeric encoding (src/observations/encode.ts) and the action mask of the action codec. */
-  encoded?: EncodedObservation;
-}
-
-/** The fixed-size numeric form of an observation. The buffers are fresh per observation; slice them with the layout descriptor. */
-export interface EncodedObservation {
-  /** OBS_ENCODING_VERSION and the hash of the layout descriptor the buffers follow. */
-  version: number;
-  layoutHash: string;
-  float: Float32Array;
-  int: Int32Array;
-  /** Concatenated per-dimension action masks of src/actions/codec.ts (1 = allowed). */
-  mask: Uint8Array;
 }
 
 export interface EndOfRun {
@@ -301,11 +288,6 @@ export interface GameEnvironmentOptions {
   apiTarget?: string;
   /** Print the page's console warnings and errors as they happen. */
   verbose?: boolean;
-  /**
-   * Also put the numeric encoding and the action-codec mask in every observation (`observation.encoded`). Needs the
-   * game-knowledge export of the running build (data/game-knowledge/<build>/). Default: off.
-   */
-  encode?: boolean;
 }
 
 export interface GameMetadata {
@@ -323,7 +305,7 @@ export interface GameMetadata {
     identifiers: { app: string; App: string; Run: string } | null;
   };
   sim: { hz: number; dt: number; actionRepeat: number; decisionsPerSecond: number; render: boolean };
-  schema: { observation: number; action: number; decision: number; snapshot: number };
+  schema: { observation: number; action: number; decision: number; snapshot: number; state: number };
   /** Every place environment code is spliced into game code or stands in for the game service. */
   instrumentation: string[];
   /** sha256 over the source of the browser shims (src/sim/*.ts) and the DOM library version. */
@@ -342,12 +324,6 @@ export interface GameMetadata {
   governor: { low: number; high: number; liveCap: number; liveMax: number; cut: boolean; everCut: boolean } | null;
   /** `handlerWrites`: field writes the environment makes in place of a HUD click handler (src/environment/dialogs.ts). */
   dialogs: { handled: string[]; refused: string[]; handlerWrites: string[] };
-  /** Versions of the learning-side formats: the state extractor, the action codec, and (with `encode: true`) the observation layout. */
-  encoding: {
-    state: number;
-    action: { version: number; hash: string; nvec: number[]; maskSize: number };
-    observation: { version: number; layoutHash: string; floatSize: number; intSize: number; vocabSha256: string } | null;
-  };
 }
 
 export interface GameEnvironment {

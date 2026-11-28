@@ -26,7 +26,7 @@ try {
   const only = args.has('only') ? args.get('only')!.split(',').map(Number) : undefined;
   const env = createEnvironment({});
   const k = await buildKnowledge(env, { only, log: args.has('verbose') ? say : undefined });
-  const build = k.vocab.header.build;
+  const build = k.species.header.build;
   const blocked = env.getMetadata().offline.blocked;
   await env.close();
   if (blocked.length) throw new Error(`network attempts were blocked during the export: ${blocked.join(', ')}`);
@@ -34,13 +34,12 @@ try {
   if (only && !args.get('out')) throw new Error('--only makes a partial export: give --out=<dir> (it is never written to data/game-knowledge)');
 
   const sha = (s: string) => createHash('sha256').update(s).digest('hex');
-  const names = ['species', 'moves', 'items', 'vocab'] as const;
-  say(`game build ${build} (${k.vocab.header.gameVersion}), language ${k.vocab.header.language}, profile ${k.vocab.header.profile}, bundle ${k.vocab.header.bundleSha256.slice(0, 16)}…`);
+  const names = ['species', 'moves', 'items'] as const;
+  say(`game build ${build} (${k.species.header.gameVersion}), language ${k.species.header.language}, profile ${k.species.header.profile}, bundle ${k.species.header.bundleSha256.slice(0, 16)}…`);
   say(`species: ${k.species.species.length} League members`);
   say(`moves: ${k.moves.moves.length} moves, ${k.moves.fusions.length} fusions, ${Object.keys(k.moves.archetypes).length} archetypes`);
   const it = k.items as unknown as Record<string, unknown[]>;
   say(`items: ${it.vitamins.length} vitamins, ${it.heldItems.length} held items, ${it.relics.length} relics, ${it.runBoosts.length} run boosts, ${it.seals.length} seals, ${it.overtimeOfferings.length} overtime offerings, ${it.typeBlessings.length} type blessings, ${it.powerups.length} power-ups, ${it.lab.length} Lab upgrades, ${it.stats.length} stats`);
-  say(`vocab: ${Object.entries(k.vocab.tables).map(([name, t]) => `${name} ${Object.keys(t).length}`).join(', ')}`);
 
   if (args.has('check')) {
     let same = true;
