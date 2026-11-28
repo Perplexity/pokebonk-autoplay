@@ -312,12 +312,35 @@ Score of Overtime alone if cashed at the end of a round, at the ceiling (million
 
 - **Berries are the main heal [C] [P].** Every KO drops a healing berry with chance 0.6 % × the power-up stat × the
   KO's weight. A berry heals 25 % of max HP through the healing stat. A build heals as long as it kills.
-- **Training [C] [P].** A level-up with nothing left to offer heals 20 % of max HP and adds a small permanent stat
-  (one of damage, max HP, attack speed, area, crit, luck, armor). Level-ups go on in Overtime.
+- **Training [C] [P].** A level-up with nothing left to offer heals 20 % of max HP and adds to one of seven stats,
+  drawn evenly (crit chance drops out once every hit is a mega crit): damage +2 %, max HP +3 %, attack speed
+  +1.5 %, area +1.5 %, crit chance +0.5 points, luck +2, armor +1. From the 50th trained level on each step is a
+  third of that. The steps of one stat add up into one multiplier: 1,000 trained levels are about max HP ×2.7 and
+  damage ×2.1; 5,000 are max HP ×9.3 and damage ×6.6. Level-ups go on in Overtime.
+- **A hit [C]** is the move's base damage × the damage stat × the special or physical stat × the type's item bonus
+  (1 + 0.4 for each item of the move's type) × effectiveness × the capped item bonuses (Metronome, Coin Case …) ×
+  damage to elites (elites, Alphas and bosses only) × 1 + 0.2 for each Binding Band on a stunned, rooted,
+  paralysed, frozen or sleeping enemy × the relics' multiplier × the crit. A crit is × crit damage; a mega crit
+  (crit chance + mega crit chance above 1) is × crit damage × (1 + 0.5 × (crit damage − 1)). Burn and poison are a
+  share of the hit that set them (30 % and 12 % a second, × status damage): nothing deals a share of the enemy's
+  HP except the relic Eye of the Abyss (finishes what is under 12 %). One hit is capped at 1e30.
 - **What a 20 million run needs (expected from the above, not measured):** the ceiling held through round 21 or 22.
   The tide at the end of those rounds asks for a max HP of roughly 15,000 to 30,000, and enemy HP there is 16,000
   to 110,000 times what it is at second 480. A leaderboard Mewtwo (29.4 million, 96 minutes) ended at level 6,293
   with max HP 19,650, damage ×152, special ×50.5, 313 items.
+- **Where a leaderboard build's lead comes from** (the saved Mewtwo, `test/fixtures/leaderboard/`, against the
+  best run of plan-9 on seeds 1–30; the factors are read from the two builds, what each is worth in rounds is
+  **expected, not measured**). No single number: factors that multiply one another, each of 1.5 to 4.
+  - Damage stat ×3.7 and max HP ×10.9: training (level 6,293 for 2,727) and items the player's item pool leaves
+    out (Assault Vest, max HP ×1.12 each, ten held; Oran Berry).
+  - Special ×3.1 (Choice Specs, ×1.35 each, five held); the crit ×3.4 (crit damage 15.0 for 8.75, mega crit chance
+    0.89 for 0.69); Binding Band ×2 on what Trick Room stuns and Mist freezes; three legendary relics from rifts
+    (the player holds none); area ×1.8.
+  - Survival: healing ×12.6 (Big Root, Soothe Bell), power-ups ×4.8 (the vitamin Poké Radar: more berries),
+    armor ×3.1, lifesteal 0.34 for 0.
+  - Experience ×3.5 (43.7 for 12.6) is what makes the levels. A saved Nidoking's moves dealt 1e21 to 3e22 damage
+    each over the run; the player's deal 1e15 to 4e15.
+  - One round more at the ceiling after second 480 costs damage ×6.9 and the tide ×2 a round (×4 a minute).
 
 ### 8.2 A zone's final swarm and collapse
 
