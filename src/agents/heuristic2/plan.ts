@@ -274,9 +274,12 @@ export const PLAN_V7: Plan = {
 };
 
 /**
- * plan-8 (NOT the default; NOT measured yet): plan-7 with the leaderboard Mewtwo's kit (above), for the account's
+ * plan-8 (NOT the default): plan-7 with the leaderboard Mewtwo's kit (above), for the account's
  * build plan `kit-1` (kit.ts: the four moves that can be linked are the account's favourites, and the moves of the
  * pool that are not of the kit are switched off as far as the game allows). `errands` gains Bill's machine.
+ * Measured (docs/phase-3-report.md, part 7): seeds 1-30 median 13.85 million against plan-7's 11.40, best 14.54
+ * against 12.95; on the 100 check seeds (3000001 to 3000100), played once, median 13.80 against 11.37, p90 14.47
+ * against 12.45, best 15.04 against 12.98, better on 87 of 100. 85 of those 100 runs end with the whole kit.
  */
 export const PLAN_V8: Plan = {
   ...PLAN_V7, version: 'plan-8',

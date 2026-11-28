@@ -27,6 +27,7 @@ Median, 90th percentile and best score of the heuristic's plans, one episode per
 | | | 49 held-out (without 900038) | 7,896,712 | 9,621,454 | 10,299,849 |
 | | | 100 second development | 7,838,016 | 9,514,985 | 11,345,601 |
 | plan-7 | vitamins by phase, changed at Hypno before the final stage | 100 second development | 11,373,575 | 12,446,802 | 12,979,411 |
+| plan-8 | the leaderboard build: one fusion, two linked pairs, Encore; the account's build plan | 100 second development | 13,803,730 | 14,467,683 | 15,039,733 |
 
 No run has reached 20 million. `docs/phase-3-report.md` has every measurement, including what failed: the first
 PPO runs on top of plan-3 changed none of its choices, and what limits a run today is how long its build keeps
@@ -44,7 +45,7 @@ the game (mirror/, unmodified)
 python/pokebonk_rl                 PPO for the manager, copying the heuristic first, rewards, evaluation, model registry
 ```
 
-- **A plan is data.** `plan-1` to `plan-7` live in `src/agents/heuristic2/plan.ts`; an old plan is never edited, a
+- **A plan is data.** `plan-1` to `plan-8` live in `src/agents/heuristic2/plan.ts`; an old plan is never edited, a
   new one is added and measured. The same holds for rewards (`configs/reward-v*.yaml`), item archives and
   observation and action layouts: new versions only, old ones kept.
 - **Seeds.** 1–30 are for tuning. A change that wins there is checked once on development seeds nothing was
