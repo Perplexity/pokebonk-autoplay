@@ -288,6 +288,13 @@ export interface GameEnvironmentOptions {
    * every Poké Ball and shop of the run by the game itself. Absent: unlocked-v3 (nothing archived).
    */
   archive?: string;
+  /**
+   * Preset unlocked-v5: the account's build plan for `species` (the game's "Plan de build"), by the name of a version
+   * in src/agents/heuristic2/kit.ts (`kit-1`): favourite moves, which the game then offers with their own chance and
+   * in every lesson of Hypno, and the moves of the species' pool that are switched off. The game's own limits hold
+   * (four favourites, at most 40 moves off, 12 moves of other League members left on). Absent: no build plan.
+   */
+  buildPlan?: string;
   /** Where the local stand-in for the game service keeps its files. Default: a per-process folder under data/env/. */
   dataDir?: string;
   /** Only `in-process-mock` is accepted (see src/sim/guard.ts). */

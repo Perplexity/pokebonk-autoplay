@@ -3,6 +3,8 @@ import { validChoices } from '../../environment/policies.ts';
 import type { ChoiceAction, ChoiceMask, Decision, DecisionOption, ExtraAction, Observation } from '../../environment/types.ts';
 import { choose as chooseV1 } from '../heuristic/chooser.ts';
 import type { Choice, ChooserContext } from '../heuristic/chooser.ts';
+import { kitState } from './kit.ts';
+import type { HeldMove, KitState } from './kit.ts';
 import type { Plan } from './plan.ts';
 import { itemWorth, vitaminWorth } from './values.ts';
 import type { Kit, Knowledge } from './values.ts';
@@ -12,7 +14,20 @@ import type { Kit, Knowledge } from './values.ts';
  * the valuation generated from the game's effect data (values.ts); every other dialog is answered as the first
  * heuristic answers it (src/agents/heuristic/chooser.ts).
  */
-export interface Chooser2Context extends ChooserContext { plan: Plan; knowledge: Knowledge; kit: Kit }
+export interface Chooser2Context extends ChooserContext {
+  plan: Plan; knowledge: Knowledge; kit: Kit;
+  /** What the plan remembers of earlier answers (policy.ts, `noteChoice`). Absent: nothing banished, no lesson passed. */
+  memo?: KitMemo;
+}
+/** plan-8: moves banished in this run, and the zone whose lesson at Hypno was taken or turned down (0: none). */
+export interface KitMemo { banished: Set<string>; lessonZone: number }
+
+/** The kit's state for an observation (kit.ts): from the run state's moves, the held items, the zone and the map points. */
+export function kitOfObservation(obs: Pick<Observation, 'snapshot' | 'state'>, ctx: Pick<Chooser2Context, 'plan' | 'knowledge'>): KitState {
+  const s = obs.snapshot, moves: HeldMove[] = [];
+  for (const m of obs.state?.build?.moves ?? []) if (m) moves.push({ slot: m.slot, key: m.key, level: m.level, fusion: m.fusion, linked: m.linked });
+  return kitState(moves, s.player.moveSlots, s.player.items ?? {}, s.player.species, s.stage, s.points ?? [], ctx.plan, ctx.knowledge);
+}
 
 const hpFrac = (s: Snapshot): number => (s.player.maxHp > 0 ? s.player.hp / s.player.maxHp : 0);
 
@@ -37,13 +52,24 @@ export function vitaminPhase(s: Snapshot, plan: Plan): { wanted: string[]; later
 }
 
 /** Score of one level-up offer (0–100) and why. Exported for tests. */
-export function scoreLevelUp2(opt: DecisionOption, s: Snapshot, ctx: Chooser2Context): { score: number; why: string; junk: boolean } {
+export function scoreLevelUp2(opt: DecisionOption, s: Snapshot, ctx: Chooser2Context, kit?: KitState): { score: number; why: string; junk: boolean; must?: boolean } {
   const d = opt.data as { kind?: string; slot?: number; vit?: string; rarity?: number; from?: number | null; id?: number };
   const rarity = Number(d.rarity) || 0;
   switch (d.kind) {
     case 'newMove': {
       const free = s.player.moves.length < s.player.moveSlots, own = d.from === undefined || d.from === null;
       if (!free) return { score: 0, why: 'new move, no slot', junk: true };
+      if (kit?.on) {
+        // plan-8: only the moves of the plan's kit, and the two of its fusion until it is made.
+        const key = ctx.knowledge.movesById.get(Number(d.id))?.key ?? '';
+        if (!kit.fused && ctx.plan.kitFuse.includes(key)) return { score: 99, why: `${key}: one of the two moves of the plan's fusion`, junk: false };
+        const rank = kit.takeable.indexOf(key);
+        if (rank >= 0) return { score: 98 - rank, why: `${key}: a move of the plan's kit`, junk: false };
+        if (ctx.plan.kit.includes(key)) return { score: 5, why: `${key}: of the plan's kit, but ${kit.missing.includes(key) ? 'not into this slot (it cannot be linked, and a pair is still to be learned, or the slot is owed to the fusion)' : 'held'}`, junk: false };
+        // One of the species' own moves comes back in every offer until it is banished: that one use is kept for it.
+        if (kit.ownJunk.includes(key)) return { score: 0, why: `${key}: the plan's kit has no place for it`, junk: true, must: true };
+        return { score: 10, why: `${key}: not a move of the plan's kit`, junk: false };
+      }
       if (own) return { score: 95 + rarity, why: 'a move of its own kit', junk: false };
       // A move of another League member: taken into a free slot when it is of the plan's damage class (it then gains
       // from the same stats as the kit), a little more when it is also of one of the kit's types.
@@ -57,6 +83,14 @@ export function scoreLevelUp2(opt: DecisionOption, s: Snapshot, ctx: Chooser2Con
     case 'upMove': {
       const move = s.player.moves[Number(d.slot)], info = move ? ctx.knowledge.moves.get(move.key ?? '') : undefined;
       const special = (info?.class ?? move?.cls) === 'special';
+      // plan-8: the two moves the machine waits for first; a move that will be forgotten last, but over a refresh.
+      // (The run state's moves are by slot; the snapshot's list closes the gap a forgotten move leaves.)
+      const held = kit?.on ? kit.held.find((m) => m.slot === Number(d.slot)) : undefined;
+      if (kit && held) {
+        if (!kit.fused && ctx.plan.kitFuse.includes(held.key)) return { score: 86 + rarity, why: `upgrade ${held.key}: the plan's fusion needs it at level ${kit.cap}`, junk: false };
+        if (kit.junk.includes(held.slot)) return { score: 64, why: `upgrade ${held.key}: a move the plan's kit will drop`, junk: false };
+        return { score: 76 + rarity * 4, why: `upgrade ${held.key}`, junk: false };
+      }
       return { score: 70 + rarity * 4 + (special ? 6 : 0), why: `upgrade ${move?.name ?? 'a move'}`, junk: false };
     }
     case 'newVit':
@@ -82,13 +116,17 @@ export function scoreLevelUp2(opt: DecisionOption, s: Snapshot, ctx: Chooser2Con
   }
 }
 
-function levelUp(d: Decision, mask: ChoiceMask, s: Snapshot, ctx: Chooser2Context): Choice | null {
-  const scored = d.options.map((o) => scoreLevelUp2(o, s, ctx));
+function levelUp(d: Decision, mask: ChoiceMask, s: Snapshot, ctx: Chooser2Context, kit?: KitState): Choice | null {
+  const scored = d.options.map((o) => scoreLevelUp2(o, s, ctx, kit));
   const can = (e: ExtraAction): boolean => mask.extras[e] === true;
-  // Junk in the offer and a banish left: it never comes back.
+  // Junk in the offer and a banish left: it never comes back. (plan-8: one banish is kept back for each move of the
+  // species' own kit that the plan drops and that is not banished yet; such a move is banished before anything else.)
   const banish = mask.extras.banish;
   if (Array.isArray(banish)) {
-    const i = scored.findIndex((x, j) => x.junk && banish[j]);
+    const kept = kit?.on ? kit.ownJunk.filter((key) => !ctx.memo?.banished.has(key)).length : 0, left = Number(d.context.banishes);
+    const spare = !(kept > 0) || !Number.isFinite(left) || left > kept;
+    let i = scored.findIndex((x, j) => x.must && banish[j]);
+    if (i < 0 && spare) i = scored.findIndex((x, j) => x.junk && banish[j]);
     if (i >= 0) return { action: { type: 'choice', extra: 'banish', target: i }, reason: `banish ${d.options[i].id}: ${scored[i].why}` };
   }
   let bi = -1;
@@ -110,7 +148,15 @@ export function choose2(obs: Observation, ctx: Chooser2Context): Choice {
   const worths = (): number[] => d.options.map((o) => worthNow(String(o.data.key ?? o.id), s, ctx));
   const bestOf = (w: number[]): number => { let b = -1; w.forEach((x, i) => { if (mask.options[i] && (b < 0 || x > w[b])) b = i; }); return b; };
   switch (d.kind) {
-    case 'levelup': return levelUp(d, mask, s, ctx) ?? fallback('a level-up pick');
+    case 'levelup': return levelUp(d, mask, s, ctx, kitOfObservation(obs, ctx)) ?? fallback('a level-up pick');
+    case 'lesson': {
+      // Hypno's lesson (plan-8): the best move of the plan's kit among the offers; otherwise it is kept.
+      const kit = kitOfObservation(obs, ctx);
+      if (!kit.on) return chooseV1(obs, ctx);
+      let pick = -1, rank = Infinity;
+      d.options.forEach((o, i) => { const r = kit.takeable.indexOf(ctx.knowledge.movesById.get(Number(o.data.id))?.key ?? ''); if (mask.options[i] && o.data.kind === 'newMove' && r >= 0 && r < rank) { pick = i; rank = r; } });
+      return option(pick, `${kit.takeable[rank]}: a move of the plan's kit`) ?? extra('decline', "none of the lesson's moves is of the plan's kit") ?? fallback('declining the lesson');
+    }
     case 'item': {
       const w = worths()[0];
       if (w < ctx.plan.itemSellBelow) return extra('sell', `sell ${d.options[0].id}: worth ${w.toFixed(1)} to this build`) ?? option(0, `take ${d.options[0].id}`) ?? fallback('selling');
@@ -163,6 +209,15 @@ export function choose2(obs: Observation, ctx: Chooser2Context): Choice {
       return extra('decline', 'none of the wanted offerings is offered') ?? fallback('declining the offering');
     }
     case 'forget': {
+      // Hypno (plan-8): a move the kit has no place for is forgotten out of a full set of slots, and this zone's
+      // lesson is taken for the free slot, once (turned down, it would offer the same moves again).
+      const kit = kitOfObservation(obs, ctx);
+      if (kit.on) {
+        const i = d.options.findIndex((o, j) => mask.options[j] && o.data.what === 'move' && kit.forget.includes(Number(o.data.slot)));
+        if (i >= 0) { const c = option(i, `forget ${String(d.options[i].data.key)}: the plan's kit has no place for it, and ${kit.missing.length} of its moves are still to be learned`); if (c) return c; }
+        const lesson = d.options.findIndex((o) => o.data.what === 'lesson');
+        if (kit.takeable.length && ctx.memo?.lessonZone !== s.stage && s.player.level >= kit.lessonFrom) { const c = option(lesson, "Hypno's lesson for the free slot"); if (c) return c; }
+      }
       // Hypno: in the final phase the vitamins that are not of it are forgotten, one answer each (he pays for them).
       const phase = vitaminPhase(s, ctx.plan);
       if (phase?.final) {
@@ -172,6 +227,14 @@ export function choose2(obs: Observation, ctx: Chooser2Context): Choice {
       return extra('leave', phase?.final ? 'the vitamins held are those of the final stage' : 'nothing to forget') ?? fallback('leaving Hypno');
     }
     case 'fusion': {
+      // Bill's machine (plan-8): the plan's fusion when its two moves are ready, else a link of two moves of the kit.
+      const kit = kitOfObservation(obs, ctx);
+      if (kit.on) {
+        const of = (how: string, pair: [string, string] | null): number => (pair ? d.options.findIndex((o, j) => mask.options[j] && o.data.how === how && pair.includes(String(o.data.moveA)) && pair.includes(String(o.data.moveB)) && o.data.moveA !== o.data.moveB) : -1);
+        return option(of('fuse', kit.fuse), `fuse ${kit.fuse?.join(' and ')}: both at level ${kit.cap}`)
+          ?? option(of('link', kit.link), `link ${kit.link?.join(' and ')}: both at level ${kit.cap}, and the slot it frees is for ${kit.missing[0] ?? 'nothing more'}`)
+          ?? extra('leave', `no two moves of the plan's kit are at level ${kit.cap}`) ?? fallback("leaving Bill's machine");
+      }
       const pick = fusionPick(d, s, ctx.plan);
       if (pick >= 0) { const c = option(pick, `${d.options[pick].id}: the ${ctx.plan.fuseNeeds} is held and both moves are at level ${moveCap(s, ctx.plan)}`); if (c) return c; }
       return extra('leave', ctx.plan.fuseNeeds ? `no two moves at level ${moveCap(s, ctx.plan)} with the ${ctx.plan.fuseNeeds} held` : "Bill's machine is not used") ?? fallback("leaving Bill's machine");

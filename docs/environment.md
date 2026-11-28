@@ -74,6 +74,22 @@ await env.close();
   for the kit of `species` (src/agents/heuristic2/values.ts) and kept within the account's archive slots (105: the
   game checks the limit only in its menu). The game takes archived items out of every Poké Ball and shop of the run.
   `getMetadata().profile.preset` reads `unlocked-v4:<version>`. docs/phase-1-report.md.
+- **Account preset unlocked-v5** (`createEnvironment({ buildPlan: 'kit-1' })`, `--build-plan=kit-1`; default: none).
+  The same account with the game's own build plan for `species` ("Plan de build"), by the name of a version in
+  src/agents/heuristic2/kit.ts:
+  - **Favourite moves** (at most four with the Lab's Affinity at its top level, which the unlocked account has). The
+    game then offers each with a chance of 15 % whenever a level-up with a free slot draws a move of the species' own
+    line (35 % of such level-ups) or of another League member (50 %), always shows a favourite it drew, and puts one
+    favourite into every lesson of Hypno.
+  - **Moves switched off** (`profile.movesOff`): never offered. The game's limits hold: at most 40, never a move of
+    the species' own kit, and 12 moves of other League members stay on (it switches moves back on, in the order of
+    the list, until 12 are). The list is generated from the knowledge export: the species' whole line but the plan's
+    moves, and the weakest of the other members' moves.
+  The plan is written where the game keeps it (`localStorage`, `pokebonk.buildPlan.<account id>`) once, before the
+  reset point is taken, so every episode starts with it; every run is checked for the favourites and the moves off
+  the game itself reports (`run.favs`, `run.movesOff`), and an episode stops with an error if they differ.
+  `getMetadata().profile.preset` reads `unlocked-v5:<archive or none>:<plan>`. Without the option nothing changes:
+  no favourites, nothing switched off (test/env/preset.test.ts). docs/phase-3-report.md part 7.
 - **A dialog raised while the Pokémon faints is dropped.** Seen: the item dialog of a Poké Ball opened as the last hit
   landed. The game sets the run to `dead` and finishes it 0.6 s later without waiting for an answer; the environment
   does the same instead of stopping with an error.

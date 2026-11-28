@@ -75,7 +75,7 @@ process.stdout.write = ((chunk: unknown, ...rest: unknown[]) => (process.stderr.
 
 // ---------------------------------------------------------------- state
 
-interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; koGapGraceGameTime?: number; archive?: string; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean; manager?: ManagerOptions }
+interface InitRequest { cmd: 'init'; env: { hz: number; actionRepeat: number; maxGameTime: number; maxIdleGameTime?: number; maxKoGapGameTime?: number; koGapGraceGameTime?: number; archive?: string; buildPlan?: string; species: number; map: string; tier: number; ranked: boolean }; recordDecisions?: boolean; view?: boolean; manager?: ManagerOptions }
 type Request = InitRequest | { cmd: 'reset'; seed: number; species?: number; map?: string; tier?: number } | { cmd: 'step'; a?: number[]; m?: number } | { cmd: 'close' };
 
 let env: HeadlessGameEnvironment | null = null;

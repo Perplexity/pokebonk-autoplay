@@ -778,3 +778,140 @@ seeds is given over all 50 and over the 49 without 900038, and no claim rests on
 - The gate's level (120) was set once, from three runs on the first development set, and not varied.
 - The rift prototype's stalls are the prototype's; rifts inside the heuristic are not built.
 - The manager is still a copy of plan-3.
+
+---
+
+# Part 7: the kit (plan-8) and the account's build plan
+
+2026-11-28. No training, no cheat. The owner, asked what to build next: the kit first, then every altar, then
+rifts; the leaderboard Mewtwo's own kit, counting moves like Encore that do no damage themselves but raise the
+others'; several uses of Bill's machine, not one.
+
+**In one paragraph.** plan-8 is plan-7 with that kit as rules: the fusion of Psystrike and Psycho Boost, Future
+Sight, Perish Song, Trick Room and Mist linked two by two at Bill's machine, and Encore in the last slot: six moves
+in four slots, which takes all three machines of a run. With the account's own build plan (favourite moves, and
+moves switched off) 22 of 30 runs on seeds 1–30 end with the whole kit, every move at level 10. Median 13.85
+million for plan-7's 11.40, best 14.54 for 12.95; on the 100 check seeds, played once, 13.80 for 11.37 and 15.04
+for 12.98 (seed by seed ×1.19, 95 %: 1.06 to 1.32). No run reaches 20 million. The runs with the whole kit kill at the Overtime ceiling through
+round 16, which is where the game itself ends it: from Overtime's second 480 enemy HP and the tide grow several
+times faster. 7 of the 8 runs without the whole kit lost a machine with a zone they left in its first minutes, a
+fault that plan-7 has too (found here, not fixed here).
+
+## What was read in the game (build mwsewi0r), and what was built on it
+
+- **Bill's machine**: one in each of zones 1 to 3, none in the sanctuary, and it works once. It takes two moves at
+  level 8 or more and either fuses them (one new move in one slot) or links them (both keep firing from one slot,
+  each ×1.15 damage and one bonus; a linked pair gets no more upgrades). Neither a fusion nor a pair goes in again.
+  A move that only strengthens the Pokémon (Encore) can be neither linked nor fused outside the species' own recipe.
+- **Why the leaderboard kit has that shape**: four slots; a fusion, two pairs and one move that cannot be linked
+  are six moves; three machines are exactly enough. Encore is ×1.25 damage, ×1.2 attack speed and ×1.15 movement
+  for 6 s, with a cooldown of 12.6 s; Perish Song curses what it hits (×1.25 damage taken for 4 s).
+- **The account's build plan** ("Plan de build"): up to four favourite moves, each offered with a chance of 15 %
+  when a level-up with a free slot draws from the species' line or from another League member, always shown when
+  drawn, and one of them in every lesson of Hypno; and up to 40 moves of the pool switched off (never one of the
+  species' own four, and 12 of the other members' stay on). It is what brings five given moves out of a pool of
+  40 in time for three machines.
+- **Hypno**: pays for a forgotten move; one lesson a zone for a free slot, and a lesson turned down keeps its
+  offers for the zone (so it is not asked for before level 8, from which every move of the kit can be offered).
+
+**plan-8** (`src/agents/heuristic2/kit.ts`, a pure function of the moves and items held, the zone and the map):
+
+- A free slot takes only a move of the kit, the four that can be linked before Encore while a machine is still to
+  come. The species' other two moves (Psycho Cut, Prismatic Laser) are banished when offered and forgotten at
+  Hypno once the slots are full and something is still to be learned.
+- Bill's machine is an errand whenever two moves are ready: the fusion's two, else the first two of the kit that
+  can be linked, at the level cap of the moment (8, or 10 with a TM Case). Hypno is an errand for a lesson or to
+  forget a move the kit has no place for.
+- **Account preset unlocked-v5** carries the build plan `kit-1`: favourites Future Sight, Perish Song, Trick Room
+  and Mist; off, the rest of Mewtwo's line and the weakest of the other members' moves (26 keys). The environment
+  checks at every reset that the game reports those favourites and moves off (docs/environment.md).
+- Nothing in plan-8 names a slot, a zone or a time for a move: the same rules build whatever kit a plan lists.
+
+## Measured
+
+**Seeds 1–30** (plan-8 with `stack-2` and `kit-1`, batch 89; plan-7 with `stack-2`, batch 84):
+
+| | Median | Mean | p90 | Best | Worst | ≥ 5 M | ≥ 10 M | ≥ 13 M | Level | Minutes | Rounds |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| plan-7 (batch 84) | 11,396,169 | 10,588,606 | 12,373,286 | 12,946,200 | 611,975 | 28 | 24 | 0 | 2,454 | 58.0 | 18 |
+| **plan-8** (batch 89) | **13,854,144** | 11,875,904 | 14,414,348 | 14,539,765 | 1,948,273 | 28 | 23 | 21 | 2,558 | 60.5 | 18 |
+
+- Seed by seed ×1.13 (95 %: 0.87 to 1.53), better on 23 of 30. The interval includes 1: the 8 runs below.
+- **The kit**: 22 of 30 runs end with the fusion, two linked pairs and Encore; the other 8 with the fusion, one
+  pair and two single moves (7 of them lost a zone, below; in seed 23 the fusion was not ready in zone 1). All 52 linked pairs are at level 10, the fusion at its top level in all 30.
+  - The fusion is made in zone 1 in 29 runs (median: the run's second 332), the first pair in zone 2 in 25
+    (second 1,181), the second pair in zone 3 in 22 (second 2,200).
+  - No run is offered a move the build plan switched off. A move outside the kit is taken 16 times in 30 runs,
+    when the refreshes and skips have run out with a slot free; Hypno forgets it.
+- **Overtime**: the median run kills at the ceiling (94,000 KOs a round and more) through round 16; plan-7's
+  through round 14. Runs at 90,000 KOs or more in round 15: 23 for 7; in round 16: 22 for 0; in round 17: none of
+  either plan.
+- **The 19 runs with the whole kit, the final vitamins and Overtime cashed** score 13.26 to 14.54 million (median
+  14.14): a narrow band under a ceiling (next section).
+- One run lost its bonus: seed 13 fainted in round 19 with 10.9 million of bonus (3.36 million scored). plan-7
+  cashed all 30.
+- KOs before Overtime: 1.94 million for 1.55 (median).
+
+**The check set, once** (seeds 3000001–3000100, on which nothing has been chosen; plan-8 batches 92 and 95,
+plan-7 batch 86, which is plan-7's own check of part 6):
+
+| | Median | Mean | p90 | Best | Worst | ≥ 5 M | ≥ 10 M | ≥ 13 M | Level | Minutes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plan-7 (batch 86) | 11,373,575 | 10,572,553 | 12,446,802 | 12,979,411 | 743,808 | 97 | 74 | 0 | 2,423 | 57.3 |
+| **plan-8** (batches 92 + 95) | **13,803,730** | 12,888,057 | 14,467,683 | 15,039,733 | 987,992 | 97 | 88 | 82 | 2,521 | 60.4 |
+
+- Seed by seed ×1.19 (95 %: 1.06 to 1.32), better on 87 of 100. One run is above 15 million; none reaches 20.
+- 85 of 100 runs end with the whole kit; the other 15 with the fusion and one pair (13) or with one move of the kit
+  missing (2). No run is offered a move the build plan switched off; a move outside the kit is taken 58 times.
+- Overtime: at 90,000 KOs or more in round 16, 84 runs for plan-7's 0; in round 17, 1 run. Three runs bring no
+  bonus: two fainted in zone 2, and seed 3000048 fainted in Overtime with 4.4 million of bonus (plan-7 cashed all
+  100).
+- 10 runs left zone 2 or 3 before its second 300 (the fault below; plan-7: 16 runs); their median is 7.4 million,
+  and 7 of them never change their vitamins.
+- **How the 100 were played.** The batch of 100 (92) ended with 96: four runs were still playing when the runner's
+  wall-time limit of 30 minutes an episode killed their workers (seeds 3000036, 3000046, 3000068 and 3000077; no
+  fault of the game or of the player). The same code played those four again with a limit of 90 minutes (batch
+  95): 7.3, 14.4, 13.8 and 9.5 million. A run of plan-8 takes 1.9 times the wall time of a run of plan-7 by the
+  same code (1,149 s for 602 on average; 190 simulation steps a second for a worker against 340). **Why was not
+  profiled**; the rules of the kit themselves are a few map lookups a step.
+- plan-7 was not played again on these seeds by this part's code: batch 86 is by part 6's code. The replay below
+  (seeds 1–30, identical) is the evidence that the code of this part plays plan-7 as before.
+- p90 here and in the table above is interpolated between the two nearest runs, as in parts 5 and 6.
+
+**Plans 1 to 7 play as before.** By the code of this part plan-7 replays seeds 1–30 identically to batch 84 and
+plan-3 to batch 79: 30 of 30 each (batches 90 and 91). The others were not replayed: a plan without a kit takes
+none of the new branches (test/agents/kit.test.ts), and without the build-plan option the game has no favourites
+and nothing switched off (test/env/preset.test.ts).
+
+## What ends a run with the whole kit
+
+- The game's own wall. Until Overtime's second 480 enemy HP grows ×4 a minute and the tide ×2; from then on (round
+  17) enemy HP grows ×48 a minute (×4 and a further ×12: the game's constants `hpPerMin`, `lateHp`) and the tide
+  ×4 (`drainGrow`, `lateDrain`). A round more costs ×2 of damage before that second and ×6.9 after it. In the 22
+  whole-kit runs round 16 is at the ceiling and round 17 at 75,000 (median); Overtime ends 515 to 547 s in.
+- At second 535 the tide is about 57 % of the reference HP a second, 40 % with Dique: about 1,400 HP a second for
+  a reference of 3,500, against a max HP of 1,500 to 2,200. 26 of 30 runs end with the HP bar at 85 % or more (plan-7: 9 of
+  30): they are not worn down, they are taken out in a second or two. **Which rule cashed them (the tide at a
+  whole bar a second, or a Max Revive spent) was not read from a trace.**
+- **Expected, not measured:** each further round at the ceiling is worth 1.7 to 2.0 million, so 20 million is
+  round 21 or 22 (phase 0's table). The tide at the end of those rounds is 9 to 18 times what it is at second 535,
+  which by the same arithmetic asks for a max HP of 15,000 to 30,000; enemy HP there is 16,000 to 110,000 times
+  what it is at second 480, where these builds stop killing everything. The leaderboard run ended with a max HP of
+  19,650, damage ×152 (ours ×42), special ×50 (ours ×11) and level 6,293 (ours 2,558) after 96 minutes (ours 60):
+  its stats multiply one another, and it brings 2.4 times the levels and 1.5 times the items. The kit was the part
+  of the gap that Bill's machine closes. The rest is what is carried into Overtime, and no single rule will give
+  it: it is the length and yield of the 50 minutes before.
+
+## A fault found: a zone abandoned in its first minutes (plan-7 and plan-8)
+
+- From zone 2 on the guardian is woken on arrival (the wake rule's level, 999, is passed in zone 1 since plan-7)
+  and falls after one or two minutes; the zone is then farmed on, and the game starts its final swarm at the
+  zone's second 600. The rule "leave a cleared zone under 40 % HP" counts from the moment the guardian falls.
+- Seed 28 under plan-8, traced: the guardian of zone 2 lands four hits in 1.6 s, the bar is at 2 HP of 386 when it
+  falls, and the portal is taken that second: zone 2 lasts 107 s for the usual 1,050, and its machine and its
+  Hypno are never used.
+- On seeds 1–30 a zone of 2 or 3 is left before its second 300 in 8 runs of plan-8 (9 zones) and in 5 runs of
+  plan-7 (6 zones). Under plan-8 those 8 runs score a median of 6.8 million; 6 of them never change their vitamins
+  (the change is made at zone 3's Hypno) and enter Overtime with a max HP under 600.
+- Every plan-8 run under 10 million but one (seed 13) is one of these. **Not fixed in this part** (plan-8 is the
+  kit and nothing else); it is the next change.
