@@ -95,7 +95,11 @@ The loop, whoever states the change (a new strategy seen on the leaderboard, a g
 3. **Write it as a rule and data**: a new key or list of the plan, a branch in `chooser.ts` or `policy.ts` that reads
    it, and a test. Nothing about one Pokémon, map or tier goes into a rule: that is data of the plan.
 4. **Trace one seed** and read it: `node scripts/trace.ts --seed=1` prints the zone's state, every intent and every
-   answer. Does it do what was meant?
+   answer. Or watch it: `npm run watch -- --seed=1` plays the run at real-time speed (or `--speed=4`) and shows it
+   on a local page: a top-down map with the enemies, the map points and the line to where the player is heading;
+   the zone, HP and level; what it intends and why; every answered dialog; its items, vitamins and stats. Watching
+   stores nothing. The speed and a pause change what is shown and when, not what is played
+   (test/watch/game.test.ts). Does it do what was meant?
 5. **Measure on the tuning seeds** (1–30) against the current plan, same code for both:
    ```sh
    node scripts/run-episodes.ts --policy=player --policy-options='{"plan":{"leaveHp":0.5}}' --episodes=30 --seed=1 \
