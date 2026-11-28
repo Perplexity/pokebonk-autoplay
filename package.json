@@ -13,11 +13,11 @@
     "typecheck": "tsc --noEmit",
     "run-episodes": "node scripts/run-episodes.ts",
     "baseline:report": "node scripts/baseline-report.ts",
-    "heuristic:trace": "node scripts/heuristic-trace.ts",
     "env:determinism": "node scripts/env-determinism.ts",
     "env:measure": "node scripts/env-measure.ts",
     "test:env": "node --test \"test/env/*.test.ts\"",
-    "export:knowledge": "node scripts/export-knowledge.ts"
+    "export:knowledge": "node scripts/export-knowledge.ts",
+    "trace": "node scripts/trace.ts"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",

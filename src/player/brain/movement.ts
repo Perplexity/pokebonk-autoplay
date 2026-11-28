@@ -1,4 +1,4 @@
-import { EF, E_ATK, E_DMG, E_FLAGS, E_HP, E_MAXHP, E_R, E_SPEED, E_VX, E_VZ, E_X, E_Z, type Enemy, type Point, type Snapshot } from '../snapshot.ts';
+import { EF, E_ATK, E_DMG, E_FLAGS, E_HP, E_MAXHP, E_R, E_SPEED, E_VX, E_VZ, E_X, E_Z, type Enemy, type Point, type Snapshot } from '../../observations/snapshot.ts';
 import { adaptTuning, type Tuning } from './tuning.ts';
 
 /**
@@ -61,7 +61,7 @@ export function markVisited(mem: Memory): Memory {
 }
 
 /**
- * What the layer above (the run's lifecycle, src/agents/heuristic) wants on top of the brain's own goals. The snapshot
+ * What the layer above (the run's lifecycle, src/player/policy.ts) wants on top of the brain's own goals. The snapshot
  * does not say whether overtime is running, so the caller, who answered the dialogs, tells the brain.
  */
 export interface Directive {

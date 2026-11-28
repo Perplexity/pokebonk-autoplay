@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { EF, E_X, E_Z } from '../src/bot/snapshot.ts';
-import type { Snapshot } from '../src/bot/snapshot.ts';
-import { assess, decide, kitRange, liveBoss, newMemory, pickFocus } from '../src/bot/brain/movement.ts';
-import { adaptTuning, DEFAULT_TUNING, resolveTuning } from '../src/bot/brain/tuning.ts';
+import { EF, E_X, E_Z } from '../src/observations/snapshot.ts';
+import type { Snapshot } from '../src/observations/snapshot.ts';
+import { assess, decide, kitRange, liveBoss, newMemory, pickFocus } from '../src/player/brain/movement.ts';
+import { adaptTuning, DEFAULT_TUNING, resolveTuning } from '../src/player/brain/tuning.ts';
 import { enemy, quiet, recorded, vary } from './helpers.ts';
 
 const T = DEFAULT_TUNING;
@@ -341,7 +341,7 @@ test('the guardian is not woken on level with an empty ultimate; a telegraphed s
   assert.ok(!decide(later, newMemory(), T).action.dash);
 });
 
-// ---- the run's lifecycle beyond the first guardian (src/agents/heuristic drives it through the environment) ----
+// ---- the run's lifecycle beyond the first guardian (src/player/policy.ts drives it through the environment) ----
 
 const GUARDIAN = { i: 7, name: 'Golduck', species: 55, x: 9, z: 0, hp: 5000, maxHp: 9000, radius: 1.5, enraged: false, chargeT: 0, cdx: 0, cdz: 0, move: '', moveT: 0, fightT: 20, phase: '' };
 const PORTAL = { kind: 'portal', sub: '', x: 0, z: -30, r: 3.4, used: false, cost: 0, d: 30 };

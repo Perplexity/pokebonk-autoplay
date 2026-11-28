@@ -16,7 +16,8 @@
  */
 import { createEnvironment } from '../../src/environment/index.ts';
 import type { Action, ChoiceMask, Observation, PlayAction, PlayMask } from '../../src/environment/index.ts';
-import { heuristicPolicy, nearestMove } from '../../src/agents/heuristic/index.ts';
+import { nearestMove } from '../../src/player/adapter.ts';
+import { playerPolicy } from '../../src/player/policy.ts';
 
 const args = new Map<string, string>();
 for (const a of process.argv.slice(2)) { const m = /^--([\w-]+)(?:=(.*))?$/.exec(a); if (m) args.set(m[1], m[2] ?? 'true'); }
@@ -25,7 +26,7 @@ const say = (s: string) => process.stdout.write(s + '\n');
 const env = createEnvironment({ maxGameTime: num('to', 600), species: num('species', 150), map: args.get('map') ?? 'forest', tier: 0 });
 const seed = num('seed', 1);
 let obs: Observation = await env.reset({ seed });
-const policy = heuristicPolicy({ planRoute: (x, z) => env.planRoute(x, z) });
+const policy = playerPolicy({ planRoute: (x, z) => env.planRoute(x, z) });
 policy.reset(seed);
 
 /** Map-point kind → the dialog its interact opens (none: the point is used by standing in it). */

@@ -28,7 +28,7 @@ import type { FromWorker, ToWorker, WorkerInit } from './protocol.ts';
 
 export interface BatchConfig {
   policy: string;
-  /** The policy's own settings, stored with the batch (heuristic: `{ tuning, heuristic }` overrides). Default: none. */
+  /** The policy's own settings, stored with the batch (player: `{ plan }`, keys of the plan to replace). Default: none. */
   policyOptions?: Record<string, unknown>;
   /** Number of episodes; episode i plays seed `seed + i`. Ignored when `seeds` is given. */
   episodes: number;

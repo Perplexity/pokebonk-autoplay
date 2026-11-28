@@ -7,15 +7,15 @@ import { Sim } from '../sim/env.ts';
 import { real } from '../sim/clock.ts';
 import { localRankedSeason } from '../sandbox/mockApi.ts';
 import type { RunRecord } from '../sandbox/store.ts';
-import { extractSnapshot } from '../bot/extract.ts';
-import type { Nav, Snapshot } from '../bot/snapshot.ts';
+import { extractSnapshot } from '../observations/extract.ts';
+import type { Nav, Snapshot } from '../observations/snapshot.ts';
 import { STATE_SCHEMA, extractState } from '../observations/state.ts';
 import { DialogCapture, HANDLED_METHODS, HANDLER_WRITES, REFUSED_METHODS, resolveBuildNames } from './dialogs.ts';
 import type { BuildNames } from './dialogs.ts';
 import { resolveGameFns } from './gamefns.ts';
 import type { GameFns } from './gamefns.ts';
-import { BUILD_PLAN_NAMES, buildPlanOf } from '../agents/heuristic2/kit.ts';
-import { ARCHIVE_NAMES, archiveOf, kitOf, loadValuationKnowledge } from '../agents/heuristic2/values.ts';
+import { BUILD_PLAN_NAMES, buildPlanOf } from '../player/kit.ts';
+import { ARCHIVE_NAMES, archiveOf, kitOf, loadValuationKnowledge } from '../player/values.ts';
 import { UNLOCKED_PRESET, playableMaps, readRegistries, unlockedProfile, verifyUnlocked } from './profile.ts';
 import type { Registries, UnlockCheck } from './profile.ts';
 import { ACTION_SCHEMA, DECISION_SCHEMA, InvalidActionError, MOVES, MOVE_VECTORS, OBSERVATION_SCHEMA, PLAY_BUTTONS, UnknownSituationError } from './types.ts';
@@ -591,7 +591,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       return false;
     }
     // The sanctuary has no wild Pokémon at all: the walk to the shrine and the rest before Overtime (45 s at most in
-    // the heuristic baseline) are stretches without a KO in every complete run. Four times the allowance there.
+    // an early version of the player) are stretches without a KO in every complete run. Four times the allowance there.
     const allowance = this.options.maxKoGapGameTime * (run.sanctuary && !run.overtime?.live ? SANCTUARY_KO_GAP_FACTOR : 1);
     this.koGapAllowance = allowance;
     return run.time - this.lastKo.time >= allowance;
@@ -676,7 +676,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   }
 
   /**
-   * Read-only helper for scripted policies (src/agents/heuristic): the next waypoint of a route from the player to the
+   * Read-only helper for the player (src/player): the next waypoint of a route from the player to the
    * world point (x, z), planned by the snapshot extractor's own A* over the game's height map and prop colliders
    * (`Snapshot.nav`, docs/SNAPSHOT.md). Reads terrain, changes nothing, draws no random number. null when no route
    * could be planned.

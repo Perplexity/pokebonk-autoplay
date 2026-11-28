@@ -1,71 +1,64 @@
-import type { Nav, Snapshot } from '../../bot/snapshot.ts';
-import { buildFor } from '../../bot/brain/builds.ts';
-import type { Build } from '../../bot/brain/builds.ts';
-import { decide, markVisited, newMemory } from '../../bot/brain/movement.ts';
-import type { Directive, Memory } from '../../bot/brain/movement.ts';
-import { DEFAULT_TUNING } from '../../bot/brain/tuning.ts';
-import type { Tuning } from '../../bot/brain/tuning.ts';
-import type { Policy } from '../../environment/policies.ts';
-import type { Action, Observation, PlayMask } from '../../environment/types.ts';
-import type { RunState } from '../../observations/state.ts';
-import { toPlayAction } from '../heuristic/adapter.ts';
-import { choose2, kitOfObservation, vitaminPhase } from './chooser.ts';
-import type { Chooser2Context, KitMemo } from './chooser.ts';
+import type { Nav, Snapshot } from '../observations/snapshot.ts';
+import { buildFor } from './brain/builds.ts';
+import type { Build } from './brain/builds.ts';
+import { decide, markVisited, newMemory } from './brain/movement.ts';
+import type { Directive, Memory } from './brain/movement.ts';
+import { DEFAULT_TUNING } from './brain/tuning.ts';
+import type { Tuning } from './brain/tuning.ts';
+import type { Policy } from '../environment/policies.ts';
+import type { Action, Observation, PlayMask } from '../environment/types.ts';
+import type { RunState } from '../observations/state.ts';
+import { toPlayAction } from './adapter.ts';
+import { choose, kitOfObservation, vitaminPhase } from './chooser.ts';
+import type { ChooserContext, KitMemo } from './chooser.ts';
 import type { KitState } from './kit.ts';
-import { EF, E_DMG, E_FLAGS } from '../../bot/snapshot.ts';
-import type { Point } from '../../bot/snapshot.ts';
+import { EF, E_DMG, E_FLAGS } from '../observations/snapshot.ts';
+import type { Point } from '../observations/snapshot.ts';
 import { planWith } from './plan.ts';
 import type { Plan } from './plan.ts';
 import { kitOf, loadValuationKnowledge } from './values.ts';
 import type { Kit, Knowledge } from './values.ts';
 
 /**
- * The second heuristic (phase 1 of the heuristic + RL refactor). Movement and fighting are the first heuristic's brain
- * (src/bot/brain, unchanged); what differs is the run plan (plan.ts) and the answers to dialogs (chooser.ts):
+ * The player. Movement and fighting are the brain's (brain/movement.ts); this file is the run's lifecycle, the orders
+ * it gives the brain, and the bookkeeping between dialogs. Dialogs are answered in chooser.ts, by the plan (plan.ts):
  *
- *   zone        farm and loot; wake the guardian late (plan.wakeAfterSec); once it has fallen keep the portal closed and
- *               stay for the final swarm, until HP falls under plan.leaveHp or the zone clock reaches plan.leaveAtSec
- *   sanctuary   as the first heuristic: legendary, a rest, Overtime
- *   Overtime    fight near the portal; cash under plan.cashHp or after plan.cashAfterRound
+ *   zone        errands (`errandFor`), Rhydon's three roars, then the guardian; once it has fallen the portal stays
+ *               closed and the zone is played on, through its final swarm, until the plan says leave
+ *   sanctuary   the legendary, a rest, Overtime
+ *   Overtime    fight near the portal; cash when the plan says so
  *
  * It sees the observation, the read-only route planner and the game's knowledge export; it is deterministic.
  */
-export const HEURISTIC2_VERSION = '2';
+export const PLAYER_VERSION = '3';
 const SERVICE_DIALOGS = new Set(['shop', 'ditto', 'trade', 'dojo', 'slots', 'forget', 'fusion']);
 const BUILD = 'mwsewi0r';
 
-export interface Heuristic2Options {
+export interface PlayerOptions {
   planRoute?: (x: number, z: number) => Nav | null;
   /** Keys of the plan to replace (plan.ts). */
   plan?: Record<string, unknown>;
   onEvent?: (e: { t: number; what: string; detail: string }) => void;
 }
-export interface Lifecycle2 {
+export interface Lifecycle {
   cashing: boolean; restSince: number | null;
   /** zones whose portal the policy has decided to take */
   leaving: Set<number>;
-  /** plan-2. The zone the next three fields belong to; errands given up in it; the errand under way; Pokédollars held on leaving its shop. */
+  /** The zone the next three fields belong to; errands given up in it; the errand under way; Pokédollars held on leaving its shop. */
   zone: number; skip: Set<string>; errand: { key: string; since: number } | null; shopLeft: number | null;
-  /** HP of the last seconds, oldest first, with the game's counter of damage taken where it is known. */
-  hpLog: { t: number; hp: number; max: number; taken?: number }[];
   /** Gengar curses drawn at slot machines in this run. */
   gengar: number;
-  /** Revives held when last seen; run time a revive was last spent; run time the current zone was cleared and Overtime began. */
-  revives: number | null; revivedAt: number; clearedAt: number | null; otAt: number | null;
-  /** plan-9. Run time the current zone's final swarm was first seen. */
-  swarmAt: number | null;
-  /** plan-3. Run time the walk to this zone's Rhydon totem was first ordered ahead of the wake. */
+  /** Revives held when last seen; run time a revive was last spent; run time the current zone was cleared, its final swarm was first seen, and Overtime began. */
+  revives: number | null; revivedAt: number; clearedAt: number | null; swarmAt: number | null; otAt: number | null;
+  /** Run time the walk to this zone's Rhydon totem was first ordered ahead of the wake. */
   roarSince: number | null;
-  /** plan-8. Moves banished and the zone whose lesson is gone (chooser.ts, `KitMemo`); the moves held when Hypno was last left (he is not visited again for the kit until they change). */
+  /** Moves banished and the zone whose lesson is gone (chooser.ts, `KitMemo`); the moves held when Hypno was last left (he is not visited again for the kit until they change). */
   memo: KitMemo; hypnoLeft: string | null;
 }
-export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, swarmAt: null, roarSince: null, memo: { banished: new Set(), lessonZone: 0 }, hypnoLeft: null });
+export const newLife = (): Lifecycle => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, swarmAt: null, roarSince: null, memo: { banished: new Set(), lessonZone: 0 }, hypnoLeft: null });
 
 /** What Hypno could change for the kit: the moves held, by slot, and whether this zone's lesson is still to be had. */
-export const kitSignature = (kit: KitState, life: Pick<Lifecycle2, 'memo'>, stage: number): string => `${kit.held.map((m) => `${m.slot}:${m.key}`).join(',')}|${life.memo.lessonZone === stage ? 'no lesson' : 'lesson'}`;
-
-/** The limit on the horde's hits that applies now: the plan's own, or the one for a held revive. */
-const limitOf = (plain: number, withRevive: number, life: Lifecycle2): number => ((life.revives ?? 0) > 0 ? withRevive : plain);
+export const kitSignature = (kit: KitState, life: Pick<Lifecycle, 'memo'>, stage: number): string => `${kit.held.map((m) => `${m.slot}:${m.key}`).join(',')}|${life.memo.lessonZone === stage ? 'no lesson' : 'lesson'}`;
 
 /**
  * What one hit of the horde would take, as a share of max HP: the upper quartile of the damage of the enemies in view
@@ -81,35 +74,8 @@ export function hordeHit(s: Snapshot): number {
   return s.player.maxHp > 0 ? worst * (1 - armor / (armor + 45)) / s.player.maxHp : 0;
 }
 
-/** Lowest HP share of the last `window` seconds (1 when nothing is logged). */
-export function lowestHp(life: Lifecycle2, now: number, window: number): number {
-  let m = 1;
-  for (const e of life.hpLog) if (e.t >= now - window && e.max > 0) m = Math.min(m, e.hp / e.max);
-  return m;
-}
-/** The largest single drop of HP between two logged moments of the last `window` seconds, as a share of max HP: the heaviest hit. */
-export function heaviestHit(life: Lifecycle2, now: number, window: number): number {
-  let worst = 0, prev: Lifecycle2['hpLog'][number] | null = null;
-  for (const e of life.hpLog) {
-    // The HP bar misses a hit that a revive made good within the same moment; the damage counter does not.
-    if (e.t >= now - window && prev && e.max > 0) worst = Math.max(worst, (prev.hp - e.hp) / e.max, e.taken !== undefined && prev.taken !== undefined ? (e.taken - prev.taken) / e.max : 0);
-    prev = e;
-  }
-  return worst;
-}
-/** HP lost in the last `window` seconds as a share of max HP: every drop counts, what was healed in between does not make up for it. */
-export function hpLost(life: Lifecycle2, now: number, window: number): number {
-  let lost = 0, prev: { hp: number; max: number } | null = null;
-  for (const e of life.hpLog) {
-    if (e.t < now - window) { prev = e; continue; }
-    if (prev && e.hp < prev.hp && e.max > 0) lost += (prev.hp - e.hp) / e.max;
-    prev = e;
-  }
-  return lost;
-}
-
 /** What the plan needs to know besides the snapshot: prices, what is held, and the estimated spawn multiplier. */
-export interface World { gold: number; ballPrice: number; cagePrice: number; slotPrice: number; items: number; spawn: number; /** plan-8: the kit's state (kit.ts). */ kit?: KitState }
+export interface World { gold: number; ballPrice: number; cagePrice: number; slotPrice: number; items: number; spawn: number; /** The state of the Pokémon's build, when the plan lists one (kit.ts). */ kit?: KitState }
 const POINT_NAME: Record<string, string> = { bill: "Bill's machine", freechest: 'Great Ball (free)', chest: 'Poké Ball', berry: 'berries', slots: 'slot machine', meowth: 'shop', ditto: 'Ditto', cage: 'cage', snorlax: 'Snorlax', magnet: 'Magnemite', rhydon: "Rhydon's roar", cursedchest: 'cursed Poké Ball', cursed: 'cursed altar', greed: "Gengar's altar" };
 export const pointKey = (q: Pick<Point, 'kind' | 'x' | 'z'>): string => `${q.kind}:${Math.round(q.x)}:${Math.round(q.z)}`;
 
@@ -128,12 +94,12 @@ export function spawnEstimate(s: Snapshot, st: Pick<RunState, 'build' | 'pointsU
 }
 
 /**
- * plan-2: the errand the plan sends the brain on, or null. The nearest map point of `plan.errands` whose own condition
+ * The errand the plan sends the brain on, or null. The nearest map point of `plan.errands` whose own condition
  * holds: a free ball always; a paid ball, a cage or the slot machine when the Pokédollars cover it; the shop on the
  * first visit or when the Pokédollars have grown; berries when hurt; Ditto with an item to copy; Rhydon before the
  * guardian wakes; curses while HP is high and the spawn multiplier is under the target. Exported for tests.
  */
-export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, life: Lifecycle2, plan: Plan, brainSkip: string[] = []): NonNullable<Directive['goto']> | null {
+export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, life: Lifecycle, plan: Plan, brainSkip: string[] = []): NonNullable<Directive['goto']> | null {
   if (hp < plan.lootHp || (s.bossSpawned && !s.stageCleared)) return null;
   const range = swarm ? plan.swarmLootRange : plan.lootRange;
   const wanted = (q: Point): boolean => {
@@ -147,12 +113,11 @@ export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, lif
       case 'cage': return w.cagePrice > 0 && w.gold >= w.cagePrice;
       case 'snorlax': case 'magnet': return true;
       case 'rhydon': return !s.bossSpawned && !s.stageCleared;
-      // Bill's machine: with the plan's item held and two moves at the cap (chooser.ts, `fusionPick`).
-      // plan-8: whenever the kit's fusion or a link of two of its moves is ready (kit.ts).
-      case 'bill': return w.kit?.on ? !!(w.kit.fuse || w.kit.link) : !!plan.fuseNeeds && (s.player.items[plan.fuseNeeds] ?? 0) > 0 && s.player.moves.filter((m) => m.level >= 10).length >= 2;
+      // Bill's machine: whenever the build's fusion or a link of two of its moves is ready (kit.ts).
+      case 'bill': return !!(w.kit?.on && (w.kit.fuse || w.kit.link));
       case 'cursedchest': case 'cursed': case 'greed': return hp >= plan.riskHp && w.spawn < plan.spawnTarget;
       // Hypno: once the final phase has begun, while a vitamin of the earlier phase is still held (chooser.ts, 'forget').
-      // plan-8: also to forget a move the kit has no place for, and for this zone's lesson into a free slot; not again
+      // Also to forget a move the kit has no place for, and for this zone's lesson into a free slot; not again
       // for either until the moves held have changed since he was last left.
       case 'hypno': {
         const phase = vitaminPhase(s, plan);
@@ -178,23 +143,7 @@ export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, lif
 /** The directive for the brain. Exported for tests. */
 export const wakeAfter = (plan: Plan, stage: number): number => plan.wakeAfterSec[Math.min(plan.wakeAfterSec.length - 1, Math.max(0, stage - 1))];
 
-/** Where the plan sends the brain to loot, or null. A berry is only fetched when hurt. */
-export function lootGoal(s: Snapshot, hp: number, swarm: boolean, skip: string[], plan: Plan): NonNullable<Directive['goto']> | null {
-  if (swarm || hp < plan.lootHp || (s.bossSpawned && !s.stageCleared)) return null;
-  // Time to wake the guardian: the brain's own rule does that, and an order to loot would come before it.
-  const wakeLv = plan.wakeLevel[Math.min(plan.wakeLevel.length - 1, Math.max(0, s.stage - 1))];
-  if (!s.bossSpawned && !s.stageCleared && (s.stageTime >= wakeAfter(plan, s.stage) || s.player.level >= wakeLv)) return null;
-  const want = s.points.filter((q) => !q.used && q.d <= plan.lootRange && plan.lootKinds.includes(q.kind) && !skip.includes(`${q.kind}:${Math.round(q.x)}:${Math.round(q.z)}`)
-    && (q.kind !== 'chest' || (s.ballCost > 0 && s.gold >= s.ballCost)) && (q.kind !== 'berry' || hp < 0.8)).sort((a, b) => a.d - b.d)[0];
-  // The shop, when the Pokédollars are worth the walk and no Poké Ball is nearer.
-  const shop = s.gold >= plan.shopGold ? s.points.filter((q) => q.kind === 'meowth' && !q.used && q.d <= plan.lootRange && !skip.includes(`${q.kind}:${Math.round(q.x)}:${Math.round(q.z)}`)).sort((a, b) => a.d - b.d)[0] : undefined;
-  if (shop && (!want || shop.d < want.d)) return { kind: 'visit', x: shop.x, z: shop.z, reach: Math.max(1, shop.r * 0.6), interact: true, force: false, note: `visit the shop with ${Math.floor(s.gold)}₽` };
-  if (!want) return null;
-  const note = want.kind === 'chest' ? `Poké Ball ${s.ballCost}₽ of ${Math.floor(s.gold)}₽` : want.kind;
-  return { kind: 'loot', x: want.x, z: want.z, reach: Math.max(1, want.r * 0.7), interact: true, force: false, note };
-}
-
-export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live' | 'over' | 'direct' | 'round'> & { drain?: number }, life: Lifecycle2, plan: Plan, swarm = false, skip: string[] = [], world?: World): Directive {
+export function directiveFor(s: Snapshot, ot: Pick<RunState['overtime'], 'live' | 'over' | 'direct' | 'round'> & { drain?: number }, life: Lifecycle, plan: Plan, swarm: boolean, skip: string[], world: World): Directive {
   const hp = s.player.maxHp > 0 ? s.player.hp / s.player.maxHp : 0;
   if (ot.over) return {};
   if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; life.swarmAt = null; life.roarSince = null; life.hypnoLeft = null; }
@@ -205,21 +154,12 @@ export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live'
       if (s.stageCleared) { life.restSince ??= s.t; if (hp < 0.9 && s.t - life.restSince < 45) return { holdPortal: true }; }
       return {};
     }
-    const limit = plan.leaveAtSec[Math.min(plan.leaveAtSec.length - 1, s.stage - 1)];
-    if (!plan.errands.length || !world) {
-      // plan-1.
-      const loot = lootGoal(s, hp, swarm, skip, plan);
-      if (!s.stageCleared) return loot ? { goto: loot } : {};
-      // The guardian has fallen: the zone is farmed on, through its final swarm, until the HP bar or the clock says leave.
-      if (hp < plan.leaveHp || s.stageTime >= limit) life.leaving.add(s.stage);
-      return life.leaving.has(s.stage) ? {} : loot ? { holdPortal: true, goto: loot } : { holdPortal: true };
-    }
     if (!s.stageCleared) {
       // Time to wake the guardian: the walk is the plan's, so that its last metres are made through the horde.
       const wakeLv = plan.wakeLevel[Math.min(plan.wakeLevel.length - 1, Math.max(0, s.stage - 1))];
       if (!s.bossSpawned && (s.stageTime >= wakeAfter(plan, s.stage) || s.player.level >= wakeLv)) {
-        // plan-3: Rhydon answers only while the guardian sleeps, three times. The roars still owed come first.
-        const totem = plan.roarsFirst && hp >= plan.wakeHp ? s.points.find((q) => q.kind === 'rhydon' && !q.used && !life.skip.has(pointKey(q)) && !skip.includes(pointKey(q))) : undefined;
+        // Rhydon answers only while the guardian sleeps, three times. The roars still owed come first.
+        const totem = hp >= plan.wakeHp ? s.points.find((q) => q.kind === 'rhydon' && !q.used && !life.skip.has(pointKey(q)) && !skip.includes(pointKey(q))) : undefined;
         if (totem) {
           life.roarSince ??= s.t;
           if (s.t - life.roarSince <= plan.roarTimeout) return { goto: { kind: 'errand', x: totem.x, z: totem.z, reach: Math.max(1, totem.r * 0.6), interact: true, force: true, note: `Rhydon's roars before the guardian (${Math.round(totem.d)} m)` } };
@@ -232,17 +172,15 @@ export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live'
       const errand = errandFor(s, world, hp, swarm, life, plan, skip);
       return errand ? { goto: errand } : {};
     }
-    // The guardian has fallen: its prizes first, then the zone is farmed on through its final swarm while the HP bar
-    // stays high, and left through the portal when it does not, or when the clock says so.
+    // The guardian has fallen: its prizes first, then the zone is played on through its final swarm, and left through
+    // the portal when the plan says so. The HP bar, the horde's hits and a spent revive count only once the final swarm
+    // is on: until then a cleared zone is an ordinary one, and a bar the guardian emptied is the brain's to refill.
     const by = plan.leaveBySec[Math.min(plan.leaveBySec.length - 1, s.stage - 1)];
-    // plan-9: the HP bar and a spent revive count only once the final swarm is on. Until then a cleared zone is an
-    // ordinary one, and a bar the guardian emptied is the brain's to refill.
     if (swarm) life.swarmAt ??= s.t;
-    const counts = !plan.leaveInSwarm || swarm, since = plan.leaveInSwarm ? Math.max(life.clearedAt ?? Infinity, life.swarmAt ?? Infinity) : life.clearedAt ?? Infinity;
-    if ((counts && hp < plan.leaveHp) || s.stageTime >= by || (s.stageTime >= limit && lowestHp(life, s.t, plan.stayWindow) < plan.stayHp)
-      || (swarm && plan.leaveHit <= 1 && heaviestHit(life, s.t, plan.stayWindow) >= plan.leaveHit)
-      || (swarm && limitOf(plan.leaveThreat, plan.leaveThreatRevive, life) > 0 && hordeHit(s) >= limitOf(plan.leaveThreat, plan.leaveThreatRevive, life))
-      || (plan.reviveLeaves && life.revivedAt >= since)) life.leaving.add(s.stage);
+    const since = Math.max(life.clearedAt ?? Infinity, life.swarmAt ?? Infinity);
+    if ((swarm && hp < plan.leaveHp) || s.stageTime >= by
+      || (swarm && plan.leaveThreat > 0 && !((life.revives ?? 0) > 0) && hordeHit(s) >= plan.leaveThreat)
+      || life.revivedAt >= since) life.leaving.add(s.stage);
     const errand = errandFor(s, world, hp, swarm || life.leaving.has(s.stage), life, plan, skip);
     if (life.leaving.has(s.stage)) return errand ? { holdPortal: true, goto: errand } : {};
     if (errand) return { holdPortal: true, goto: errand };
@@ -256,38 +194,36 @@ export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live'
   const portal = s.points.filter((q) => q.kind === 'portal').sort((a, b) => a.d - b.d)[0];
   if (!portal) return { holdPortal: true };
   const drain = s.player.maxHp > 0 ? (ot.drain ?? 0) / s.player.maxHp : 0;
-  const lost = plan.cashLoss <= 1 ? hpLost(life, s.t, plan.cashWindow) : 0;
-  const cap = limitOf(plan.cashThreat, plan.cashThreatRevive, life), threat = cap > 0 ? hordeHit(s) : 0, revived = plan.reviveLeaves && life.revivedAt >= (life.otAt ?? Infinity);
-  if (life.cashing || hp < plan.cashHp || ot.round > plan.cashAfterRound || drain >= plan.cashDrain || lost >= plan.cashLoss || (cap > 0 && threat >= cap) || revived) {
+  const revived = life.revivedAt >= (life.otAt ?? Infinity);
+  if (life.cashing || hp < plan.cashHp || ot.round > plan.cashAfterRound || drain >= plan.cashDrain || revived) {
     life.cashing = true;
-    const why = revived ? ', a revive spent' : cap > 0 && threat >= cap ? `, the horde hits for ${Math.round(threat * 100)}% of max HP` : lost >= plan.cashLoss ? `, ${Math.round(lost * 100)}% lost in ${plan.cashWindow} s` : '';
-    return { holdPortal: true, goto: { kind: 'cash', x: portal.x, z: portal.z, reach: Math.max(1, portal.r * 0.5), interact: true, force: true, note: `cash out overtime (hp ${Math.round(hp * 100)}%, round ${ot.round}, tide ${(drain * 100).toFixed(1)}%/s${why})` } };
+    return { holdPortal: true, goto: { kind: 'cash', x: portal.x, z: portal.z, reach: Math.max(1, portal.r * 0.5), interact: true, force: true, note: `cash out overtime (hp ${Math.round(hp * 100)}%, round ${ot.round}, tide ${(drain * 100).toFixed(1)}%/s${revived ? ', a revive spent' : ''})` } };
   }
   return { holdPortal: true, leash: { x: portal.x, z: portal.z, r: plan.leash } };
 }
 
 let cached: Knowledge | null = null;
 
-/** What the heuristic would do in one play tick: the snapshot the brain sees (with the planned route), its tuning and the plan's order. */
+/** What the player would do in one play tick: the snapshot the brain sees (with the planned route), its tuning and the plan's order. */
 export interface Advice { snap: Snapshot; tuning: Tuning; directive: Directive }
 
 /**
- * The heuristic taken apart, for a layer that can overrule it (src/hybrid): the plan's order for a play tick
+ * The player taken apart: the plan's order for a play tick
  * (`advise`), the brain's answer to an order WITHOUT committing it (`peek`), committing one (`commit`), and the
  * answer to a dialog (`choose`) with the bookkeeping the plan does on whatever was answered (`noteChoice`).
- * `heuristic2Policy` below is these five in the heuristic's own order, and plays as it always did.
+ * `playerPolicy` below is these five in order.
  */
-export interface Heuristic2Advisor {
+export interface PlayerAdvisor {
   readonly plan: Plan;
   readonly knowledge: Knowledge;
-  /** The brain's tuning without the zone's wake time (the manager's own skills start from it). */
+  /** The brain's tuning without the zone's wake time. */
   readonly baseTuning: Tuning;
   readonly state: { intent: string; note: string; plan: string };
-  readonly life: Lifecycle2;
+  readonly life: Lifecycle;
   /** Map points the brain has given up on in this zone ("kind:x:z"). */
   readonly skip: readonly string[];
   kit(species: number): Kit;
-  context(species: number): Chooser2Context;
+  context(species: number): ChooserContext;
   reset(): void;
   /** Once per play observation: logs HP, tracks revives, and returns the plan's order. Advances the plan's own state. */
   advise(obs: Observation): Advice;
@@ -300,15 +236,15 @@ export interface Heuristic2Advisor {
   noteChoice(obs: Observation, action: Action, reason: string): void;
 }
 
-export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Advisor {
+export function playerAdvisor(options: PlayerOptions = {}): PlayerAdvisor {
   const plan = planWith(options.plan);
   const base: Tuning = { ...DEFAULT_TUNING, ...plan.tuning, wakeLevel: [...plan.wakeLevel], wakeAfterSec: plan.wakeAfterSec[0], visitKinds: [...(plan.tuning.visitKinds ?? DEFAULT_TUNING.visitKinds)] };
   const knowledge = (cached ??= loadValuationKnowledge(BUILD));
   let mem: Memory = newMemory(), build: Build | null = null, kit: Kit | null = null;
-  let life: Lifecycle2 = newLife();
+  let life: Lifecycle = newLife();
   let nav: Nav | null = null, navAt = -Infinity, navGoal: { x: number; z: number } | null = null, intent = '', note = '';
   const emit = (t: number, what: string, detail: string) => options.onEvent?.({ t, what, detail });
-  const ctxOf = (species: number): Chooser2Context => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge, kit: (kit ??= kitOf(knowledge, species)), memo: life.memo });
+  const ctxOf = (species: number): ChooserContext => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge, kit: (kit ??= kitOf(knowledge, species)), memo: life.memo });
   return {
     plan, knowledge, baseTuning: base,
     get state() { return { intent, note, plan: plan.version }; },
@@ -317,18 +253,18 @@ export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Ad
     kit: (species) => (kit ??= kitOf(knowledge, species)),
     context: ctxOf,
     reset() { mem = newMemory(); build = null; kit = null; nav = null; navAt = -Infinity; navGoal = null; intent = ''; note = ''; life = newLife(); },
-    choose(obs) { return choose2(obs, ctxOf(obs.snapshot.player.species)); },
+    choose(obs) { return choose(obs, ctxOf(obs.snapshot.player.species)); },
     noteChoice(obs, action, reason) {
       const d = obs.decision!, s = obs.snapshot;
       if (SERVICE_DIALOGS.has(d.kind)) mem = markVisited(mem);
       // What the plan remembers of the answers: what was left on leaving the shop, and Gengar's curses at the slot machine.
       if (d.kind === 'shop' && 'extra' in action && action.extra === 'leave') life.shopLeft = s.gold;
       if (d.kind === 'slots' && (d.context.last as { prize?: string } | null)?.prize === 'gengar') life.gengar++;
-      // plan-8: a banished move does not come back; a lesson answered either way is gone for the zone (turned down,
+      // A banished move does not come back; a lesson answered either way is gone for the zone (turned down,
       // it offers the same moves again); Hypno left, and a machine left unused, are not walked to again as things are.
       if (d.kind === 'levelup' && 'extra' in action && action.extra === 'banish') { const o = d.options[Number((action as { target?: number }).target)]; const key = o?.data.kind === 'newMove' ? knowledge.movesById.get(Number(o.data.id))?.key : undefined; if (key) life.memo.banished.add(key); }
       if (d.kind === 'lesson' || (d.kind === 'forget' && d.context.lessonReady === false)) life.memo.lessonZone = s.stage;
-      if (plan.kit.length || plan.kitFuse.length) {
+      if (plan.builds[s.player.species]) {
         if (d.kind === 'forget' && 'extra' in action && action.extra === 'leave') life.hypnoLeft = kitSignature(kitOfObservation(obs, { plan, knowledge }), life, s.stage);
         if (d.kind === 'fusion' && 'extra' in action && action.extra === 'leave') { const q = s.points.filter((x) => x.kind === 'bill' && !x.used).sort((a, b) => a.d - b.d)[0]; if (q) life.skip.add(pointKey(q)); }
       }
@@ -343,12 +279,10 @@ export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Ad
       // The wake time is the zone's own.
       const tuning: Tuning = base.wakeAfterSec === wakeAfter(plan, s.stage) ? base : { ...base, wakeAfterSec: wakeAfter(plan, s.stage) };
       const st = obs.state;
-      life.hpLog.push({ t: s.t, hp: s.player.hp, max: s.player.maxHp, taken: st.counters.damageTaken });
       if (life.revives !== null && st.build.revives < life.revives) life.revivedAt = s.t;
       life.revives = st.build.revives;
-      while (life.hpLog.length && (life.hpLog[0].t < s.t - 30 || life.hpLog[0].t > s.t)) life.hpLog.shift();
-      const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, knowledge, life.gengar), ...(plan.kit.length || plan.kitFuse.length ? { kit: kitOfObservation(obs, { plan, knowledge }) } : {}) };
-      return { snap, tuning, directive: directiveFor2(s, st.overtime, life, plan, st.zone.finalSwarm, mem.skip, world) };
+      const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, knowledge, life.gengar), ...(plan.builds[s.player.species] ? { kit: kitOfObservation(obs, { plan, knowledge }) } : {}) };
+      return { snap, tuning, directive: directiveFor(s, st.overtime, life, plan, st.zone.finalSwarm, mem.skip, world) };
     },
     peek(advice) { return decide(advice.snap, mem, advice.tuning, advice.directive); },
     commit(obs, out) {
@@ -362,10 +296,10 @@ export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Ad
   };
 }
 
-export function heuristic2Policy(options: Heuristic2Options = {}): Policy & { readonly state: { intent: string; note: string; plan: string } } {
-  const adv = heuristic2Advisor(options);
+export function playerPolicy(options: PlayerOptions = {}): Policy & { readonly state: { intent: string; note: string; plan: string } } {
+  const adv = playerAdvisor(options);
   return {
-    name: 'heuristic2',
+    name: 'player',
     get state() { return adv.state; },
     reset() { adv.reset(); },
     act(obs: Observation): Action {
@@ -374,7 +308,7 @@ export function heuristic2Policy(options: Heuristic2Options = {}): Policy & { re
         adv.noteChoice(obs, c.action, c.reason);
         return c.action;
       }
-      if (obs.phase !== 'play') throw new Error('heuristic2 policy: the episode is over');
+      if (obs.phase !== 'play') throw new Error('player policy: the episode is over');
       return adv.commit(obs, adv.peek(adv.advise(obs)));
     },
   };

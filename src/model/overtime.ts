@@ -6,7 +6,7 @@
  * test/model/overtime.test.ts reads the table out of the mirrored bundle and fails if a constant here differs.
  * Checked in play with scripts/probes/overtime-ceiling-probe.ts (docs/phase-0-report.md).
  *
- * Pure functions, no game object: usable by a heuristic, by a report and by a test alike.
+ * Pure functions, no game object: usable by the player, by a report and by a test alike.
  */
 
 /** The game's Overtime table (`ot` of the assets chunk). */

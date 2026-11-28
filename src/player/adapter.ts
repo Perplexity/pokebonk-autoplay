@@ -1,6 +1,6 @@
-import type { Action as BrainAction, Vec } from '../../bot/brain/movement.ts';
-import { MOVES } from '../../environment/types.ts';
-import type { Move, PlayAction, PlayMask } from '../../environment/types.ts';
+import type { Action as BrainAction, Vec } from './brain/movement.ts';
+import { MOVES } from '../environment/types.ts';
+import type { Move, PlayAction, PlayMask } from '../environment/types.ts';
 
 /**
  * The brain (src/bot/brain/movement.ts) decides a free heading on the ground and four buttons; the environment takes

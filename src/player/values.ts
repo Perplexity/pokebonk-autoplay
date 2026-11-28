@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { knowledgeDir } from '../../knowledge/load.ts';
+import { knowledgeDir } from '../knowledge/load.ts';
 
 /**
  * What an item, a vitamin or a stat is worth to a build, computed from the game's own effect data (the knowledge
  * export in data/game-knowledge/<build>/: `mods`, `typeBoost`, vitamin `stat` / `perLevel`, and the effect text for
  * the items whose effect is not a stat). Nothing here is a list of "good items": the numbers follow from a build
- * DIRECTION, a set of weights per stat (configs of the heuristic carry them, versioned), and from the kit of the
+ * DIRECTION, a set of weights per stat (the plan carries it), and from the kit of the
  * Pokémon (which damage class and which types its moves have).
  *
  * Unit: roughly "per cent of the build's strength". A multiplier m of a stat with weight w is worth 100·w·ln(m).
@@ -32,21 +32,28 @@ export interface Direction {
   risk: string[];
 }
 
-/** The default direction: special / psychic damage, with healing and max HP alongside, and experience and Pokédollars because they become both. */
-export const DIRECTION_V1: Direction = {
-  version: 'special-sustain-1',
+/**
+ * The direction (version `luck-experience-1`). Damage is the yardstick. Luck, experience and Pokédollars stand at
+ * what they were measured to be worth against it (tier 2, Mewtwo, seeds 1 to 30, one stat of the build multiplied
+ * from the first second by a cheating probe: luck ×3 gave ×2.8 of the score, experience ×5 gave ×2.4, Pokédollars ×5
+ * gave ×1.8, damage ×10 gave ×1.5; armor ×3 and healing ×5 gave nothing). Armor, healing, regeneration and the other
+ * ways of taking a hit stand at a fraction: the plan takes no hit while it still kills, and leaves or cashes when it
+ * no longer does.
+ */
+export const DIRECTION: Direction = {
+  version: 'luck-experience-1',
   mul: {
     damage: 1, special: 1, physical: 1, attackSpeed: 0.9, area: 0.45, duration: 0.2, eliteDamage: 0.25, statusDamage: 0.1, statusChance: 0.08, superEffective: 0.2, projSpeed: 0.05, critDamage: 0.5,
-    maxHp: 0.8, healing: 0.7, regen: 0.15, powerup: 0.5, xpGain: 0.8, gold: 0.45, moveSpeed: 0.25, jumpHeight: 0, knockback: 0.02, enemyAmount: 0.35, eliteSpawn: 0.1, difficulty: 0.35,
+    maxHp: 0.5, healing: 0.15, regen: 0.05, powerup: 0.5, xpGain: 1.7, gold: 1.5, moveSpeed: 0.25, jumpHeight: 0, knockback: 0.02, enemyAmount: 0.35, eliteSpawn: 0.1, difficulty: 0.35,
   },
   add: {
-    critChance: 110, megaCrit: 60, critDamage: 45, projectiles: 12, bounces: 3, maxHp: 0.4, regen: 4, armor: 0.8, evasion: 60, lifesteal: 250, overheal: 20, shieldMax: 0.3, thorns: 0.02, luck: 0.25, pickupRange: 1, extraJumps: 1, flinch: 5, damage: 100, special: 100,
+    critChance: 110, megaCrit: 60, critDamage: 45, projectiles: 12, bounces: 3, maxHp: 0.25, regen: 1, armor: 0.15, evasion: 20, lifesteal: 60, overheal: 5, shieldMax: 0.1, thorns: 0.02, luck: 1.2, pickupRange: 1, extraJumps: 1, flinch: 5, damage: 100, special: 100,
   },
   typeBoost: 100 * Math.log(1.4),
   text: [
     { pattern: 'survive a lethal hit|revive|you come back|second life', worth: 60, why: 'a second life' },
     { pattern: 'can go up \\d+ more levels|can level up \\d+ more times', worth: 55, why: 'raises a level cap' },
-    { pattern: 'you heal|heals you|chance to heal|heal you for', worth: 30, why: 'heals' },
+    { pattern: 'you heal|heals you|chance to heal|heal you for', worth: 10, why: 'heals' },
     { pattern: 'fall instantly|instantly (ko|defeat)|finish(es)? (off )?enem', worth: 22, why: 'finishes weakened enemies' },
     { pattern: 'grows with your (level|armor)|every \\d+(\\.\\d+)? s (it |you |lightning )', worth: 14, why: 'a damage source of its own' },
     { pattern: 'charge you \\d+% less|more (unown altars?|poké balls)|one more relic|\\+1 slot', worth: 15, why: 'economy or map' },
@@ -57,25 +64,6 @@ export const DIRECTION_V1: Direction = {
   ],
   risk: ['enemyAmount', 'eliteSpawn', 'difficulty'],
 };
-
-/**
- * The second direction (phase 3, docs/phase-3-report.md part 4): luck, experience and Pokédollars at what they were
- * measured to be worth against damage; armor, healing, regeneration and the other ways of taking a hit at a fraction.
- * Measured on tier 2, Mewtwo, seeds 1 to 30, with one stat of the build multiplied from the first second of the run
- * (a cheating probe, never training or evaluation): luck ×3 gave ×2.8 of the score, experience ×5 gave ×2.4,
- * Pokédollars ×5 gave ×1.8, damage ×10 gave ×1.5; armor ×3 and healing ×5 gave nothing. The plan takes no hit while
- * it still kills, and leaves or cashes when it no longer does: what stops a run is the kill rate, and behind it levels,
- * rarities and what can be bought. Damage keeps its weight; the others are set against it.
- */
-export const DIRECTION_V2: Direction = {
-  ...DIRECTION_V1,
-  version: 'luck-experience-1',
-  mul: { ...DIRECTION_V1.mul, xpGain: 1.7, gold: 1.5, maxHp: 0.5, healing: 0.15, regen: 0.05 },
-  add: { ...DIRECTION_V1.add, luck: 1.2, armor: 0.15, lifesteal: 60, regen: 1, evasion: 20, overheal: 5, shieldMax: 0.1, maxHp: 0.25 },
-  text: DIRECTION_V1.text.map((r) => (r.why === 'heals' ? { ...r, worth: 10 } : r)),
-};
-
-export const DIRECTIONS: Record<string, Direction> = { [DIRECTION_V1.version]: DIRECTION_V1, [DIRECTION_V2.version]: DIRECTION_V2 };
 
 export interface Knowledge {
   items: Map<string, ItemInfo>; vitamins: Map<string, VitaminInfo>; moves: Map<string, MoveInfo>; movesById: Map<number, MoveInfo>; kitOf(species: number): string[];
@@ -143,7 +131,7 @@ function modWorth(m: StatMod, kit: Kit, d: Direction, out: Worth): void {
 }
 
 /** Worth of one more of an item. `risk` is the part that is only worth it while the build can take a bigger horde. */
-export function itemWorth(item: ItemInfo, kit: Kit, d: Direction = DIRECTION_V1): Worth {
+export function itemWorth(item: ItemInfo, kit: Kit, d: Direction = DIRECTION): Worth {
   const out: Worth = { value: 0, risk: 0, why: [] };
   for (const m of item.mods) modWorth(m, kit, d, out);
   if (item.typeBoost) { const v = d.typeBoost * (kit.types[item.typeBoost] ?? 0); if (v) { out.value += v; out.why.push(`${item.typeBoost} moves ${v.toFixed(1)}`); } }
@@ -168,7 +156,7 @@ export function itemWorth(item: ItemInfo, kit: Kit, d: Direction = DIRECTION_V1)
 }
 
 /** Worth of one level of a vitamin. */
-export function vitaminWorth(v: VitaminInfo, kit: Kit, d: Direction = DIRECTION_V1): Worth {
+export function vitaminWorth(v: VitaminInfo, kit: Kit, d: Direction = DIRECTION): Worth {
   const out: Worth = { value: 0, risk: 0, why: [] };
   if (v.dice) { out.value = 6; out.why.push('a random stat 6.0'); return out; }
   modWorth(v.kind === 'mul' ? { stat: v.stat, mul: 1 + v.perLevel } : { stat: v.stat, add: v.perLevel }, kit, d, out);
@@ -177,41 +165,21 @@ export function vitaminWorth(v: VitaminInfo, kit: Kit, d: Direction = DIRECTION_
   return out;
 }
 
-/** The archive versions of preset unlocked-v4: how many of the least valuable items each takes out of the pool. */
-export const ARCHIVES: Record<string, number> = { empty: 0, loose: 20, balanced: 40, narrow: 105 };
-
-/**
- * The item archive of a preset: the `count` least valuable items for the kit, never more than the account's slots,
- * never an item worth `keepAbove` or more, and items of risk only when `archiveRisk` says so.
- */
-export function itemArchive(k: Knowledge, kit: Kit, opts: { count: number; slots: number; keepAbove?: number; archiveRisk?: boolean; direction?: Direction }): string[] {
-  const d = opts.direction ?? DIRECTION_V1, keepAbove = opts.keepAbove ?? 8;
-  const scored = [...k.items.values()].map((it) => { const w = itemWorth(it, kit, d); return { key: it.key, v: w.value + (opts.archiveRisk ? 0 : Math.max(0, w.risk)) }; });
-  scored.sort((a, b) => a.v - b.v || a.key.localeCompare(b.key));
-  return scored.filter((s) => s.v < keepAbove).slice(0, Math.max(0, Math.min(opts.count, opts.slots))).map((s) => s.key);
-}
-
-/**
- * Archive versions made with the second direction (phase 3; the four above are kept as they are):
- *   balanced-2   the 40 least valuable items by the second direction (the same size as `balanced`)
- *   stack-2      as many as the account has slots for, the items that cannot be stacked without limit first: what
- *                stays in the pool is what the second direction values highly and what can be held ten times
- * Why `stack-2` (docs/phase-3-report.md part 5): plan-5 ends a run with about 140 items of 70 kinds, two of each; the
- * leaderboard Mewtwo held 308 of 71 kinds, ten each of the multipliers. A smaller pool offers the same item more often.
- */
-export const ARCHIVE_NAMES: string[] = [...Object.keys(ARCHIVES), 'balanced-2', 'stack-2'];
-
-/** How many times more an item that stacks without a limit of its own is worth keeping in the pool (`stack-2`). */
+/** How many times more an item that stacks without a limit of its own is worth keeping in the pool. */
 const STACK_BONUS = 3;
 
-/** The items an archive version takes out of the pool for this kit, never more than the account's slots. */
+/**
+ * The item archive `stack-2`: what the account takes out of the pool for this kit. As many items as the account has
+ * slots for, the least valuable first, where an item that cannot be stacked without limit counts for a third: what
+ * stays in the pool is what the direction values highly and what can be held ten times. (A leaderboard Mewtwo held
+ * 308 items of 71 kinds, ten each of the multipliers; a smaller pool offers the same item more often.)
+ */
+export const ARCHIVE_NAMES: string[] = ['stack-2'];
+
+/** The items an archive takes out of the pool for this kit, never more than the account's slots. */
 export function archiveOf(name: string, k: Knowledge, kit: Kit, slots: number): string[] {
-  if (name in ARCHIVES) return itemArchive(k, kit, { count: ARCHIVES[name], slots });
-  if (name === 'balanced-2') return itemArchive(k, kit, { count: ARCHIVES.balanced, slots, direction: DIRECTION_V2 });
-  if (name === 'stack-2') {
-    const scored = [...k.items.values()].map((it) => { const w = itemWorth(it, kit, DIRECTION_V2); return { key: it.key, v: (w.value + Math.max(0, w.risk)) * (it.maxStack == null ? STACK_BONUS : 1) }; });
-    scored.sort((a, b) => a.v - b.v || a.key.localeCompare(b.key));
-    return scored.slice(0, Math.max(0, slots)).map((x) => x.key);
-  }
-  throw new Error(`unknown archive "${name}": use one of ${ARCHIVE_NAMES.join(', ')}`);
+  if (name !== 'stack-2') throw new Error(`unknown archive "${name}": use one of ${ARCHIVE_NAMES.join(', ')}`);
+  const scored = [...k.items.values()].map((it) => { const w = itemWorth(it, kit, DIRECTION); return { key: it.key, v: (w.value + Math.max(0, w.risk)) * (it.maxStack == null ? STACK_BONUS : 1) }; });
+  scored.sort((a, b) => a.v - b.v || a.key.localeCompare(b.key));
+  return scored.slice(0, Math.max(0, slots)).map((x) => x.key);
 }

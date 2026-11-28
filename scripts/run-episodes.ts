@@ -1,7 +1,7 @@
 /**
  * Unattended episode runner over the headless environment (no browser, no network).
  *
- *   node scripts/run-episodes.ts --policy=heuristic --episodes=30 --workers=4
+ *   node scripts/run-episodes.ts --policy=player --episodes=30 --workers=10 --species=150 --map=forest --tier=2 --archive=stack-2 --build-plan=kit-1
  *   node scripts/run-episodes.ts --policy=idle --episodes=3 --seed=100 --species=25 --map=coast --tier=1
  *   node scripts/run-episodes.ts --policy=random --episodes=2 --max-time=300      safety cap on the run clock (truncated)
  *   node scripts/run-episodes.ts --policy=random --classic                        Classic instead of Ranked rules
@@ -10,7 +10,7 @@
  * result to the SQLite database (docs/storage.md). It never loads the game itself.
  *
  * Options
- *   --policy=random|idle|heuristic     --episodes=N     --seed=S (episode i plays seed S + i)     --seeds=3,7,19 (explicit)
+ *   --policy=random|idle|player        --episodes=N     --seed=S (episode i plays seed S + i)     --seeds=3,7,19 (explicit)
  *   --workers=K (default 1)            --species=<dex>  --map=<id>  --tier=0..2  --classic
  *   --max-time=<game seconds, 0 = none>   --action-repeat=3   --hz=60
  *   --max-idle=<game seconds>          end an episode as invalid after this long without a KO and without movement
@@ -27,7 +27,7 @@
  *   --db=<file>   (default data/pokebonk.sqlite)        --no-db
  *   --jsonl[=<folder>]                 also write <folder, default data/runs>/<timestamp>/episodes.jsonl and metadata.json
  *   --label=<text>                     stored with the batch
- *   --policy-options=<json>            the policy's own settings, stored with the batch (heuristic: {"tuning":{…},"heuristic":{…}})
+ *   --policy-options=<json>            the policy's own settings, stored with the batch (player: {"plan":{…}}, keys of the plan to replace)
  *   --quiet                            no line per episode
  *
  * Exit code: 0 when every episode was played and stored, 1 when anything failed (errors are in the `errors` table and

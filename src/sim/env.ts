@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { MockApi } from '../sandbox/mockApi.ts';
 import { Store } from '../sandbox/store.ts';
 import { initLogger } from '../logger.ts';
-import { extractSnapshot } from '../bot/extract.ts';
+import { extractSnapshot } from '../observations/extract.ts';
 import { VirtualClock, real } from './clock.ts';
 import { Net, ORIGIN } from './net.ts';
 import { installLoader } from './loader.ts';

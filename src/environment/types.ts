@@ -1,4 +1,4 @@
-import type { Snapshot } from '../bot/snapshot.ts';
+import type { Snapshot } from '../observations/snapshot.ts';
 import type { Counters, RunState } from '../observations/state.ts';
 
 /**
@@ -256,7 +256,7 @@ export interface GameEnvironmentOptions {
   /**
    * A grace for the opening of a run (the owner, 2026-11-25): `maxKoGapGameTime` does not run during the first this
    * many seconds of the run clock; its stretch without a KO starts at that moment at the earliest. A level-1 Pokémon
-   * that walks to the free chests first can go more than 30 s without a KO there (the second heuristic on tier 2:
+   * that walks to the free chests first can go more than 30 s without a KO there (the player on tier 2:
    * about one run in 25, docs/phase-2-report.md §6). `maxIdleGameTime` is not affected: standing still in the opening
    * still ends the episode. Default 0: no grace.
    */
@@ -270,14 +270,14 @@ export interface GameEnvironmentOptions {
   profile?: 'unlocked' | 'starter';
   /**
    * Preset unlocked-v4: the item archive of the unlocked account (`profile.itemsOff`), by the name of a version in
-   * src/agents/heuristic2/values.ts (`empty`, `loose`, `balanced`, `narrow`, `balanced-2`, `stack-2`). The archived items are generated from the
+   * src/player/values.ts (`stack-2`). The archived items are generated from the
    * game's item effects for the kit of `species`, never more than the account has archive slots, and are taken out of
    * every Poké Ball and shop of the run by the game itself. Absent: unlocked-v3 (nothing archived).
    */
   archive?: string;
   /**
    * Preset unlocked-v5: the account's build plan for `species` (the game's "Plan de build"), by the name of a version
-   * in src/agents/heuristic2/kit.ts (`kit-1`): favourite moves, which the game then offers with their own chance and
+   * in src/player/kit.ts (`kit-1`): favourite moves, which the game then offers with their own chance and
    * in every lesson of Hypno, and the moves of the species' pool that are switched off. The game's own limits hold
    * (four favourites, at most 40 moves off, 12 moves of other League members left on). Absent: no build plan.
    */

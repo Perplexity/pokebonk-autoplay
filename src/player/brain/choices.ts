@@ -1,4 +1,4 @@
-import type { Snapshot, UiModal, UiOption } from '../snapshot.ts';
+import type { Snapshot, UiModal, UiOption } from '../../observations/snapshot.ts';
 import type { Build } from './builds.ts';
 import type { Tuning } from './tuning.ts';
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nearestMove, toPlayAction } from '../../src/agents/heuristic/adapter.ts';
-import type { Action as BrainAction } from '../../src/bot/brain/movement.ts';
+import { nearestMove, toPlayAction } from '../../src/player/adapter.ts';
+import type { Action as BrainAction } from '../../src/player/brain/movement.ts';
 import { playActionProblem } from '../../src/environment/GameEnvironment.ts';
 import { MOVES, MOVE_VECTORS } from '../../src/environment/types.ts';
 import type { Move, PlayMask } from '../../src/environment/types.ts';
