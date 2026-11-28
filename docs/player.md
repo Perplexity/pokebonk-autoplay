@@ -76,9 +76,10 @@ woken on arrival and a zone is ten minutes of errands and eight of final swarm.
   second. A leaderboard build holds ten Assault Vests, five Choice Specs, ten Big Roots and five Binding Bands;
   all are in the player's item pool and its runs end with none (docs/game.md §8.1). Vitamins change by phase;
   items do not yet.
-- **Where the levels are made.** One run looked at (plan-9, seed 20): 1,070 levels in zone 1's final swarm, 660 in
-  zone 2's, 260 in zone 3's, 110 in the thirty minutes before the swarms and 28 in Overtime. Zone 3's swarm is
-  left at second 1060, 140 s before its collapse begins.
+- **Where the levels are made.** One run looked at (plan-9, seed 20, level 2,727; from the levels its dialogs
+  record, so to about ten levels): 470 in zone 1's first ten minutes, 1,070 in its final swarm, about 790 in zone
+  2's swarm, 260 in zone 3's, about 100 in the twenty minutes before those two swarms and 28 in Overtime. Zone
+  3's swarm is left at second 1060, 140 s before its collapse begins.
 - **One Pokémon has a build.** The rules are general; only Mewtwo's data is written and measured.
 - **The wake by level** (999) is an accident of older, weaker builds that today's builds trip in zone 1. It is kept
   because every measurement includes it; it should become a choice.
