@@ -9,8 +9,9 @@ import type { Policy } from '../../environment/policies.ts';
 import type { Action, Observation, PlayMask } from '../../environment/types.ts';
 import type { RunState } from '../../observations/state.ts';
 import { toPlayAction } from '../heuristic/adapter.ts';
-import { choose2, vitaminPhase } from './chooser.ts';
-import type { Chooser2Context } from './chooser.ts';
+import { choose2, kitOfObservation, vitaminPhase } from './chooser.ts';
+import type { Chooser2Context, KitMemo } from './chooser.ts';
+import type { KitState } from './kit.ts';
 import { EF, E_DMG, E_FLAGS } from '../../bot/snapshot.ts';
 import type { Point } from '../../bot/snapshot.ts';
 import { planWith } from './plan.ts';
@@ -53,8 +54,13 @@ export interface Lifecycle2 {
   revives: number | null; revivedAt: number; clearedAt: number | null; otAt: number | null;
   /** plan-3. Run time the walk to this zone's Rhydon totem was first ordered ahead of the wake. */
   roarSince: number | null;
+  /** plan-8. Moves banished and the zone whose lesson is gone (chooser.ts, `KitMemo`); the moves held when Hypno was last left (he is not visited again for the kit until they change). */
+  memo: KitMemo; hypnoLeft: string | null;
 }
-export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, roarSince: null });
+export const newLife = (): Lifecycle2 => ({ cashing: false, restSince: null, leaving: new Set(), zone: 0, skip: new Set(), errand: null, shopLeft: null, hpLog: [], gengar: 0, revives: null, revivedAt: -Infinity, clearedAt: null, otAt: null, roarSince: null, memo: { banished: new Set(), lessonZone: 0 }, hypnoLeft: null });
+
+/** What Hypno could change for the kit: the moves held, by slot, and whether this zone's lesson is still to be had. */
+export const kitSignature = (kit: KitState, life: Pick<Lifecycle2, 'memo'>, stage: number): string => `${kit.held.map((m) => `${m.slot}:${m.key}`).join(',')}|${life.memo.lessonZone === stage ? 'no lesson' : 'lesson'}`;
 
 /** The limit on the horde's hits that applies now: the plan's own, or the one for a held revive. */
 const limitOf = (plain: number, withRevive: number, life: Lifecycle2): number => ((life.revives ?? 0) > 0 ? withRevive : plain);
@@ -101,7 +107,7 @@ export function hpLost(life: Lifecycle2, now: number, window: number): number {
 }
 
 /** What the plan needs to know besides the snapshot: prices, what is held, and the estimated spawn multiplier. */
-export interface World { gold: number; ballPrice: number; cagePrice: number; slotPrice: number; items: number; spawn: number }
+export interface World { gold: number; ballPrice: number; cagePrice: number; slotPrice: number; items: number; spawn: number; /** plan-8: the kit's state (kit.ts). */ kit?: KitState }
 const POINT_NAME: Record<string, string> = { bill: "Bill's machine", freechest: 'Great Ball (free)', chest: 'Poké Ball', berry: 'berries', slots: 'slot machine', meowth: 'shop', ditto: 'Ditto', cage: 'cage', snorlax: 'Snorlax', magnet: 'Magnemite', rhydon: "Rhydon's roar", cursedchest: 'cursed Poké Ball', cursed: 'cursed altar', greed: "Gengar's altar" };
 export const pointKey = (q: Pick<Point, 'kind' | 'x' | 'z'>): string => `${q.kind}:${Math.round(q.x)}:${Math.round(q.z)}`;
 
@@ -140,14 +146,22 @@ export function errandFor(s: Snapshot, w: World, hp: number, swarm: boolean, lif
       case 'snorlax': case 'magnet': return true;
       case 'rhydon': return !s.bossSpawned && !s.stageCleared;
       // Bill's machine: with the plan's item held and two moves at the cap (chooser.ts, `fusionPick`).
-      case 'bill': return !!plan.fuseNeeds && (s.player.items[plan.fuseNeeds] ?? 0) > 0 && s.player.moves.filter((m) => m.level >= 10).length >= 2;
+      // plan-8: whenever the kit's fusion or a link of two of its moves is ready (kit.ts).
+      case 'bill': return w.kit?.on ? !!(w.kit.fuse || w.kit.link) : !!plan.fuseNeeds && (s.player.items[plan.fuseNeeds] ?? 0) > 0 && s.player.moves.filter((m) => m.level >= 10).length >= 2;
       case 'cursedchest': case 'cursed': case 'greed': return hp >= plan.riskHp && w.spawn < plan.spawnTarget;
       // Hypno: once the final phase has begun, while a vitamin of the earlier phase is still held (chooser.ts, 'forget').
-      case 'hypno': { const phase = vitaminPhase(s, plan); return !!phase?.final && Object.keys(s.player.vitamins ?? {}).some((k) => !phase.wanted.includes(k)); }
+      // plan-8: also to forget a move the kit has no place for, and for this zone's lesson into a free slot; not again
+      // for either until the moves held have changed since he was last left.
+      case 'hypno': {
+        const phase = vitaminPhase(s, plan);
+        if (!!phase?.final && Object.keys(s.player.vitamins ?? {}).some((k) => !phase.wanted.includes(k))) return true;
+        const kit = w.kit;
+        return !!kit?.on && s.player.level >= kit.lessonFrom && (kit.forget.length > 0 || (kit.takeable.length > 0 && life.memo.lessonZone !== s.stage)) && kitSignature(kit, life, s.stage) !== life.hypnoLeft;
+      }
       default: return false;
     }
   };
-  const q = s.points.filter((x) => !x.used && plan.errands.includes(x.kind) && (x.kind === 'hypno' || (x.d <= range && (!swarm || x.kind === 'freechest')))
+  const q = s.points.filter((x) => !x.used && plan.errands.includes(x.kind) && (x.kind === 'hypno' || (x.kind === 'bill' && !!w.kit?.on) || (x.d <= range && (!swarm || x.kind === 'freechest')))
     && !life.skip.has(pointKey(x)) && !brainSkip.includes(pointKey(x)) && wanted(x)).sort((a, b) => a.d - b.d)[0];
   if (!q) { life.errand = null; return null; }
   // An errand that does not get done (out of reach, or the press went to another point) is given up for the zone.
@@ -181,7 +195,7 @@ export function lootGoal(s: Snapshot, hp: number, swarm: boolean, skip: string[]
 export function directiveFor2(s: Snapshot, ot: Pick<RunState['overtime'], 'live' | 'over' | 'direct' | 'round'> & { drain?: number }, life: Lifecycle2, plan: Plan, swarm = false, skip: string[] = [], world?: World): Directive {
   const hp = s.player.maxHp > 0 ? s.player.hp / s.player.maxHp : 0;
   if (ot.over) return {};
-  if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; life.roarSince = null; }
+  if (s.stage !== life.zone) { life.zone = s.stage; life.skip = new Set(); life.errand = null; life.shopLeft = null; life.clearedAt = null; life.roarSince = null; life.hypnoLeft = null; }
   if (s.stageCleared) life.clearedAt ??= s.t;
   if (ot.live || ot.direct) life.otAt ??= s.t;
   if (!(ot.live || ot.direct)) {
@@ -288,7 +302,7 @@ export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Ad
   let life: Lifecycle2 = newLife();
   let nav: Nav | null = null, navAt = -Infinity, navGoal: { x: number; z: number } | null = null, intent = '', note = '';
   const emit = (t: number, what: string, detail: string) => options.onEvent?.({ t, what, detail });
-  const ctxOf = (species: number): Chooser2Context => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge, kit: (kit ??= kitOf(knowledge, species)) });
+  const ctxOf = (species: number): Chooser2Context => ({ build: (build ??= buildFor(species)), tuning: base, plan, knowledge, kit: (kit ??= kitOf(knowledge, species)), memo: life.memo });
   return {
     plan, knowledge, baseTuning: base,
     get state() { return { intent, note, plan: plan.version }; },
@@ -304,6 +318,14 @@ export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Ad
       // What the plan remembers of the answers: what was left on leaving the shop, and Gengar's curses at the slot machine.
       if (d.kind === 'shop' && 'extra' in action && action.extra === 'leave') life.shopLeft = s.gold;
       if (d.kind === 'slots' && (d.context.last as { prize?: string } | null)?.prize === 'gengar') life.gengar++;
+      // plan-8: a banished move does not come back; a lesson answered either way is gone for the zone (turned down,
+      // it offers the same moves again); Hypno left, and a machine left unused, are not walked to again as things are.
+      if (d.kind === 'levelup' && 'extra' in action && action.extra === 'banish') { const o = d.options[Number((action as { target?: number }).target)]; const key = o?.data.kind === 'newMove' ? knowledge.movesById.get(Number(o.data.id))?.key : undefined; if (key) life.memo.banished.add(key); }
+      if (d.kind === 'lesson' || (d.kind === 'forget' && d.context.lessonReady === false)) life.memo.lessonZone = s.stage;
+      if (plan.kit.length || plan.kitFuse.length) {
+        if (d.kind === 'forget' && 'extra' in action && action.extra === 'leave') life.hypnoLeft = kitSignature(kitOfObservation(obs, { plan, knowledge }), life, s.stage);
+        if (d.kind === 'fusion' && 'extra' in action && action.extra === 'leave') { const q = s.points.filter((x) => x.kind === 'bill' && !x.used).sort((a, b) => a.d - b.d)[0]; if (q) life.skip.add(pointKey(q)); }
+      }
       emit(s.t, `choice:${d.kind}`, reason);
     },
     advise(obs) {
@@ -319,7 +341,7 @@ export function heuristic2Advisor(options: Heuristic2Options = {}): Heuristic2Ad
       if (life.revives !== null && st.build.revives < life.revives) life.revivedAt = s.t;
       life.revives = st.build.revives;
       while (life.hpLog.length && (life.hpLog[0].t < s.t - 30 || life.hpLog[0].t > s.t)) life.hpLog.shift();
-      const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, knowledge, life.gengar) };
+      const world: World = { gold: s.gold, ballPrice: st.economy.ballPrice, cagePrice: st.economy.cagePrice, slotPrice: st.economy.slotPrice, items: st.build.items.length, spawn: spawnEstimate(s, st, knowledge, life.gengar), ...(plan.kit.length || plan.kitFuse.length ? { kit: kitOfObservation(obs, { plan, knowledge }) } : {}) };
       return { snap, tuning, directive: directiveFor2(s, st.overtime, life, plan, st.zone.finalSwarm, mem.skip, world) };
     },
     peek(advice) { return decide(advice.snap, mem, advice.tuning, advice.directive); },

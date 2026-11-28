@@ -163,6 +163,19 @@ export interface Plan {
    * to 14 items and no move upgraded, because every early level had gone into vitamins.
    */
   vitaminsRiskLevel: number;
+  // ---- added with plan-8 ----
+  /**
+   * The kit the build ends with (kit.ts; both empty = the species' own four moves, as before). `kitFuse`: the two
+   * moves Bill's machine fuses. `kit`: the other moves, in order of preference; those the machine can link are linked
+   * two by two, so that the fusion, two pairs and one move that cannot be linked fill the four slots. A level-up takes
+   * a new move only from these, the species' other moves are banished when they are offered and forgotten at Hypno
+   * once the slots are full, Hypno's lesson is taken for a move of the kit, and the machine is an errand whenever two
+   * moves are ready for it. The owner, 2026-11-28, of the leaderboard Mewtwo's kit (Trick Room, Future Sight, Perish
+   * Song, Mist, Encore and the fusion of Psycho Boost and Psystrike): "Yes, aim for that for mewtwo but we have to
+   * consider boost moves like Encore since they boost the damage of other moves", and several uses of the machine,
+   * not one.
+   */
+  kit: string[]; kitFuse: string[];
 }
 
 export const PLAN_V1: Plan = {
@@ -190,6 +203,7 @@ export const PLAN_V1: Plan = {
   roarsFirst: false, roarTimeout: 120,
   fuseNeeds: '',
   vitaminsFarm: [], vitaminsFinal: [], swapZone: 3, swapAtSec: 720, vitaminsRiskLevel: 0,
+  kit: [], kitFuse: [],
 };
 
 /**
@@ -259,11 +273,22 @@ export const PLAN_V7: Plan = {
   errands: [...PLAN_V6.errands, 'hypno'], vitaminsRiskLevel: 120,
 };
 
-export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6, 'plan-7': PLAN_V7 };
+/**
+ * plan-8 (NOT the default; NOT measured yet): plan-7 with the leaderboard Mewtwo's kit (above), for the account's
+ * build plan `kit-1` (kit.ts: the four moves that can be linked are the account's favourites, and the moves of the
+ * pool that are not of the kit are switched off as far as the game allows). `errands` gains Bill's machine.
+ */
+export const PLAN_V8: Plan = {
+  ...PLAN_V7, version: 'plan-8',
+  kitFuse: ['psystrike', 'psycho-boost'], kit: ['future-sight', 'perish-song', 'trick-room', 'mist', 'encore'],
+  errands: [...PLAN_V7.errands, 'bill'],
+};
+
+export const PLANS: Record<string, Plan> = { 'plan-1': PLAN_V1, 'plan-2': PLAN_V2, 'plan-3': PLAN_V3, 'plan-4': PLAN_V4, 'plan-5': PLAN_V5, 'plan-6': PLAN_V6, 'plan-7': PLAN_V7, 'plan-8': PLAN_V8 };
 
 /**
  * The plan with single keys replaced (nested `tuning` merged). The key `base` names the plan to start from
- * ('plan-1' … 'plan-7'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
+ * ('plan-1' … 'plan-8'; default: plan-3, the plan the manager copies). Unknown keys are an error: a typo must not play silently.
  */
 export function planWith(over: Record<string, unknown> | undefined, from?: Plan): Plan {
   const name = over?.base;

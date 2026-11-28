@@ -18,6 +18,8 @@ test('preset unlocked-v4: the game adopts the item archive, within the account\'
     assert.equal(run.itemsOff.size, expected.length, 'the run took the archive');
     assert.equal(run.itemInPool(expected[0]), false);
     assert.equal(run.itemInPool('twisted-spoon'), true);
+    // No build plan: no favourites and no move switched off, as before unlocked-v5.
+    assert.deepEqual([run.favs, [...run.movesOff], profile.movesOff], [[], [], {}]);
     // The profile is the same after another reset: the archive is part of the preset, not of an episode.
     await env.reset({ seed: 2 });
     assert.deepEqual(env.debug.sim!.run.meta.profile.itemsOff, expected);

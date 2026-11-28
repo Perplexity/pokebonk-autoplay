@@ -17,6 +17,7 @@ import { DialogCapture, HANDLED_METHODS, HANDLER_WRITES, REFUSED_METHODS, resolv
 import type { BuildNames } from './dialogs.ts';
 import { resolveGameFns } from './gamefns.ts';
 import type { GameFns } from './gamefns.ts';
+import { BUILD_PLAN_NAMES, buildPlanOf } from '../agents/heuristic2/kit.ts';
 import { ARCHIVE_NAMES, archiveOf, kitOf, loadValuationKnowledge } from '../agents/heuristic2/values.ts';
 import { UNLOCKED_PRESET, playableMaps, readRegistries, unlockedProfile, verifyUnlocked } from './profile.ts';
 import type { Registries, UnlockCheck } from './profile.ts';
@@ -138,7 +139,7 @@ export function findHuntSpecies(loaded: string[]): number[] {
 /** `maxKoGapGameTime` in the sanctuary outside Overtime: this many times the allowance (see koGapTooLong). */
 const SANCTUARY_KO_GAP_FACTOR = 4;
 
-type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; koGapGraceGameTime: number; dataDir?: string; archive?: string; apiTarget?: string; encode: boolean };
+type Resolved = Required<Pick<GameEnvironmentOptions, 'hz' | 'actionRepeat' | 'invalidAction' | 'species' | 'map' | 'tier' | 'ranked' | 'profile' | 'verbose'>> & { maxGameTime: number; maxIdleGameTime: number; idleRadius: number; maxKoGapGameTime: number; koGapGraceGameTime: number; dataDir?: string; archive?: string; buildPlan?: string; apiTarget?: string; encode: boolean };
 
 export class HeadlessGameEnvironment implements GameEnvironment {
   readonly options: Resolved;
@@ -174,6 +175,8 @@ export class HeadlessGameEnvironment implements GameEnvironment {
   private droppedDialogs: string[] = [];
   /** Preset unlocked-v4: the items archived (empty for unlocked-v3 and for the archive version `empty`). */
   private archived: string[] = [];
+  /** Preset unlocked-v5: the build plan in the game's terms (null without one), and the species family it is stored under. */
+  private buildPlan: { family: number; moves: number[]; favs: number[]; movesOff: string[] } | null = null;
   private lastKo = { time: 0, kills: 0, overtime: false };
   private koGapAllowance = 0;
   /** Wall-clock cost of the last boot and reset, for measurements. */
@@ -183,12 +186,14 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     this.options = {
       hz: options.hz ?? 60, actionRepeat: options.actionRepeat ?? 3, invalidAction: options.invalidAction ?? 'throw',
       maxGameTime: options.maxGameTime ?? 0, maxIdleGameTime: options.maxIdleGameTime ?? 0, idleRadius: options.idleRadius ?? 3, maxKoGapGameTime: options.maxKoGapGameTime ?? 0, koGapGraceGameTime: options.koGapGraceGameTime ?? 0, species: options.species ?? 155, map: options.map ?? 'forest', tier: options.tier ?? 0,
-      ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', archive: options.archive, verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
+      ranked: options.ranked ?? true, profile: options.profile ?? 'unlocked', archive: options.archive, buildPlan: options.buildPlan, verbose: !!options.verbose, dataDir: options.dataDir, apiTarget: options.apiTarget,
       encode: !!options.encode,
     };
     if (!Number.isInteger(this.options.actionRepeat) || this.options.actionRepeat < 1) throw new Error('actionRepeat must be a positive integer');
     if (!(this.options.maxIdleGameTime >= 0) || !(this.options.idleRadius > 0)) throw new Error('maxIdleGameTime must be 0 (no rule) or a positive number of game seconds, and idleRadius a positive number of metres');
     if (this.options.archive != null && !ARCHIVE_NAMES.includes(this.options.archive)) throw new Error(`unknown archive "${this.options.archive}": use one of ${ARCHIVE_NAMES.join(', ')}`);
+    if (this.options.buildPlan != null && !BUILD_PLAN_NAMES.includes(this.options.buildPlan)) throw new Error(`unknown build plan "${this.options.buildPlan}": use one of ${BUILD_PLAN_NAMES.join(', ')}`);
+    if (this.options.buildPlan != null && this.options.profile !== 'unlocked') throw new Error('a build plan needs the unlocked profile (its favourites come with the Lab\'s Affinity)');
     if (!(this.options.maxKoGapGameTime >= 0)) throw new Error('maxKoGapGameTime must be 0 (no rule) or a positive number of game seconds');
     if (!(this.options.koGapGraceGameTime >= 0)) throw new Error('koGapGraceGameTime must be 0 (no grace) or a positive number of game seconds');
     if (this.options.invalidAction !== 'throw' && this.options.invalidAction !== 'penalty') throw new Error('invalidAction must be "throw" or "penalty"');
@@ -233,8 +238,15 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     if (!(season?.live && season?.ranked && Array.isArray(season?.maps) && season.maps.length)) throw new Error(`[environment] the game does not see a live ranked season: ${JSON.stringify(season)}`);
 
     if (this.options.profile === 'unlocked') {
+      // unlocked-v5: the same account with a build plan for the species: the moves switched off are part of the profile,
+      // the plan itself (with its favourites) is kept by the game in the browser's storage, under the account's id.
+      if (this.options.buildPlan != null) {
+        const family = Number(app.meta.family(this.options.species));
+        this.buildPlan = { family, ...buildPlanOf(this.options.buildPlan, this.options.species, loadValuationKnowledge(this.buildId())) };
+      }
+      const withPlan = (profile: Record<string, any>): Record<string, any> => (this.buildPlan ? { ...profile, movesOff: { ...(profile.movesOff ?? {}), [this.buildPlan.family]: [...this.buildPlan.movesOff] } } : profile);
       sim.api.unlockPreset = (p) => {
-        const profile = unlockedProfile(p, reg, (s) => app.meta.family(s));
+        const profile = withPlan(unlockedProfile(p, reg, (s) => app.meta.family(s)));
         if (this.options.archive == null) return profile;
         // unlocked-v4: the same account with an item archive. The game applies its slot limit only when an item is
         // toggled in the menu, not when a run starts, so the preset keeps to it itself.
@@ -247,6 +259,12 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       };
       await this.settle(app.meta.devUnlock(), 'meta.devUnlock()');
       if (this.options.archive != null && JSON.stringify(app.meta.profile.itemsOff) !== JSON.stringify(this.archived)) throw new Error('[environment] the game did not adopt the item archive of the preset');
+      if (this.buildPlan) {
+        const bp = this.buildPlan;
+        if (JSON.stringify(app.meta.profile.movesOff?.[bp.family]) !== JSON.stringify(bp.movesOff)) throw new Error('[environment] the game did not adopt the moves switched off by the build plan');
+        (globalThis as any).localStorage.setItem(`pokebonk.buildPlan.${app.meta.account?.id ?? 'local'}`, JSON.stringify({ [bp.family]: { moves: bp.moves, vits: [], fus: [], items: [], relics: [], favs: bp.favs, links: [] } }));
+        this.instrumentation.push(`build plan "${this.options.buildPlan}" of species family ${bp.family}: written where the game keeps build plans (localStorage "pokebonk.buildPlan.<account id>") and as profile.movesOff; every run is checked for the favourites and the moves off the game itself reports`);
+      }
       this.unlockCheck = verifyUnlocked(app.meta, reg, this.archived);
       if (!this.unlockCheck.ok) throw new Error(`[environment] the unlocked profile is not fully unlocked according to the game:\n  ${this.unlockCheck.problems.join('\n  ')}`);
     } else {
@@ -398,6 +416,11 @@ export class HeadlessGameEnvironment implements GameEnvironment {
     const got = { species: run.player?.speciesId, map: run.biome?.id, tier: run.tier, mode: run.mode, competitive: !!run.competitive, seed: run.seed >>> 0, state: run.state };
     const want = { species: cfg.species, map: cfg.biome, tier: cfg.tier, mode: 'standard', competitive: 'competitive' in cfg, seed, state: 'play' };
     if (JSON.stringify(got) !== JSON.stringify(want)) throw new UnknownSituationError('[environment] the run the game started is not the run that was asked for', { want, got });
+    if (this.buildPlan && cfg.species === this.options.species) {
+      // The game's own reading of the build plan for this run: its favourites (in the plan's order) and the moves off.
+      const favs = (run.favs ?? []).map((f: any) => Number(f.id)), off = [...(run.movesOff ?? [])];
+      if (JSON.stringify(favs) !== JSON.stringify(this.buildPlan.favs) || JSON.stringify(off) !== JSON.stringify(this.buildPlan.movesOff)) throw new UnknownSituationError('[environment] the run does not have the favourites and the moves off of the build plan', { want: this.buildPlan, got: { favs, off } });
+    }
 
     // Loading consumed a number of random draws that depends on what this process had cached; play starts from a
     // defined point of the stream instead.
@@ -792,7 +815,7 @@ export class HeadlessGameEnvironment implements GameEnvironment {
       instrumentation: [...sim.instrumentation, ...this.instrumentation],
       shimHash: sh.digest('hex'),
       shims: [...shims.map((f) => `src/sim/${f}`), dom],
-      profile: { preset: this.options.profile === 'unlocked' ? (this.options.archive != null ? `unlocked-v4:${this.options.archive}` : UNLOCKED_PRESET) : this.options.profile, registered: !sim.session?.guest, summary: this.unlockCheck?.summary ?? { note: 'starter-only fresh account' } },
+      profile: { preset: this.options.profile === 'unlocked' ? (this.options.buildPlan != null ? `unlocked-v5:${this.options.archive ?? 'none'}:${this.options.buildPlan}` : this.options.archive != null ? `unlocked-v4:${this.options.archive}` : UNLOCKED_PRESET) : this.options.profile, registered: !sim.session?.guest, summary: this.unlockCheck?.summary ?? { note: 'starter-only fresh account' } },
       mode: { ranked: this.episode.ranked, season: JSON.parse(JSON.stringify(sim.api.season)) },
       offline: {
         guardInstalled: true, primitives: [...sim.guard.primitives],

@@ -77,7 +77,15 @@ export const DIRECTION_V2: Direction = {
 
 export const DIRECTIONS: Record<string, Direction> = { [DIRECTION_V1.version]: DIRECTION_V1, [DIRECTION_V2.version]: DIRECTION_V2 };
 
-export interface Knowledge { items: Map<string, ItemInfo>; vitamins: Map<string, VitaminInfo>; moves: Map<string, MoveInfo>; movesById: Map<number, MoveInfo>; kitOf(species: number): string[] }
+export interface Knowledge {
+  items: Map<string, ItemInfo>; vitamins: Map<string, VitaminInfo>; moves: Map<string, MoveInfo>; movesById: Map<number, MoveInfo>; kitOf(species: number): string[];
+  /**
+   * The moves a free slot of the species can be offered besides its kit: of its own line, and of other League members;
+   * and the level of the Pokémon from which each can be offered (the game's own rule: a move of the line learnt at
+   * level n from level (n − 10) / 2.6, a move of another member from the level its slot in that member's kit opens).
+   */
+  learnable(species: number): { line: string[]; shared: string[]; from: Record<string, number> };
+}
 
 /** The knowledge export of a game build, as the valuation needs it. */
 export function loadValuationKnowledge(build: string, dir = knowledgeDir(build)): Knowledge {
@@ -89,7 +97,14 @@ export function loadValuationKnowledge(build: string, dir = knowledgeDir(build))
   const movesById = new Map<number, MoveInfo>([...moves.values()].map((m) => [m.id, m]));
   const species: any[] = Array.isArray(sp.species) ? sp.species : Object.values(sp.species);
   const kits = new Map<number, string[]>(species.map((s) => [s.id, (s.kit ?? []).map((k: any) => (typeof k === 'string' ? k : k.move))]));
-  return { items, vitamins, moves, movesById, kitOf: (id) => kits.get(id) ?? [] };
+  const keys = (list: any): string[] => (Array.isArray(list) ? list : []).map((x: any) => String(x.move));
+  const pools = new Map<number, { line: string[]; shared: string[]; from: Record<string, number> }>(species.map((s) => {
+    const m = s.moves?.[String(s.id)] ?? {}, from: Record<string, number> = {};
+    for (const x of Array.isArray(m.line) ? m.line : []) from[String(x.move)] = Math.max(1, Math.ceil((Number(x.level) - 10) / 2.6));
+    for (const x of Array.isArray(m.shared) ? m.shared : []) from[String(x.move)] = Math.max(1, Number(x.level) || 1);
+    return [s.id, { line: keys(m.line), shared: keys(m.shared), from }];
+  }));
+  return { items, vitamins, moves, movesById, kitOf: (id) => kits.get(id) ?? [], learnable: (id) => pools.get(id) ?? { line: [], shared: [], from: {} } };
 }
 
 /** The kit's damage classes and types, from the moves the Pokémon's own kit has. */
