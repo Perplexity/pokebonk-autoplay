@@ -300,8 +300,10 @@ export const PLAN_V8: Plan = {
 };
 
 /**
- * plan-9 (NOT the default; NOT measured yet): plan-8, and a cleared zone is left on the HP bar or a spent revive only
- * once its final swarm has begun (`leaveInSwarm`).
+ * plan-9 (NOT the default): plan-8, and a cleared zone is left on the HP bar or a spent revive only once its final
+ * swarm has begun (`leaveInSwarm`). Measured (docs/phase-3-report.md, part 8): on the 100 check seeds, played once,
+ * 90 runs are plan-8's own, 10 are higher and none lower; median 13.88 million against 13.80, mean 13.53 against
+ * 12.89, p90 14.56 against 14.47, best 15.04 for both. Seeds 1-30: median 14.07 against 13.85, mean 13.63 against 11.88.
  */
 export const PLAN_V9: Plan = { ...PLAN_V8, version: 'plan-9', leaveInSwarm: true };
 

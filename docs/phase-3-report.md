@@ -915,3 +915,96 @@ and nothing switched off (test/env/preset.test.ts).
   (the change is made at zone 3's Hypno) and enter Overtime with a max HP under 600.
 - Every plan-8 run under 10 million but one (seed 13) is one of these. **Not fixed in this part** (plan-8 is the
   kit and nothing else); it is the next change.
+
+---
+
+# Part 8: a cleared zone is left only in its final swarm (plan-9)
+
+2026-11-28. No training, no cheat. The fault of part 7, fixed and nothing else.
+
+**In one paragraph.** plan-9 is plan-8 with one rule changed: the HP bar and a spent Max Revive make the run leave a
+cleared zone only once the zone's final swarm has begun. On the 100 check seeds, played once, 90 runs are the same
+runs as plan-8's, the other 10 are all higher (by 2.0 to 12.3 million), and none is lower: median 13.88 million
+ranked KOs for 13.80, mean 13.53 for 12.89, best 15.04 for both. No zone of 2 or 3 is left before its second 600 any
+more (plan-8: 10 runs). The top does not move: the runs that already had the whole kit are untouched, and the
+ceiling of part 7 (round 16 of Overtime) stands. The leaderboard's best runs are at 30 to 32 million.
+
+"Ranked KOs" is what earlier parts called the score: the run's own KOs plus the Overtime bonus when it is cashed,
+which is the KO figure of the leaderboard.
+
+## What changed
+
+- Plans 1 to 8 count `leaveHp` (40 % of the bar) and `reviveLeaves` from the moment the guardian falls. From zone 2
+  on the guardian is woken on arrival and falls in a minute or two, so a bar it had emptied itself opened the portal
+  that second (part 7, the fault).
+- plan-9 (`leaveInSwarm`): both count only while the zone's final swarm is on, and a revive only if it was spent
+  after the swarm began. Before the swarm a cleared zone is played as any zone is; the brain refills the bar. The
+  clock (`leaveBySec`), the heaviest hit and the horde's threat leave a zone as before.
+- One field of the plan, one condition in `directiveFor2` and the run time the swarm was first seen
+  (`Lifecycle2.swarmAt`). Plans 1 to 8 have the field off (test/agents/heuristic2.test.ts).
+
+## Measured
+
+**Seeds 1–30** (plan-9 batch 96, by this part's code; plan-8 batch 89):
+
+| | Median | Mean | p90 | Best | Worst | ≥ 5 M | ≥ 10 M | ≥ 13 M | Level | Minutes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| plan-8 (batch 89) | 13,854,144 | 11,875,904 | 14,414,348 | 14,539,765 | 1,948,273 | 28 | 23 | 21 | 2,558 | 60.5 |
+| **plan-9** (batch 96) | **14,067,070** | 13,632,461 | 14,510,817 | 14,792,507 | 3,363,340 | 29 | 29 | 27 | 2,638 | 60.7 |
+
+- 21 of 30 runs are identical to plan-8's; the other 9 are all higher (by 0.6 to 12.7 million). Seed by seed ×1.22
+  (95 %: 1.07 to 1.44).
+- 29 of 30 runs end with the whole kit (plan-8: 22). No zone of 2 or 3 is left before its second 600 (plan-8: 9
+  zones in 8 runs before their second 300).
+- The one run under 10 million is seed 13, as under plan-8: it faints in Overtime's round 19 with 10.9 million of
+  bonus.
+
+**The check set, once** (seeds 3000001–3000100; plan-9 batch 98, plan-8 batches 92 and 95 of part 7):
+
+| | Median | Mean | p90 | Best | Worst | ≥ 5 M | ≥ 10 M | ≥ 13 M | ≥ 14 M | Level | Minutes |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| plan-8 (batches 92 + 95) | 13,803,730 | 12,888,057 | 14,467,683 | 15,039,733 | 987,992 | 97 | 88 | 82 | 37 | 2,521 | 60.4 |
+| **plan-9** (batch 98) | **13,884,013** | 13,525,227 | 14,560,342 | 15,039,733 | 987,992 | 98 | 96 | 92 | 41 | 2,558 | 60.7 |
+
+- 90 of 100 runs are identical to plan-8's, 10 are higher, none is lower. Seed by seed ×1.08 (95 %: 1.03 to 1.14);
+  the mean is higher by 637,169.
+- The 10 are the 10 runs that left zone 2 or 3 before its second 300 under plan-8 (median then 7.4 million; now
+  13.4 to 14.9). One of them, seed 3000048, had fainted in Overtime with 4.4 million of bonus and now cashes 13.9.
+- 94 of 100 runs end with the whole kit (plan-8: 85); 89 change their vitamins (82). A zone of 1 to 3 still ends
+  before its second 900 in 21 runs (29): those leave in the final swarm, by the rules that were not changed, and
+  their median is 13.4 million against 14.0 for the other 79.
+- Two runs bring no bonus, the same two as under plan-8: seeds 3000004 and 3000018 faint in zone 2 (1.09 and 0.99
+  million). The rule does not reach them; **why they faint was not traced**.
+- Overtime: 94 runs are at 90,000 KOs or more in round 16 (plan-8: 84), 1 in round 17 (1). The ceiling is where it
+  was.
+- **Which code played what.** Batch 96 was played by this part's code. The check set (batch 98) was played by the
+  code of the cleanup that follows this part (`chore/cleanup-rule-player` at 125cd0f: the same player moved to
+  `src/player`, plan-9 its only plan). That code replays plan-9 on seeds 1–30 identically to batch 96, 30 of 30,
+  every episode and every decision row (batch 97). This part's own code did not play the check set.
+- plan-8 was not played again by this part's code. Its 100 check runs are part 7's.
+- All 160 runs of plan-9 (batches 96, 97 and 98) ended by the game's own rules, none by the runner's limit (90
+  minutes of wall time an episode for these batches); no run asked for the network.
+
+## What it means
+
+- The fault of part 7 cost plan-8 about 0.64 million of mean on the check set and nothing at the median or the top.
+  It is fixed.
+- A run with the whole kit and the final vitamins lands between 13 and 15 million whatever the seed. The
+  leaderboard's best are at 30 to 32 million, and the build that gets there differs from ours before Overtime
+  begins: level 6,293 for about 2,600, three legendary relics for none, 308 items for about 200. Nothing in plan-9
+  moves that.
+
+## Limitations and unresolved questions
+
+- The check set has now been played once for plan-8 and once for plan-9, and nothing was chosen on it. `leaveInSwarm`
+  has no number to tune; it was written from the trace of seed 28 and seeds 1–30.
+- Two zone-2 faints in 100 runs, and seed 13's faint in round 19, are not explained.
+- The 21 runs that still leave a zone in its final swarm before second 900 score 0.6 million less at the median.
+  Whether staying longer would pay was not measured.
+
+## Recommended next stage
+
+1. Rifts: the player never opens one (rules written and waiting on their batch: an Incense is burnt as soon as it
+   is held, and relics are taken by rarity).
+2. Every altar, and items chosen for what Overtime asks.
+3. Longer stays in each zone's final swarm, where the levels are made.
